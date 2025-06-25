@@ -171,29 +171,49 @@ async function generateFallbackContent(
   if (process.env.OPENROUTER_API_KEY) {
     let structuredContent = ''
     let fallbackAttempts = 0
-    const maxFallbackAttempts = 2
+    const maxFallbackAttempts = 3 // Increased from 2 to 3
 
     while (fallbackAttempts < maxFallbackAttempts) {
       try {
         console.log(`Fallback attempt ${fallbackAttempts + 1}/${maxFallbackAttempts}`)
         
+        // Extract technology name for better prompting
+        let techName = input.split(" ").slice(0, 5).join(" ")
+        try {
+          // Try to extract from parsedTech if available
+          if (parsedTech && typeof parsedTech === 'string') {
+            const parsed = JSON.parse(parsedTech.replace(/^```[a-zA-Z0-9]*\n?/, '').replace(/```$/, '').trim())
+            if (parsed && parsed.technology) {
+              techName = parsed.technology
+            }
+          }
+        } catch (e) {
+          console.log("Could not extract technology name from parsedTech, using input")
+        }
+        
+        // Use different models for different attempts
+        const fallbackModel = fallbackAttempts === 0 ? "openai/gpt-4" : 
+                             fallbackAttempts === 1 ? "anthropic/claude-3-opus" : "openai/gpt-4-turbo"
+        
+        console.log(`Using fallback model: ${fallbackModel}`)
+        
         const result = await generateTextWithTimeout({
-          model: "openai/gpt-4",
+          model: fallbackModel,
           prompt: `Generate a complete professional services JSON structure for: "${input}"
 
-CRITICAL: You must return a COMPLETE, VALID JSON object. Do not stop mid-response.
+CRITICAL: You must create SPECIFIC content for ${techName}, not generic content.
 
 Required structure:
 {
-  "technology": "Technology name",
+  "technology": "${techName}",
   "questions": [
     {
       "id": "q1",
       "slug": "question-slug",
-      "question": "Question text?",
+      "question": "Question text specific to ${techName}?",
       "options": [
-        {"key": "Option 1", "value": 1, "default": true},
-        {"key": "Option 2", "value": 2}
+        {"key": "Option 1 specific to ${techName}", "value": 1, "default": true},
+        {"key": "Option 2 specific to ${techName}", "value": 2}
       ]
     }
   ],
@@ -201,7 +221,7 @@ Required structure:
     {
       "id": "calc1",
       "slug": "calculation-slug",
-      "name": "Calculation name",
+      "name": "Calculation name relevant to ${techName}",
       "description": "Calculation description",
       "formula": "question1 + question2",
       "mappedQuestions": ["question-slug1", "question-slug2"],
@@ -211,17 +231,17 @@ Required structure:
   "services": [
     {
       "phase": "Planning",
-      "service": "Service name",
-      "description": "Service description",
+      "service": "Service name specific to ${techName}",
+      "description": "Service description with specific ${techName} terminology",
       "hours": 10,
-      "serviceDescription": "What this service includes",
-      "keyAssumptions": "Critical assumptions",
+      "serviceDescription": "What this service includes for ${techName}",
+      "keyAssumptions": "Critical assumptions for ${techName}",
       "clientResponsibilities": "What client must provide",
       "outOfScope": "What is not included",
       "subservices": [
         {
-          "name": "Subservice 1",
-          "description": "Subservice description",
+          "name": "Subservice 1 specific to ${techName}",
+          "description": "Subservice description with ${techName} specifics",
           "hours": 4,
           "mappedQuestions": ["question-slug"],
           "calculationSlug": "calculation-slug",
@@ -235,18 +255,19 @@ Required structure:
   ],
   "totalHours": 100,
   "sources": [
-    {"url": "https://example.com", "title": "Source title", "relevance": "Source relevance"}
+    {"url": "https://example.com", "title": "Source title specific to ${techName}", "relevance": "Source relevance to ${techName}"}
   ]
 }
 
 REQUIREMENTS:
-- MINIMUM 10 services
-- Each service has exactly 3 subservices
-- All fields must be present
+- MINIMUM 10 services with names SPECIFIC to ${techName}
+- Each service must have exactly 3 subservices with names SPECIFIC to ${techName}
+- Include specific ${techName} terminology, tools, and methodologies
+- All fields must be present and technology-specific
 - Return ONLY valid JSON starting with { and ending with }
 - No markdown, no explanations, no comments
 - Complete the entire JSON structure`,
-        }, 60000, "Fallback Content Generation")
+        }, 90000, "Fallback Content Generation") // Increased timeout from 60000 to 90000
         
         structuredContent = result.text
 
@@ -1931,59 +1952,83 @@ function validateContentStructure(content: any): boolean {
 function generateUltimateFallbackContent(input: string): any {
   console.log("Generating ultimate fallback content for:", input)
   
-  // Extract a simple technology name from the input
-  const technology = input.split(/\s+/).slice(0, 3).join(" ")
+  // Extract a more comprehensive technology name from the input
+  const technology = input.split(/\s+/).slice(0, 5).join(" ")
   
-  // Create a more comprehensive set of questions
+  // Try to extract industry and scale information
+  let industry = "Enterprise"
+  let scale = "Medium"
+  
+  if (input.toLowerCase().includes("hospital") || input.toLowerCase().includes("healthcare")) {
+    industry = "Healthcare"
+  } else if (input.toLowerCase().includes("bank") || input.toLowerCase().includes("financial")) {
+    industry = "Financial Services"
+  } else if (input.toLowerCase().includes("retail") || input.toLowerCase().includes("ecommerce")) {
+    industry = "Retail"
+  } else if (input.toLowerCase().includes("manufacturing")) {
+    industry = "Manufacturing"
+  } else if (input.toLowerCase().includes("government")) {
+    industry = "Government"
+  }
+  
+  if (input.toLowerCase().includes("1000") || input.toLowerCase().includes("enterprise")) {
+    scale = "Enterprise"
+  } else if (input.toLowerCase().includes("500") || input.toLowerCase().includes("mid")) {
+    scale = "Mid-size"
+  } else if (input.toLowerCase().includes("100") || input.toLowerCase().includes("small")) {
+    scale = "Small"
+  }
+  
+  // Create technology-specific questions
   const questions = [
     {
       id: "q1",
       slug: "implementation-scope",
       question: `What is the scope of ${technology} implementation?`,
       options: [
-        { key: "Basic implementation", value: 1, default: true },
-        { key: "Standard implementation", value: 2 },
-        { key: "Comprehensive implementation", value: 3 }
+        { key: `Basic ${technology} implementation`, value: 1, default: true },
+        { key: `Standard ${technology} implementation`, value: 2 },
+        { key: `Comprehensive ${technology} implementation`, value: 3 }
       ]
     },
     {
       id: "q2",
       slug: "organization-size",
-      question: "What is the size of your organization?",
+      question: `What is the size of your organization for ${technology}?`,
       options: [
-        { key: "Small (1-100 employees)", value: 1 },
-        { key: "Medium (101-1000 employees)", value: 2, default: true },
-        { key: "Large (1000+ employees)", value: 3 }
+        { key: `Small organization (1-100 users)`, value: 1 },
+        { key: `Medium organization (101-1000 users)`, value: 2, default: true },
+        { key: `Large organization (1000+ users)`, value: 3 }
       ]
     },
     {
       id: "q3",
       slug: "timeline-requirements",
-      question: "What is your implementation timeline?",
+      question: `What is your ${technology} implementation timeline?`,
       options: [
-        { key: "Standard (3-6 months)", value: 1, default: true },
-        { key: "Accelerated (1-3 months)", value: 2 },
-        { key: "Extended (6-12 months)", value: 3 }
+        { key: `Standard (3-6 months)`, value: 1, default: true },
+        { key: `Accelerated (1-3 months)`, value: 2 },
+        { key: `Extended (6-12 months)`, value: 3 }
       ]
     },
     {
       id: "q4",
       slug: "compliance-requirements",
-      question: "What compliance requirements apply?",
+      question: `What compliance requirements apply to your ${technology} implementation?`,
       options: [
-        { key: "Standard compliance", value: 1, default: true },
-        { key: "Industry-specific compliance", value: 2 },
-        { key: "Strict regulatory compliance", value: 3 }
+        { key: `Standard compliance`, value: 1, default: true },
+        { key: `${industry}-specific compliance`, value: 2 },
+        { key: `Strict regulatory compliance`, value: 3 }
       ]
     },
     {
       id: "q5",
       slug: "integration-complexity",
-      question: "What is the integration complexity?",
+      question: `What is the integration complexity for ${technology}?`,
       options: [
-        { key: "Minimal integration", value: 1, default: true },
-        { key: "Standard integration", value: 2 },
-        { key: "Complex integration", value: 3 }
+        { key: `Minimal integration with existing systems`, value: 1, default: true },
+        { key: `Standard integration with core systems`, value: 2 },
+        { key: `Complex integration with multiple systems`, value: 3 }
       ]
     }
   ]
@@ -1993,8 +2038,8 @@ function generateUltimateFallbackContent(input: string): any {
     {
       id: "calc1",
       slug: "scope-multiplier",
-      name: "Scope Multiplier",
-      description: "Adjusts hours based on implementation scope",
+      name: `${technology} Scope Multiplier`,
+      description: `Adjusts hours based on ${technology} implementation scope`,
       formula: "implementation_scope",
       mappedQuestions: ["implementation-scope"],
       resultType: "multiplier"
@@ -2003,7 +2048,7 @@ function generateUltimateFallbackContent(input: string): any {
       id: "calc2",
       slug: "size-factor",
       name: "Organization Size Factor",
-      description: "Adjusts hours based on organization size",
+      description: `Adjusts hours based on organization size for ${technology}`,
       formula: "organization_size",
       mappedQuestions: ["organization-size"],
       resultType: "multiplier"
@@ -2011,14 +2056,18 @@ function generateUltimateFallbackContent(input: string): any {
     {
       id: "calc3",
       slug: "complexity-factor",
-      name: "Integration Complexity Factor",
-      description: "Adjusts hours based on integration complexity",
+      name: `${technology} Integration Complexity Factor`,
+      description: `Adjusts hours based on ${technology} integration complexity`,
       formula: "integration_complexity",
       mappedQuestions: ["integration-complexity"],
       resultType: "multiplier"
     }
   ]
 
+  // Create more technology-specific service names
+  let techTerms = technology.split(" ")
+  const techTerm = techTerms[0] // First term (e.g., "Microsoft" from "Microsoft Email Migration")
+  
   // Create a more comprehensive set of services with proper structure
   const phases = ["Planning", "Design", "Implementation", "Testing", "Go-Live", "Support"]
   const services = phases.flatMap((phase, phaseIndex) => {
@@ -2027,48 +2076,103 @@ function generateUltimateFallbackContent(input: string): any {
       const serviceNumber = phaseIndex * 2 + serviceIndex
       const baseHours = 40
       
+      // Generate more specific service names based on the phase and technology
+      let serviceName = ""
+      let serviceDesc = ""
+      
+      switch(phase) {
+        case "Planning":
+          serviceName = serviceIndex === 1 ? 
+            `${technology} Assessment & Discovery` : 
+            `${technology} Requirements & Architecture Planning`
+          serviceDesc = serviceIndex === 1 ?
+            `Comprehensive assessment of current environment and ${technology} implementation requirements` :
+            `Detailed requirements gathering and architecture planning for ${technology} implementation`
+          break
+        case "Design":
+          serviceName = serviceIndex === 1 ? 
+            `${technology} Solution Design` : 
+            `${technology} Integration Design`
+          serviceDesc = serviceIndex === 1 ?
+            `Technical design of ${technology} solution architecture` :
+            `Design of integrations between ${technology} and existing systems`
+          break
+        case "Implementation":
+          serviceName = serviceIndex === 1 ? 
+            `${technology} Core Implementation` : 
+            `${technology} Configuration & Customization`
+          serviceDesc = serviceIndex === 1 ?
+            `Implementation of core ${technology} components and services` :
+            `Configuration and customization of ${technology} for specific business requirements`
+          break
+        case "Testing":
+          serviceName = serviceIndex === 1 ? 
+            `${technology} Functional Testing` : 
+            `${technology} Integration & Performance Testing`
+          serviceDesc = serviceIndex === 1 ?
+            `Comprehensive testing of ${technology} functionality` :
+            `Testing of ${technology} integrations and performance under load`
+          break
+        case "Go-Live":
+          serviceName = serviceIndex === 1 ? 
+            `${technology} Deployment & Cutover` : 
+            `${technology} User Training & Adoption`
+          serviceDesc = serviceIndex === 1 ?
+            `Production deployment and cutover to ${technology}` :
+            `End-user training and adoption support for ${technology}`
+          break
+        case "Support":
+          serviceName = serviceIndex === 1 ? 
+            `${technology} Post-Implementation Support` : 
+            `${technology} Optimization & Knowledge Transfer`
+          serviceDesc = serviceIndex === 1 ?
+            `Post-implementation support and issue resolution for ${technology}` :
+            `Optimization of ${technology} and knowledge transfer to internal teams`
+          break
+      }
+      
       return {
         phase,
-        service: `${phase} Service ${serviceIndex}`,
-        description: `Standard ${phase.toLowerCase()} service for ${technology}`,
+        service: serviceName,
+        description: serviceDesc,
         hours: baseHours,
-        serviceDescription: `Complete ${phase.toLowerCase()} service for ${technology} implementation`,
-        keyAssumptions: "Standard implementation assumptions apply",
-        clientResponsibilities: "Client will provide necessary access and resources",
-        outOfScope: "Custom development and third-party integrations",
+        serviceDescription: `Complete ${phase.toLowerCase()} service for ${technology} implementation in ${scale} ${industry} environment`,
+        keyAssumptions: `Standard ${technology} implementation assumptions for ${industry} sector`,
+        clientResponsibilities: `Client will provide necessary access and resources for ${technology} implementation`,
+        outOfScope: `Custom development beyond standard ${technology} implementation and third-party integrations`,
         subservices: [
           {
-            name: `${phase} Planning`,
-            description: `Planning component of ${phase.toLowerCase()} service`,
+            name: `${phase} Assessment for ${technology}`,
+            description: `Assessment component of ${phase.toLowerCase()} for ${technology} implementation`,
             hours: Math.floor(baseHours / 3),
             mappedQuestions: ["implementation-scope"],
             calculationSlug: "scope-multiplier",
-            serviceDescription: "Standard implementation planning",
-            keyAssumptions: "Standard implementation assumptions",
-            clientResponsibilities: "Client will provide necessary resources",
-            outOfScope: "Custom development"
+            serviceDescription: `Assessment of ${technology} ${phase.toLowerCase()} requirements`,
+            keyAssumptions: `Standard ${technology} implementation assumptions`,
+            clientResponsibilities: `Client will provide necessary resources for ${technology} assessment`,
+            outOfScope: `Custom development beyond standard ${technology} assessment`
           },
           {
-            name: `${phase} Execution`,
-            description: `Execution component of ${phase.toLowerCase()} service`,
+            name: `${phase} Execution for ${technology}`,
+            description: `Execution component of ${phase.toLowerCase()} for ${technology} implementation`,
             hours: Math.floor(baseHours / 3),
             mappedQuestions: ["organization-size"],
             calculationSlug: "size-factor",
-            serviceDescription: "Standard implementation execution",
-            keyAssumptions: "Standard implementation assumptions",
-            clientResponsibilities: "Client will provide necessary resources",
-            outOfScope: "Custom development"
+            serviceDescription: `Execution of ${technology} ${phase.toLowerCase()} activities`,
+            keyAssumptions: `Standard ${technology} implementation assumptions`,
+            clientResponsibilities: `Client will provide necessary resources for ${technology} execution`,
+            outOfScope: `Custom development beyond standard ${technology} execution`
           },
           {
-            name: `${phase} Review`,
-            description: `Review component of ${phase.toLowerCase()} service`,
+            name: `${phase} Review for ${technology}`,
+            description: `Review component of ${phase.toLowerCase()} for ${technology} implementation`,
             hours: Math.floor(baseHours / 3),
             mappedQuestions: ["integration-complexity"],
             calculationSlug: "complexity-factor",
-            serviceDescription: "Standard implementation review",
-            keyAssumptions: "Standard implementation assumptions",
-            clientResponsibilities: "Client will provide necessary resources",
-            outOfScope: "Custom development"
+            serviceDescription: `Review of ${technology} ${phase.toLowerCase()} deliverables`,
+            keyAssumptions: `Standard ${technology} implementation assumptions`,
+            clientResponsibilities: `Client will provide necessary resources for ${technology} review`,
+            outOfScope: `Custom development beyond standard ${technology} review`
           }
         ]
       }
@@ -2078,22 +2182,22 @@ function generateUltimateFallbackContent(input: string): any {
   // Calculate total hours
   const totalHours = services.reduce((total, service) => total + service.hours, 0)
 
-  // Create a comprehensive set of sources
+  // Create technology-specific sources
   const sources = [
     {
-      url: "https://docs.microsoft.com",
+      url: `https://docs.microsoft.com`,
       title: `${technology} Documentation`,
-      relevance: "Official documentation and implementation guides"
+      relevance: `Official documentation and implementation guides for ${technology}`
     },
     {
-      url: "https://www.gartner.com",
-      title: "Gartner Research",
-      relevance: "Industry analysis and implementation benchmarks"
+      url: `https://www.gartner.com`,
+      title: `Gartner ${industry} Technology Research`,
+      relevance: `Industry analysis and implementation benchmarks for ${technology} in ${industry}`
     },
     {
-      url: "https://www.forrester.com",
-      title: "Forrester Research",
-      relevance: "Best practices and implementation methodologies"
+      url: `https://www.forrester.com`,
+      title: `Forrester ${technology} Research`,
+      relevance: `Best practices and implementation methodologies for ${technology}`
     }
   ]
 
@@ -2435,16 +2539,17 @@ Analysis: ${JSON.stringify(analysisData)}
 Original Request: ${input}
 
 Generate structured content with:
-- At least 5 questions with options
-- At least 5 services across all phases (Planning, Design, Implementation, Testing, Go-Live, Support)
+- At least 5 questions with options that are SPECIFIC to ${parsedData.technology || input}
+- At least 10 services across all phases (Planning, Design, Implementation, Testing, Go-Live, Support)
 - Each service must have exactly 3 subservices
-- All content must be specific to ${parsedData.technology || input}
+- All content must be specific to ${parsedData.technology || input} - DO NOT use generic service names
 - Hours based on research findings and industry standards
+- Include specific technology terms, tools, and methodologies in service names and descriptions
 
 IMPORTANT: Return ONLY valid JSON. Start with { and end with }. Do not include any markdown code blocks or explanations.
 Your response MUST be a valid JSON object with the following structure:
 {
-  "technology": "Technology name",
+  "technology": "${parsedData.technology || input}",
   "questions": [...],
   "calculations": [...],
   "services": [...],
@@ -2459,26 +2564,48 @@ Do NOT nest the response inside fields like "email_migration_research" or "resea
           
           try {
             console.log("Attempting to generate content with model:", models?.content || "anthropic/claude-3.5-sonnet")
-            const contentResponse = await callOpenRouter({
-              model: models?.content || "anthropic/claude-3.5-sonnet",
-              prompt: contentPrompt,
-            })
-            
+            // Try up to 3 times with the primary model before falling back
             try {
-              contentObj = await parseAIResponse(contentResponse)
+              contentObj = await generateWithRetry(
+                contentPrompt,
+                models?.content || "anthropic/claude-3.5-sonnet",
+                3 // Increase max attempts to 3
+              )
               
               // Check if we got a valid structure or need to normalize a nested structure
               if (contentObj.email_migration_research || contentObj.research_findings || 
                   contentObj.project_scope || contentObj.assessment_questions) {
-                console.log("Detected assessment_questions structure, normalizing...");
+                console.log("Detected nested structure, normalizing...");
                 contentObj = normalizeNestedStructure(contentObj);
               }
               
               console.log("✅ Content generation successful!")
-            } catch (parseError) {
-              const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
-              console.error(`❌ Content parsing failed: ${errorMessage}`)
-              shouldUseFallback = true
+            } catch (primaryModelError) {
+              const errorMessage = primaryModelError instanceof Error ? primaryModelError.message : String(primaryModelError)
+              console.error(`❌ Primary model content generation failed: ${errorMessage}`)
+              
+              // Try a different model as backup before using fallback content
+              console.log("Attempting with backup model: openai/gpt-4...")
+              try {
+                const backupResponse = await callOpenRouter({
+                  model: "openai/gpt-4",
+                  prompt: contentPrompt,
+                })
+                
+                contentObj = await parseAIResponse(backupResponse)
+                
+                if (contentObj.email_migration_research || contentObj.research_findings || 
+                    contentObj.project_scope || contentObj.assessment_questions) {
+                  console.log("Detected nested structure in backup response, normalizing...");
+                  contentObj = normalizeNestedStructure(contentObj);
+                }
+                
+                console.log("✅ Backup model content generation successful!")
+              } catch (backupError) {
+                const backupErrorMessage = backupError instanceof Error ? backupError.message : String(backupError)
+                console.error(`❌ Backup model content generation failed: ${backupErrorMessage}`)
+                shouldUseFallback = true
+              }
             }
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error)
