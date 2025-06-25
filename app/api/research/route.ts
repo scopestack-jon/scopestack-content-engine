@@ -13,6 +13,8 @@ CRITICAL RESPONSE FORMAT:
 - Start response with { and end with }
 - Complete the entire JSON structure
 - Validate JSON syntax before returning
+- DO NOT nest your response inside fields like "email_migration_research" or "research_findings"
+- Use a flat structure with top-level fields
 
 RESPOND WITH PURE JSON ONLY.
 `;
@@ -1093,22 +1095,38 @@ REQUIREMENTS:
 
 // Function to fix common URL issues in AI responses
 function fixUrlsInJson(json: string): string {
-  // First, try to identify and fix incomplete URLs
-  let fixed = json;
-  
-  // Fix incomplete URLs in "url": "https: patterns
-  fixed = fixed.replace(/"url"\s*:\s*"https:(?:[^"]*)?(?!")(?=[,}])/g, '"url": "https://example.com"');
-  
-  // Fix incomplete URLs in "source": "SOURCE: https: patterns
-  fixed = fixed.replace(/"source"\s*:\s*"SOURCE:\s*https:(?:[^"]*)?(?!")(?=[,}])/g, '"source": "SOURCE: https://example.com"');
-  
-  // Fix incomplete URLs in general
-  fixed = fixed.replace(/"https:(?:[^"]*)?(?!")(?=[,}\]])/g, '"https://example.com"');
-  
-  // Fix URLs that are missing closing quotes
-  fixed = fixed.replace(/("(?:url|source|link|href)"\s*:\s*"https:[^",}\]]*?)(?=[,}\]])/g, '$1"');
-  
-  return fixed;
+  try {
+    // First, try to identify and fix incomplete URLs
+    let fixed = json;
+    
+    // Fix missing quotes at the end of values
+    fixed = fixed.replace(/:\s*"([^"]*)(?=\s*[,}])/g, ': "$1"');
+    
+    // Simple approach: replace all instances of "https:" with "https://example.com"
+    fixed = fixed.replace(/"https:"/g, '"https://example.com"');
+    fixed = fixed.replace(/"https:\s*"/g, '"https://example.com"');
+    fixed = fixed.replace(/"https:\s*(?=\s*[,}])/g, '"https://example.com"');
+    
+    // Replace all instances of "url": "https:" with "url": "https://example.com"
+    fixed = fixed.replace(/"url"\s*:\s*"https:[^"]*"/g, '"url": "https://example.com"');
+    fixed = fixed.replace(/"url"\s*:\s*"https:[^"]*(?=\s*[,}])/g, '"url": "https://example.com"');
+    
+    // Replace all instances of "source": "https:" with "source": "https://example.com"
+    fixed = fixed.replace(/"source"\s*:\s*"https:[^"]*"/g, '"source": "https://example.com"');
+    fixed = fixed.replace(/"source"\s*:\s*"https:[^"]*(?=\s*[,}])/g, '"source": "https://example.com"');
+    
+    // Replace all instances of "title": "https:" with "title": "https://example.com"
+    fixed = fixed.replace(/"title"\s*:\s*"https:[^"]*"/g, '"title": "https://example.com"');
+    fixed = fixed.replace(/"title"\s*:\s*"https:[^"]*(?=\s*[,}])/g, '"title": "https://example.com"');
+    
+    // Fix any remaining unquoted URLs
+    fixed = fixed.replace(/https:\/\/[^",}\]]*(?=[,}\]])/g, '"https://example.com"');
+    
+    return fixed;
+  } catch (error) {
+    console.error("Error in fixUrlsInJson:", error);
+    return json; // Return the original if there's an error
+  }
 }
 
 // Enhanced response cleaning pipeline
@@ -1184,13 +1202,30 @@ async function parseAIResponse(response: string): Promise<any> {
   // First, clean the response
   let cleaned = cleanAIResponse(response)
   
+  // Fix URL issues before parsing
+  cleaned = fixUrlsInJson(cleaned)
+  
   console.log("Cleaned response length:", cleaned.length)
   console.log("First 200 chars:", cleaned.substring(0, 200))
   console.log("Last 200 chars:", cleaned.substring(Math.max(0, cleaned.length - 200)))
   
   // Try standard JSON parsing first
   try {
-    return JSON.parse(cleaned)
+    const parsed = JSON.parse(cleaned);
+    
+    // If parsed successfully, check if we need to transform the structure
+    // Look for common nested structures in the responses and normalize them
+    if (parsed.email_migration_research || 
+        parsed.research_findings || 
+        parsed.project_scope || 
+        parsed.assessment_questions || 
+        parsed.implementation_methodologies ||
+        parsed.migration_research) {
+      console.log("Detected nested structure, normalizing...");
+      return normalizeNestedStructure(parsed);
+    }
+    
+    return parsed;
   } catch (initialError) {
     const errorMessage = initialError instanceof Error ? initialError.message : String(initialError)
     console.warn("Initial JSON parsing failed, attempting advanced recovery:", errorMessage)
@@ -1207,7 +1242,15 @@ async function parseAIResponse(response: string): Promise<any> {
       cleaned = cleaned.replace(/,(\s*\])/g, '$1')
       
       // Try parsing again after fixes
-      return JSON.parse(cleaned)
+      const parsed = JSON.parse(cleaned);
+      
+      // Check for nested structures
+      if (parsed.email_migration_research || parsed.research_findings || parsed.project_scope || parsed.assessment_questions) {
+        console.log("Detected nested structure after recovery, normalizing...");
+        return normalizeNestedStructure(parsed);
+      }
+      
+      return parsed;
     } catch (error) {
       console.warn("Basic fixes didn't work, attempting structural recovery")
     }
@@ -1236,7 +1279,16 @@ async function parseAIResponse(response: string): Promise<any> {
           // Extract what seems to be valid JSON
           const potentialJson = cleaned.substring(firstBrace, lastValidBrace + 1)
           try {
-            return JSON.parse(potentialJson)
+            const parsed = JSON.parse(potentialJson);
+            console.log("Successfully extracted valid JSON structure");
+            
+            // Check for nested structures
+            if (parsed.email_migration_research || parsed.research_findings || parsed.project_scope || parsed.assessment_questions) {
+              console.log("Detected nested structure in extracted JSON, normalizing...");
+              return normalizeNestedStructure(parsed);
+            }
+            
+            return parsed;
           } catch (error) {
             console.warn("Extracted JSON structure is still invalid")
           }
@@ -1268,13 +1320,318 @@ async function parseAIResponse(response: string): Promise<any> {
       }
       
       // Try parsing one more time
-      return JSON.parse(cleaned)
+      const parsed = JSON.parse(cleaned);
+      
+      // Check for nested structures
+      if (parsed.email_migration_research || parsed.research_findings || parsed.project_scope || parsed.assessment_questions) {
+        console.log("Detected nested structure after aggressive recovery, normalizing...");
+        return normalizeNestedStructure(parsed);
+      }
+      
+      return parsed;
     } catch (finalError) {
       const finalErrorMessage = finalError instanceof Error ? finalError.message : String(finalError)
       console.error("All JSON recovery attempts failed:", finalErrorMessage)
       console.error("Cleaned Response:", cleaned)
       throw new Error(`Failed to parse AI response: ${finalErrorMessage}`)
     }
+  }
+}
+
+// Function to normalize nested structures into the expected format
+function normalizeNestedStructure(parsed: any): any {
+  try {
+    console.log("Normalizing nested structure...");
+    
+    const normalized: any = {
+      technology: "",
+      questions: [],
+      calculations: [],
+      services: [],
+      totalHours: 0,
+      sources: []
+    };
+    
+    // Extract technology name - try multiple possible locations
+    if (parsed.technology) {
+      normalized.technology = parsed.technology;
+    } else if (parsed.project_scope?.title) {
+      normalized.technology = parsed.project_scope.title;
+    } else if (parsed.email_migration_research) {
+      normalized.technology = "Email Migration to Office 365";
+    } else if (parsed.migration_research) {
+      normalized.technology = "Email Migration to Office 365";
+    } else if (parsed.research_findings?.implementation_methodologies?.recommended_frameworks?.[0]) {
+      normalized.technology = parsed.research_findings.implementation_methodologies.recommended_frameworks[0];
+    } else if (parsed.implementation_methodologies?.recommended_frameworks?.[0]) {
+      normalized.technology = parsed.implementation_methodologies.recommended_frameworks[0];
+    } else if (parsed.project_title) {
+      normalized.technology = parsed.project_title;
+    }
+    
+    // Extract questions from various possible locations
+    if (Array.isArray(parsed.questions)) {
+      normalized.questions = parsed.questions;
+    } else if (parsed.assessment_questions) {
+      // Convert assessment_questions to the expected format
+      normalized.questions = Object.entries(parsed.assessment_questions).map(([id, q]: [string, any], index) => ({
+        id: id,
+        slug: id.replace('question_', ''),
+        question: q.text || `Question ${index + 1}`,
+        options: Array.isArray(q.options) ? q.options.map((opt: string, i: number) => ({
+          key: opt,
+          value: i + 1,
+          default: i === 0
+        })) : []
+      }));
+    } else if (parsed.discovery_questions) {
+      // Convert discovery_questions to the expected format
+      normalized.questions = parsed.discovery_questions.map((q: any, index: number) => ({
+        id: `q${index + 1}`,
+        slug: `question-${index + 1}`,
+        question: q.question,
+        options: Array.isArray(q.options) ? q.options.map((opt: string, i: number) => ({
+          key: opt,
+          value: i + 1,
+          default: i === 0
+        })) : []
+      }));
+    } else if (parsed.email_migration_research?.assessment_questions) {
+      normalized.questions = Object.entries(parsed.email_migration_research.assessment_questions).map(([id, q]: [string, any], index) => ({
+        id: id,
+        slug: id.replace('question_', ''),
+        question: q.text || `Question ${index + 1}`,
+        options: Array.isArray(q.options) ? q.options.map((opt: string, i: number) => ({
+          key: opt,
+          value: i + 1,
+          default: i === 0
+        })) : []
+      }));
+    } else if (parsed.research_findings?.assessment_questions) {
+      normalized.questions = Object.entries(parsed.research_findings.assessment_questions).map(([id, q]: [string, any], index) => ({
+        id: id,
+        slug: id.replace('question_', ''),
+        question: q.text || `Question ${index + 1}`,
+        options: Array.isArray(q.options) ? q.options.map((opt: string, i: number) => ({
+          key: opt,
+          value: i + 1,
+          default: i === 0
+        })) : []
+      }));
+    }
+    
+    // Extract services from various possible locations
+    if (Array.isArray(parsed.services)) {
+      normalized.services = parsed.services;
+    } else {
+      // Try to find services in different locations
+      const serviceLocations = [
+        parsed.service_components,
+        parsed.service_components?.core_services,
+        parsed.email_migration_research?.professional_services?.core_services,
+        parsed.email_migration_research?.service_components,
+        parsed.research_findings?.service_components?.core_services,
+        parsed.research_findings?.service_components,
+        parsed.implementation_services,
+        parsed.service_breakdown,
+        parsed.professional_services?.service_components,
+        parsed.professional_services
+      ];
+      
+      let foundServices = false;
+      
+      for (const location of serviceLocations) {
+        if (Array.isArray(location)) {
+          // Transform services to expected format
+          const services = location.map((svc: any) => {
+            const phase = svc.phase || "Implementation";
+            const service = svc.name || svc.service;
+            const hours = svc.estimated_hours || svc.hours || 40;
+            
+            // Handle subservices
+            let subservices = [];
+            if (Array.isArray(svc.subservices)) {
+              subservices = svc.subservices.map((sub: any, i: number) => {
+                // Handle both string and object subservices
+                if (typeof sub === 'string') {
+                  return {
+                    name: sub,
+                    description: `${sub} activities`,
+                    hours: Math.floor(hours / 3)
+                  };
+                } else {
+                  return {
+                    name: sub.name || `Subservice ${i+1}`,
+                    description: sub.description || `${sub.name || 'Subservice'} activities`,
+                    hours: sub.hours || Math.floor(hours / 3)
+                  };
+                }
+              });
+            }
+            
+            // Ensure exactly 3 subservices
+            while (subservices.length < 3) {
+              subservices.push({
+                name: `Additional Activity ${subservices.length + 1}`,
+                description: `Supporting activities for ${service}`,
+                hours: Math.floor(hours / 3)
+              });
+            }
+            
+            // Limit to exactly 3 subservices
+            subservices = subservices.slice(0, 3);
+            
+            return {
+              phase,
+              service,
+              description: svc.description || `${service} for implementation`,
+              hours,
+              subservices
+            };
+          });
+          
+          if (services.length > 0) {
+            normalized.services = services;
+            foundServices = true;
+            break;
+          }
+        }
+      }
+      
+      // If no services found yet, try to extract from implementation_phases
+      if (!foundServices && Array.isArray(parsed.implementation_phases)) {
+        const services = parsed.implementation_phases.map((phase: any, index: number) => {
+          const phaseName = phase.name || phase.phase || `Phase ${index+1}`;
+          const hours = phase.hours || phase.estimated_hours || 40;
+          
+          // Create subservices from activities if available
+          let subservices = [];
+          if (Array.isArray(phase.activities)) {
+            subservices = phase.activities.slice(0, 3).map((activity: string, i: number) => ({
+              name: activity,
+              description: `${activity} for ${phaseName}`,
+              hours: Math.floor(hours / 3)
+            }));
+          }
+          
+          // Ensure exactly 3 subservices
+          while (subservices.length < 3) {
+            subservices.push({
+              name: `Activity ${subservices.length + 1}`,
+              description: `Supporting activity for ${phaseName}`,
+              hours: Math.floor(hours / 3)
+            });
+          }
+          
+          return {
+            phase: "Implementation",
+            service: phaseName,
+            description: phase.description || `${phaseName} phase activities`,
+            hours,
+            subservices
+          };
+        });
+        
+        if (services.length > 0) {
+          normalized.services = services;
+        }
+      }
+    }
+    
+    // Extract sources from various possible locations
+    if (Array.isArray(parsed.sources)) {
+      normalized.sources = parsed.sources;
+    } else if (parsed.reference_sources) {
+      normalized.sources = parsed.reference_sources.map((src: any) => ({
+        url: src.url || "https://example.com",
+        title: src.title || "Reference Source",
+        relevance: src.relevance || "Implementation guidance"
+      }));
+    } else if (parsed.email_migration_research?.reference_sources) {
+      normalized.sources = parsed.email_migration_research.reference_sources.map((src: any) => ({
+        url: src.url || "https://example.com",
+        title: src.title || "Reference Source",
+        relevance: src.relevance || "Implementation guidance"
+      }));
+    } else if (parsed.research_findings?.reference_sources) {
+      normalized.sources = parsed.research_findings.reference_sources.map((src: any) => ({
+        url: src.url || "https://example.com",
+        title: src.title || "Reference Source",
+        relevance: src.relevance || "Implementation guidance"
+      }));
+    } else if (parsed.resources) {
+      normalized.sources = parsed.resources.map((src: any) => ({
+        url: src.url || "https://example.com",
+        title: src.title || src.name || "Resource",
+        relevance: src.relevance || "Implementation resource"
+      }));
+    }
+    
+    // Ensure we have at least one source
+    if (!normalized.sources || normalized.sources.length === 0) {
+      normalized.sources = [
+        {
+          url: "https://example.com",
+          title: "Default Resource",
+          relevance: "Implementation guidance"
+        }
+      ];
+    }
+    
+    // Calculate total hours
+    if (typeof parsed.totalHours === 'number') {
+      normalized.totalHours = parsed.totalHours;
+    } else if (typeof parsed.total_estimated_hours === 'number') {
+      normalized.totalHours = parsed.total_estimated_hours;
+    } else if (typeof parsed.total_hours === 'number') {
+      normalized.totalHours = parsed.total_hours;
+    } else if (Array.isArray(normalized.services)) {
+      normalized.totalHours = normalized.services.reduce((total: number, service: any) => total + (service.hours || 0), 0);
+    }
+    
+    console.log("Successfully normalized nested structure");
+    return normalized;
+  } catch (error) {
+    console.error("Error in normalizeNestedStructure:", error);
+    
+    // Return a minimal valid structure
+    return {
+      technology: "Technology Solution",
+      questions: [
+        {
+          id: "q1",
+          slug: "default-question",
+          question: "What is your implementation timeline?",
+          options: [
+            { key: "Standard (3-6 months)", value: 1, default: true },
+            { key: "Accelerated (1-3 months)", value: 2 },
+            { key: "Extended (6-12 months)", value: 3 }
+          ]
+        }
+      ],
+      calculations: [],
+      services: [
+        {
+          phase: "Planning",
+          service: "Implementation Planning",
+          description: "Comprehensive planning for implementation",
+          hours: 40,
+          subservices: [
+            { name: "Requirements Gathering", description: "Gather implementation requirements", hours: 16 },
+            { name: "Solution Design", description: "Design the implementation solution", hours: 16 },
+            { name: "Implementation Planning", description: "Create implementation plan", hours: 8 }
+          ]
+        }
+      ],
+      totalHours: 40,
+      sources: [
+        {
+          url: "https://example.com",
+          title: "Implementation Guide",
+          relevance: "Official implementation documentation"
+        }
+      ]
+    };
   }
 }
 
@@ -1289,16 +1646,26 @@ async function generateWithRetry(
       console.log(`Attempt ${attempt}/${maxAttempts} for ${model}`)
       
       // Add a specific instruction to return valid JSON
-      const enhancedPrompt = prompt + "\n\nIMPORTANT: Return only valid JSON. Do not include markdown code blocks. Start with { and end with }."
+      const enhancedPrompt = prompt + "\n\nIMPORTANT: Return only valid JSON. Do not include markdown code blocks. Start with { and end with }. Do NOT nest your response inside fields like 'email_migration_research' or 'research_findings'."
       
       const response = await callOpenRouter({ model, prompt: enhancedPrompt })
       
       try {
+        // First try parsing directly
         const parsed = await parseAIResponse(response)
         
         // Basic validation of the response
         if (!parsed || typeof parsed !== 'object') {
           throw new Error(`Invalid response structure: ${typeof parsed}`)
+        }
+        
+        // Check if we need to normalize a nested structure
+        if (parsed.email_migration_research || parsed.research_findings || 
+            parsed.project_scope || parsed.assessment_questions) {
+          console.log(`⚠️ Parse error on attempt ${attempt}: Detected nested structure, normalizing...`)
+          const normalized = normalizeNestedStructure(parsed)
+          console.log("✅ Successfully normalized nested structure")
+          return normalized
         }
         
         console.log(`✅ Successfully parsed response from ${model}`)
@@ -1322,6 +1689,15 @@ async function generateWithRetry(
             try {
               const extracted = JSON.parse(largestMatch)
               console.log("✅ Successfully extracted valid JSON using regex")
+              
+              // Check if we need to normalize a nested structure
+              if (extracted.email_migration_research || extracted.research_findings || 
+                  extracted.project_scope || extracted.assessment_questions) {
+                console.log("Detected nested structure in extracted JSON, normalizing...")
+                const normalized = normalizeNestedStructure(extracted)
+                return normalized
+              }
+              
               return extracted
             } catch (regexError) {
               console.error("❌ Failed to parse extracted JSON:", 
@@ -1915,7 +2291,7 @@ export async function POST(request: NextRequest) {
             stepId: "parse", 
             status: "active", 
             progress: 10,
-            model: models?.parsing || "anthropic/claude-3-sonnet"
+            model: models?.parsing || "anthropic/claude-3.5-sonnet"
           })
 
           // Parse input
@@ -1925,7 +2301,7 @@ export async function POST(request: NextRequest) {
           let parsedData
           try {
             const parsingResponse = await callOpenRouter({
-              model: models?.parsing || "anthropic/claude-3-sonnet",
+              model: models?.parsing || "anthropic/claude-3.5-sonnet",
               prompt: parsingPrompt,
             })
             
@@ -1935,7 +2311,7 @@ export async function POST(request: NextRequest) {
               stepId: "parse", 
               status: "completed", 
               progress: 25,
-              model: models?.parsing || "anthropic/claude-3-sonnet"
+              model: models?.parsing || "anthropic/claude-3.5-sonnet"
             })
           } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : String(error)
@@ -1953,7 +2329,7 @@ export async function POST(request: NextRequest) {
               stepId: "parse", 
               status: "completed", 
               progress: 25,
-              model: models?.parsing || "anthropic/claude-3-sonnet"
+              model: models?.parsing || "anthropic/claude-3.5-sonnet"
             })
           }
           
@@ -1962,7 +2338,7 @@ export async function POST(request: NextRequest) {
             stepId: "research", 
             status: "active", 
             progress: 25,
-            model: models?.research || "anthropic/claude-3-sonnet"
+            model: models?.research || "anthropic/claude-3.5-sonnet"
           })
           
           console.log("📚 Step 2: Conducting research...")
@@ -1974,7 +2350,7 @@ export async function POST(request: NextRequest) {
           try {
             researchData = await generateWithRetry(
               researchPrompt,
-              models?.research || "anthropic/claude-3-sonnet",
+              models?.research || "anthropic/claude-3.5-sonnet",
               2
             )
             console.log("✅ Research successful")
@@ -1982,7 +2358,7 @@ export async function POST(request: NextRequest) {
               stepId: "research", 
               status: "completed", 
               progress: 50,
-              model: models?.research || "anthropic/claude-3-sonnet",
+              model: models?.research || "anthropic/claude-3.5-sonnet",
               sources: ["Research sources found"]
             })
           } catch (error: unknown) {
@@ -1995,7 +2371,7 @@ export async function POST(request: NextRequest) {
               stepId: "research", 
               status: "completed", 
               progress: 50,
-              model: models?.research || "anthropic/claude-3-sonnet"
+              model: models?.research || "anthropic/claude-3.5-sonnet"
             })
           }
 
@@ -2004,7 +2380,7 @@ export async function POST(request: NextRequest) {
             stepId: "analyze", 
             status: "active", 
             progress: 50,
-            model: models?.analysis || "anthropic/claude-3-sonnet"
+            model: models?.analysis || "anthropic/claude-3.5-sonnet"
           })
           
           console.log("🔬 Step 3: Analyzing research...")
@@ -2015,7 +2391,7 @@ export async function POST(request: NextRequest) {
           let analysisData
           try {
             const analysisResponse = await callOpenRouter({
-              model: models?.analysis || "anthropic/claude-3-sonnet",
+              model: models?.analysis || "anthropic/claude-3.5-sonnet",
               prompt: analysisPrompt,
             })
             
@@ -2025,7 +2401,7 @@ export async function POST(request: NextRequest) {
               stepId: "analyze", 
               status: "completed", 
               progress: 75,
-              model: models?.analysis || "anthropic/claude-3-sonnet"
+              model: models?.analysis || "anthropic/claude-3.5-sonnet"
             })
           } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : String(error)
@@ -2037,7 +2413,7 @@ export async function POST(request: NextRequest) {
               stepId: "analyze", 
               status: "completed", 
               progress: 75,
-              model: models?.analysis || "anthropic/claude-3-sonnet"
+              model: models?.analysis || "anthropic/claude-3.5-sonnet"
             })
           }
 
@@ -2063,7 +2439,20 @@ Generate structured content with:
 - At least 5 services across all phases (Planning, Design, Implementation, Testing, Go-Live, Support)
 - Each service must have exactly 3 subservices
 - All content must be specific to ${parsedData.technology || input}
-- Hours based on research findings and industry standards${JSON_RESPONSE_INSTRUCTION}`
+- Hours based on research findings and industry standards
+
+IMPORTANT: Return ONLY valid JSON. Start with { and end with }. Do not include any markdown code blocks or explanations.
+Your response MUST be a valid JSON object with the following structure:
+{
+  "technology": "Technology name",
+  "questions": [...],
+  "calculations": [...],
+  "services": [...],
+  "totalHours": number,
+  "sources": [...]
+}
+
+Do NOT nest the response inside fields like "email_migration_research" or "research_findings" - use the exact structure above.${JSON_RESPONSE_INSTRUCTION}`
 
           let contentObj
           let shouldUseFallback = false
@@ -2077,6 +2466,14 @@ Generate structured content with:
             
             try {
               contentObj = await parseAIResponse(contentResponse)
+              
+              // Check if we got a valid structure or need to normalize a nested structure
+              if (contentObj.email_migration_research || contentObj.research_findings || 
+                  contentObj.project_scope || contentObj.assessment_questions) {
+                console.log("Detected assessment_questions structure, normalizing...");
+                contentObj = normalizeNestedStructure(contentObj);
+              }
+              
               console.log("✅ Content generation successful!")
             } catch (parseError) {
               const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)

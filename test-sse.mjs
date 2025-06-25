@@ -1,60 +1,79 @@
-// Simple Node.js script to test the SSE implementation
+// Test script for the research API endpoint using SSE
 import fetch from 'node-fetch';
 
-async function testSSE() {
-  console.log('Testing SSE implementation...');
+async function testResearchEndpoint() {
+  console.log('Testing research endpoint...');
+  
+  const response = await fetch('http://localhost:3001/api/research', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      input: 'Microsoft Email Migration to Office 365 for a Hospital with 1000 users',
+      models: {
+        parsing: 'anthropic/claude-3.5-sonnet',
+        research: 'anthropic/claude-3.5-sonnet',
+        analysis: 'anthropic/claude-3.5-sonnet',
+        content: 'anthropic/claude-3.5-sonnet'
+      }
+    }),
+  });
+
+  if (!response.ok) {
+    console.error(`Error: ${response.status} ${response.statusText}`);
+    const text = await response.text();
+    console.error(text);
+    return;
+  }
+
+  // For node-fetch, we need to handle the stream differently
+  const body = response.body;
+  
+  let buffer = '';
   
   try {
-    const response = await fetch('http://localhost:3006/api/research', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        input: 'Microsoft Email Migration to Office 365 for a Hospital with 1000 users',
-        models: {
-          research: 'anthropic/claude-3-sonnet',
-          analysis: 'anthropic/claude-3-sonnet',
-          content: 'anthropic/claude-3-sonnet',
-          format: 'openai/gpt-4o',
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-
-    console.log('Response received, reading stream...');
-    
-    // Use response.body as a stream directly
-    for await (const chunk of response.body) {
-      const text = new TextDecoder().decode(chunk);
-      const lines = text.split('\n');
+    // Set up event handlers for the stream
+    body.on('data', (chunk) => {
+      const text = chunk.toString();
+      buffer += text;
+      
+      // Process any complete events
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
       
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           try {
             const data = JSON.parse(line.slice(6));
-            console.log('Event received:', data.type);
+            console.log(`Event: ${data.type}`);
             
-            if (data.type === 'step') {
-              console.log(`Step: ${data.stepId}, Status: ${data.status}, Progress: ${data.progress}%`);
-            } else if (data.type === 'complete') {
-              console.log('Content generation complete!');
+            if (data.type === 'complete') {
+              console.log('Content received:');
+              console.log(`- Technology: ${data.content.technology}`);
+              console.log(`- Questions: ${data.content.questions.length}`);
+              console.log(`- Services: ${data.content.services.length}`);
+              console.log(`- Sources: ${data.content.sources.length}`);
+              console.log(`- Total Hours: ${data.content.totalHours}`);
             }
-          } catch (e) {
-            if (line.trim()) {
-              console.error('Error parsing SSE data:', e);
-              console.error('Raw line:', line);
-            }
+          } catch (error) {
+            console.error('Error parsing SSE data:', error);
+            console.error('Raw data:', line.slice(6));
           }
         }
       }
-    }
+    });
     
-    console.log('Stream complete');
+    body.on('end', () => {
+      console.log('Stream complete');
+    });
+    
+    body.on('error', (error) => {
+      console.error('Stream error:', error);
+    });
   } catch (error) {
-    console.error('Test failed:', error);
+    console.error('Error reading stream:', error);
   }
 }
 
-testSSE(); 
+testResearchEndpoint().catch(console.error); 
