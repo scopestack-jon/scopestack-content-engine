@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Search, Brain, FileText, CheckCircle, Settings, Calculator } from "lucide-react"
+import { Loader2, Search, Brain, FileText, CheckCircle, Settings, Calculator, RotateCcw } from "lucide-react"
 import { ResearchProgress } from "./components/research-progress"
 import { ContentOutput } from "./components/content-output"
 import { SourceAttribution } from "./components/source-attribution"
@@ -70,27 +70,40 @@ export default function ScopeStackContentEngine() {
   const [isResearchCollapsed, setIsResearchCollapsed] = useState(false)
 
   useEffect(() => {
-    // Load persisted content from localStorage
+    // Load saved content and input from localStorage
     const savedContent = localStorage.getItem("generated_content")
     const savedInput = localStorage.getItem("user_input")
 
     if (savedContent) {
       try {
         setGeneratedContent(JSON.parse(savedContent))
-        setIsResearchCollapsed(true) // Auto-collapse when content exists
       } catch (e) {
-        console.error("Failed to load saved content:", e)
+        console.error("Failed to parse saved content:", e)
       }
     }
 
     if (savedInput) {
       setUserInput(savedInput)
     }
+
+    // Log current settings for debugging
+    console.log("Current settings loaded:", {
+      researchModel: localStorage.getItem("research_model") || "default",
+      analysisModel: localStorage.getItem("analysis_model") || "default", 
+      contentModel: localStorage.getItem("content_model") || "default",
+      formatModel: localStorage.getItem("format_model") || "default",
+      hasCustomPrompts: {
+        parsing: !!localStorage.getItem("parsing_prompt"),
+        research: !!localStorage.getItem("research_prompt"),
+        analysis: !!localStorage.getItem("analysis_prompt"),
+      }
+    })
   }, [])
 
   // Save content whenever it changes
   useEffect(() => {
     if (generatedContent) {
+      console.log("Generated content state updated:", generatedContent)
       localStorage.setItem("generated_content", JSON.stringify(generatedContent))
       setIsResearchCollapsed(true) // Auto-collapse when new content is generated
     }
@@ -104,15 +117,23 @@ export default function ScopeStackContentEngine() {
   }, [userInput])
 
   const handleClearContent = () => {
+    // Clear all state
     setGeneratedContent(null)
     setUserInput("")
     setResearchSteps([])
+    setProgress(0)
     setIsResearchCollapsed(false)
+    
+    // Clear localStorage
     localStorage.removeItem("generated_content")
     localStorage.removeItem("user_input")
+    
+    // Provide user feedback
+    console.log("Content and input cleared successfully")
   }
 
   const handleGenerate = async () => {
+    console.log("Generate button clicked", { userInput })
     if (!userInput.trim()) return
 
     setIsProcessing(true)
@@ -186,6 +207,8 @@ export default function ScopeStackContentEngine() {
                 )
                 setProgress(data.progress)
               } else if (data.type === "complete") {
+                console.log("Received complete data:", data)
+                console.log("Content received:", data.content)
                 setGeneratedContent(data.content)
                 setProgress(100)
               }
@@ -208,7 +231,15 @@ export default function ScopeStackContentEngine() {
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="flex items-center justify-between mb-4">
-            <div></div>
+            <Button 
+              onClick={handleClearContent} 
+              variant="outline" 
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-800"
+              disabled={isProcessing}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reset
+            </Button>
             <Link href="/settings">
               <Button variant="outline" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
@@ -243,30 +274,23 @@ export default function ScopeStackContentEngine() {
               <div className="text-sm text-gray-500">
                 Be specific about technology, scale, industry, and compliance requirements
               </div>
-              <div className="flex gap-2">
-                {generatedContent && (
-                  <Button onClick={handleClearContent} variant="outline" className="text-gray-600">
-                    Clear Content
-                  </Button>
+              <Button
+                onClick={handleGenerate}
+                disabled={!userInput.trim() || isProcessing}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Researching...
+                  </>
+                ) : (
+                  <>
+                    <Brain className="h-4 w-4 mr-2" />
+                    Generate Content
+                  </>
                 )}
-                <Button
-                  onClick={handleGenerate}
-                  disabled={!userInput.trim() || isProcessing}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Researching...
-                    </>
-                  ) : (
-                    <>
-                      <Brain className="h-4 w-4 mr-2" />
-                      Generate Content
-                    </>
-                  )}
-                </Button>
-              </div>
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -282,12 +306,15 @@ export default function ScopeStackContentEngine() {
         )}
 
         {/* Generated Content */}
-        {generatedContent && (
-          <div className="space-y-6">
-            <ContentOutput content={generatedContent} />
-            <SourceAttribution sources={generatedContent.sources} />
-          </div>
-        )}
+        {(() => {
+          console.log("Checking if should render ContentOutput. generatedContent:", generatedContent)
+          return generatedContent && (
+            <div className="space-y-6">
+              <ContentOutput content={generatedContent} />
+              <SourceAttribution sources={generatedContent.sources} />
+            </div>
+          )
+        })()}
 
         {/* Key Features */}
         <Card className="bg-white/50 backdrop-blur-sm">

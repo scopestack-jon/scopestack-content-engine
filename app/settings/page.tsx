@@ -153,30 +153,32 @@ export default function SettingsPage() {
     setAnalysisPrompt(savedAnalysisPrompt)
   }, [])
 
-  const fetchOpenRouterModels = async () => {
-    if (!openRouterKey) return
-
-    try {
-      const response = await fetch("https://openrouter.ai/api/v1/models", {
-        headers: {
-          Authorization: `Bearer ${openRouterKey}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        const models = data.data.map((model: any) => ({
-          id: model.id,
-          name: model.name || model.id.split("/").pop(),
-          provider: model.id.split("/")[0],
-        }))
-        setAvailableModels(models)
+  // Fetch all available models from OpenRouter when API key changes
+  useEffect(() => {
+    const fetchModels = async () => {
+      if (!openRouterKey) return
+      try {
+        const response = await fetch("https://openrouter.ai/api/v1/models", {
+          headers: {
+            Authorization: `Bearer ${openRouterKey}`,
+            "Content-Type": "application/json",
+          },
+        })
+        if (response.ok) {
+          const data = await response.json()
+          const models = data.data.map((model: any) => ({
+            id: model.id,
+            name: model.name || model.id.split("/").pop(),
+            provider: model.id.split("/")[0],
+          }))
+          setAvailableModels(models)
+        }
+      } catch (error) {
+        console.error("Failed to fetch OpenRouter models:", error)
       }
-    } catch (error) {
-      console.error("Failed to fetch OpenRouter models:", error)
     }
-  }
+    fetchModels()
+  }, [openRouterKey])
 
   const resetPromptToDefault = (promptType: "parsing" | "research" | "analysis") => {
     switch (promptType) {
@@ -197,44 +199,55 @@ export default function SettingsPage() {
     setSaveStatus("idle")
 
     try {
-      // Save to localStorage (in a real app, you'd save to a secure backend)
+      // Save to localStorage
       localStorage.setItem("openrouter_key", openRouterKey)
       localStorage.setItem("scopestack_url", scopeStackUrl)
       localStorage.setItem("scopestack_token", scopeStackToken)
-
+      
+      // Save model selections
       localStorage.setItem("research_model", researchModel)
       localStorage.setItem("analysis_model", analysisModel)
       localStorage.setItem("content_model", contentModel)
       localStorage.setItem("format_model", formatModel)
-
-      // Save prompts
+      
+      // Save custom prompts
       localStorage.setItem("parsing_prompt", parsingPrompt)
       localStorage.setItem("research_prompt", researchPrompt)
       localStorage.setItem("analysis_prompt", analysisPrompt)
 
-      // Test the connections
-      if (openRouterKey) {
-        // Test OpenRouter connection
-        const testResponse = await fetch("/api/test-openrouter", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ apiKey: openRouterKey }),
-        })
-
-        if (!testResponse.ok) {
-          throw new Error("OpenRouter connection failed")
-        }
-      }
-
       setSaveStatus("success")
       setTimeout(() => setSaveStatus("idle"), 3000)
     } catch (error) {
-      console.error("Save failed:", error)
+      console.error("Failed to save settings:", error)
       setSaveStatus("error")
-      setTimeout(() => setSaveStatus("idle"), 3000)
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const resetToDefaults = () => {
+    // Reset model selections to defaults
+    setResearchModel("anthropic/claude-3.5-sonnet")
+    setAnalysisModel("openai/gpt-4-turbo")
+    setContentModel("anthropic/claude-3.5-sonnet")
+    setFormatModel("openai/gpt-4o")
+    
+    // Reset prompts to defaults
+    setParsingPrompt(DEFAULT_PROMPTS.parsing)
+    setResearchPrompt(DEFAULT_PROMPTS.research)
+    setAnalysisPrompt(DEFAULT_PROMPTS.analysis)
+    
+    // Save the defaults to localStorage
+    localStorage.setItem("research_model", "anthropic/claude-3.5-sonnet")
+    localStorage.setItem("analysis_model", "openai/gpt-4-turbo")
+    localStorage.setItem("content_model", "anthropic/claude-3.5-sonnet")
+    localStorage.setItem("format_model", "openai/gpt-4o")
+    localStorage.setItem("parsing_prompt", DEFAULT_PROMPTS.parsing)
+    localStorage.setItem("research_prompt", DEFAULT_PROMPTS.research)
+    localStorage.setItem("analysis_prompt", DEFAULT_PROMPTS.analysis)
+    
+    setSaveStatus("success")
+    setTimeout(() => setSaveStatus("idle"), 3000)
   }
 
   const testScopeStackConnection = async () => {
@@ -421,16 +434,6 @@ export default function SettingsPage() {
                       </select>
                     </div>
                   </div>
-                  <Button
-                    onClick={fetchOpenRouterModels}
-                    variant="outline"
-                    size="sm"
-                    disabled={!openRouterKey}
-                    className="mt-2"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh Models
-                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -619,6 +622,14 @@ export default function SettingsPage() {
                   </Badge>
                 )}
                 {saveStatus === "error" && <Badge variant="destructive">Error saving</Badge>}
+                <Button 
+                  onClick={resetToDefaults} 
+                  variant="outline" 
+                  className="text-gray-600 hover:text-gray-800"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset to Defaults
+                </Button>
                 <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
                   {isSaving ? (
                     <>

@@ -13,6 +13,8 @@ interface SourceAttributionProps {
 }
 
 export function SourceAttribution({ sources }: SourceAttributionProps) {
+  const safeSources = Array.isArray(sources) ? sources : []
+
   const getSourceIcon = (url: string) => {
     if (url.includes("cisco.com") || url.includes("microsoft.com") || url.includes("aws.amazon.com")) {
       return <Shield className="h-4 w-4 text-blue-600" />
@@ -48,31 +50,37 @@ export function SourceAttribution({ sources }: SourceAttributionProps) {
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {sources.map((source, index) => (
-          <div key={index} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  {getSourceIcon(source.url)}
-                  <Badge variant="outline" className="text-xs">
-                    {getSourceType(source.url)}
-                  </Badge>
+        {safeSources.length > 0 ? (
+          safeSources.map((source, index) => (
+            <div key={index} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    {getSourceIcon(source.url)}
+                    <Badge variant="outline" className="text-xs">
+                      {getSourceType(source.url)}
+                    </Badge>
+                  </div>
+                  <h4 className="font-medium text-sm mb-2">{source.title}</h4>
+                  <p className="text-xs text-gray-600 mb-2">{source.relevance}</p>
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                  >
+                    {source.url}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
                 </div>
-                <h4 className="font-medium text-sm mb-2">{source.title}</h4>
-                <p className="text-xs text-gray-600 mb-2">{source.relevance}</p>
-                <a
-                  href={source.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                >
-                  {source.url}
-                  <ExternalLink className="h-3 w-3" />
-                </a>
               </div>
             </div>
+          ))
+        ) : (
+          <div className="text-center text-gray-500 py-4">
+            <div className="text-sm">No sources available</div>
           </div>
-        ))}
+        )}
 
         <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
           <div className="flex items-center gap-2 mb-2">
