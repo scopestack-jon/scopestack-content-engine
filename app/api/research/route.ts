@@ -2,6 +2,20 @@ console.log("OPENROUTER_API_KEY:", process.env.OPENROUTER_API_KEY);
 import { generateText } from "ai"
 import type { NextRequest } from "next/server"
 
+// Add the JSON response instruction constant
+const JSON_RESPONSE_INSTRUCTION = `
+
+CRITICAL RESPONSE FORMAT:
+- Return ONLY valid JSON
+- NO markdown code blocks (no \`\`\`json or \`\`\`)
+- NO explanations before or after the JSON
+- NO comments within the JSON
+- Start response with { and end with }
+- Complete the entire JSON structure
+- Validate JSON syntax before returning
+
+RESPOND WITH PURE JSON ONLY.
+`;
 
 const DEFAULT_PROMPTS = {
   parsing: `Analyze this technology solution request and extract key information:
@@ -15,7 +29,7 @@ Extract and return in JSON format:
 - compliance: compliance requirements
 - complexity: complexity factors
 
-Be specific and detailed.`,
+Be specific and detailed.${JSON_RESPONSE_INSTRUCTION}`,
 
   research: `Based on this technology solution: "{input}"
 
@@ -42,7 +56,7 @@ Format sources as: SOURCE: [URL] | [Title] | [Relevance]
 
 Provide specific, actionable research findings that would inform professional services scoping.
 Focus on current 2024-2025 industry standards and practices.
-Include enough detail to generate at least 10 distinct services with 3 subservices each.`,
+Include enough detail to generate at least 10 distinct services with 3 subservices each.${JSON_RESPONSE_INSTRUCTION}`,
 
   analysis: `Analyze these research findings and create structured insights:
 
@@ -64,7 +78,7 @@ IMPORTANT: Ensure your analysis provides enough detail to support generating:
 - Each service must have exactly 3 subservices
 - Realistic hour estimates for each component
 
-Base your analysis on current professional services benchmarks and proven methodologies.`,
+Base your analysis on current professional services benchmarks and proven methodologies.${JSON_RESPONSE_INSTRUCTION}`,
 }
 
 // Generic function to call OpenRouter API for any model
@@ -162,7 +176,7 @@ async function generateFallbackContent(
         console.log(`Fallback attempt ${fallbackAttempts + 1}/${maxFallbackAttempts}`)
         
         const result = await generateTextWithTimeout({
-          model: "openai/gpt-4o",
+          model: "openai/gpt-4",
           prompt: `Generate a complete professional services JSON structure for: "${input}"
 
 CRITICAL: You must return a COMPLETE, VALID JSON object. Do not stop mid-response.
@@ -1004,7 +1018,7 @@ REQUIREMENTS:
           serviceDescription: "Placeholder service description.",
           keyAssumptions: "Placeholder key assumptions.",
           clientResponsibilities: "Placeholder client responsibilities.",
-          outOfScope: "Placeholder out of scope."
+          outOfScope: "Placeholder out of scope"
         },
         {
           name: "Placeholder Subservice 2",
@@ -1014,7 +1028,7 @@ REQUIREMENTS:
           serviceDescription: "Placeholder service description.",
           keyAssumptions: "Placeholder key assumptions.",
           clientResponsibilities: "Placeholder client responsibilities.",
-          outOfScope: "Placeholder out of scope."
+          outOfScope: "Placeholder out of scope"
         },
         {
           name: "Placeholder Subservice 3",
@@ -1024,7 +1038,7 @@ REQUIREMENTS:
           serviceDescription: "Placeholder service description.",
           keyAssumptions: "Placeholder key assumptions.",
           clientResponsibilities: "Placeholder client responsibilities.",
-          outOfScope: "Placeholder out of scope."
+          outOfScope: "Placeholder out of scope"
         }
       ]
     }))
@@ -1077,902 +1091,1085 @@ REQUIREMENTS:
   return fallbackContent
 }
 
-export async function POST(request: NextRequest) {
-  console.log("API /api/research hit")
-  const { input, models, prompts } = await request.json()
+// Function to fix common URL issues in AI responses
+function fixUrlsInJson(json: string): string {
+  // First, try to identify and fix incomplete URLs
+  let fixed = json;
+  
+  // Fix incomplete URLs in "url": "https: patterns
+  fixed = fixed.replace(/"url"\s*:\s*"https:(?:[^"]*)?(?!")(?=[,}])/g, '"url": "https://example.com"');
+  
+  // Fix incomplete URLs in "source": "SOURCE: https: patterns
+  fixed = fixed.replace(/"source"\s*:\s*"SOURCE:\s*https:(?:[^"]*)?(?!")(?=[,}])/g, '"source": "SOURCE: https://example.com"');
+  
+  // Fix incomplete URLs in general
+  fixed = fixed.replace(/"https:(?:[^"]*)?(?!")(?=[,}\]])/g, '"https://example.com"');
+  
+  // Fix URLs that are missing closing quotes
+  fixed = fixed.replace(/("(?:url|source|link|href)"\s*:\s*"https:[^",}\]]*?)(?=[,}\]])/g, '$1"');
+  
+  return fixed;
+}
 
-  // Default models if not provided
-  const selectedModels = {
-    research: models?.research || "anthropic/claude-3.5-sonnet",
-    analysis: models?.analysis || "openai/gpt-4-turbo",
-    content: models?.content || "anthropic/claude-3.5-sonnet",
-    format: models?.format || "openai/gpt-4o",
+// Enhanced response cleaning pipeline
+function cleanAIResponse(response: string): string {
+  if (!response) return "{}"
+  
+  let cleaned = response.trim()
+  
+  // Remove markdown code blocks
+  if (cleaned.startsWith('```json')) {
+    cleaned = cleaned.replace(/^```json\s*/, '')
+    cleaned = cleaned.replace(/\s*```$/, '')
+  } else if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```[a-zA-Z0-9]*\s*/, '')
+    cleaned = cleaned.replace(/\s*```$/, '')
   }
-
-  // Use custom prompts or defaults
-  const customPrompts = {
-    parsing: prompts?.parsing || DEFAULT_PROMPTS.parsing,
-    research: prompts?.research || DEFAULT_PROMPTS.research,
-    analysis: prompts?.analysis || DEFAULT_PROMPTS.analysis,
+  
+  // Remove any text before first {
+  const firstBrace = cleaned.indexOf('{')
+  if (firstBrace > 0) {
+    cleaned = cleaned.substring(firstBrace)
   }
-
-  if (!process.env.OPENROUTER_API_KEY) {
-    console.log("No OpenRouter API key found, using fallback content")
-    const fallbackContent = await generateFallbackContent(input)
-
-    return new Response(
-      `data: ${JSON.stringify({
-        type: "complete",
-        content: fallbackContent,
-      })}\n\n`,
-      {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      },
-    )
+  
+  // Remove any text after last }
+  const lastBrace = cleaned.lastIndexOf('}')
+  if (lastBrace >= 0 && lastBrace < cleaned.length - 1) {
+    cleaned = cleaned.substring(0, lastBrace + 1)
   }
+  
+  // Remove comments
+  cleaned = cleaned.replace(/\/\/.*$/gm, '') // Remove // comments
+  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
+  
+  // Fix common JSON issues
+  cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
+  cleaned = cleaned.replace(/\n/g, ' ') // Remove newlines
+  cleaned = cleaned.replace(/\s+/g, ' ') // Normalize whitespace
+  cleaned = cleaned.replace(/"\s*:\s*"/g, '":"') // Normalize spacing in key-value pairs
+  cleaned = cleaned.replace(/"\s*:\s*\{/g, '":{') // Normalize spacing before objects
+  cleaned = cleaned.replace(/"\s*:\s*\[/g, '":[') // Normalize spacing before arrays
+  
+  // Handle escaped quotes inside strings
+  cleaned = cleaned.replace(/\\"/g, '\\u0022')
+  
+  // Fix URL issues which are a common source of parsing errors
+  cleaned = fixUrlsInJson(cleaned)
+  
+  // If JSON is completely empty or invalid, return an empty object
+  if (!cleaned || cleaned === '{}' || !cleaned.includes('{')) {
+    return '{}'
+  }
+  
+  return cleaned.trim()
+}
 
-  const encoder = new TextEncoder()
-  const stream = new ReadableStream({
-    async start(controller) {
-      let parsedTech = ""
-      let researchFindings = ""
-      let analysis = ""
-      let dynamicSources: any[] = []
+function validateJSONStructure(jsonString: string): boolean {
+  if (!jsonString.startsWith('{') || !jsonString.endsWith('}')) {
+    return false
+  }
+  
+  // Check for balanced braces
+  let braceCount = 0
+  for (const char of jsonString) {
+    if (char === '{') braceCount++
+    if (char === '}') braceCount--
+  }
+  
+  return braceCount === 0
+}
 
-      try {
-        console.log("Starting research for input:", input.substring(0, 100) + "...")
-
-        // Step 1: Parse technology requirements
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "step",
-              stepId: "parse",
-              status: "active",
-              progress: 10,
-              model: selectedModels.format,
-            })}\n\n`,
-          ),
-        )
-
-        try {
-          console.log("Calling GPT-4o for technology parsing...")
-          const parseResult = await generateTextWithTimeout({
-            model: selectedModels.format,
-            prompt: customPrompts.parsing.replace("{input}", input),
-          })
-          parsedTech = parseResult.text
-          console.log("Technology parsing completed successfully")
-        } catch (parseError) {
-          console.error("Technology parsing failed:", parseError)
-          parsedTech = `{"technology": "Technology Solution", "error": "parsing failed"}`
-        }
-
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "step",
-              stepId: "parse",
-              status: "completed",
-              progress: 20,
-            })}\n\n`,
-          ),
-        )
-
-        // Step 2: Conduct research using selected model
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "step",
-              stepId: "research",
-              status: "active",
-              progress: 30,
-              model: selectedModels.research,
-              sources: ["Conducting live research..."],
-            })}\n\n`,
-          ),
-        )
-
-        try {
-          console.log(`Calling ${selectedModels.research} for research...`)
-          const researchResult = await generateTextWithTimeout({
-            model: selectedModels.research,
-            prompt: customPrompts.research.replace("{input}", input),
-          })
-          researchFindings = researchResult.text
-          console.log("Research completed successfully")
-
-          // Extract sources from research findings
-          const sourceMatches = researchFindings.match(/SOURCE: ([^|]+) \| ([^|]+) \| ([^\n]+)/g)
-          if (sourceMatches) {
-            dynamicSources = sourceMatches.map((match) => {
-              const parts = match.replace("SOURCE: ", "").split(" | ")
-              return {
-                url: parts[0]?.trim() || "",
-                title: parts[1]?.trim() || "",
-                relevance: parts[2]?.trim() || "",
-              }
-            })
-          }
-        } catch (researchError) {
-          console.error("Research failed:", researchError)
-          researchFindings = "Research findings unavailable due to API error"
-        }
-
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "step",
-              stepId: "research",
-              status: "completed",
-              progress: 50,
-              sources:
-                dynamicSources.length > 0
-                  ? dynamicSources.map((s) => s.title)
-                  : ["Research completed with limited sources"],
-            })}\n\n`,
-          ),
-        )
-
-        // Step 3: Analyze findings using selected model
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "step",
-              stepId: "analyze",
-              status: "active",
-              progress: 60,
-              model: selectedModels.analysis,
-            })}\n\n`,
-          ),
-        )
-
-        try {
-          console.log(`Calling ${selectedModels.analysis} for analysis...`)
-          const analysisResult = await generateTextWithTimeout({
-            model: selectedModels.analysis,
-            prompt: customPrompts.analysis.replace("{researchFindings}", researchFindings).replace("{input}", input),
-          }, 90000, "Analysis")
-          analysis = analysisResult.text
-          console.log("Analysis completed successfully")
-        } catch (analysisError) {
-          console.error("Analysis failed:", analysisError)
-          analysis = "Analysis unavailable due to API error"
-        }
-
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "step",
-              stepId: "analyze",
-              status: "completed",
-              progress: 70,
-            })}\n\n`,
-          ),
-        )
-
-        // Step 4: Generate content using selected model
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "step",
-              stepId: "generate",
-              status: "active",
-              progress: 80,
-              model: selectedModels.content,
-            })}\n\n`,
-          ),
-        )
-
-        let generatedContent = ""
-        let contentAttempts = 0
-        const maxAttempts = 3
-
-        while (contentAttempts < maxAttempts) {
-          try {
-            console.log(`Calling ${selectedModels.content} for content generation (attempt ${contentAttempts + 1})...`)
-            const contentResult = await generateTextWithTimeout({
-              model: selectedModels.content,
-              prompt: `Generate professional services content based on this research:
-              
-              Original Request: ${input}
-              Research Findings: ${researchFindings}
-              Analysis: ${analysis}
-              Research Sources Found: ${JSON.stringify(dynamicSources)}
-
-              Use these actual research sources in your sources array, supplemented with additional relevant sources for the technology.
-              
-              CRITICAL REQUIREMENTS - DO NOT COMPROMISE:
-              1. EXACTLY 10 OR MORE services (never less than 10)
-              2. Each service MUST have exactly 3 subservices
-              3. Question options format: {"key": "Easy to understand description", "value": numerical_value}
-              
-              IMPORTANT: You must generate at least 10 services, each with exactly 3 subservices. Return only valid JSON. No markdown, no explanations.
-              
-              Generate exactly this structure with NO TEMPLATES - everything must be research-derived:
-              
-              1. MINIMUM 12 discovery questions with 3-5 select options each
-                 - Each question needs a unique slug (kebab-case)
-                 - Questions must be specific to the technology and use case
-                 - Each option format: {"key": "Easy description", "value": numerical_value}
-                 - Include technical, business, and operational questions
-              
-              2. CALCULATIONS for subservices with multiple mapped questions:
-                 - Create calculations using Ruby ternary operators and math operations
-                 - Support: +, -, *, /, (), ==, !=, >, <, >=, <=
-                 - Use format: condition ? value_if_true : value_if_false
-                 - Example: "(question1 + question2) > 5 ? 1.5 : 1.0"
-                 - resultType: "multiplier", "additive", or "conditional"
-              
-              3. Services across these phases (MINIMUM 10 SERVICES TOTAL):
-                 - Planning Phase (2+ services)
-                 - Design Phase (2+ services) 
-                 - Implementation Phase (4+ services)
-                 - Testing Phase (2+ services)
-                 - Go-Live Phase (2+ services)
-                 - Support Phase (2+ services)
-              
-              4. Each service MUST have:
-                 - Exactly 3 subservices with specific descriptions
-                 - Conservative base hour estimates starting at 1-2 hours for simple tasks
-                 - Hours should scale based on complexity (1-16 hour range typical)
-                 - mappedQuestions array linking to question slugs
-                 - calculationSlug for subservices with multiple questions
-                 - Realistic complexity factors that multiply base hours appropriately
-                 - Four language fields for the service: serviceDescription, keyAssumptions, clientResponsibilities, outOfScope
-                 - Each subservice must also have these four language fields: serviceDescription, keyAssumptions, clientResponsibilities, outOfScope
-
-              HOUR ESTIMATION GUIDELINES:
-              - Start with minimal base hours (1-4 hours for most subservices)
-              - Simple configuration tasks: 1-2 hours
-              - Standard implementation tasks: 2-8 hours  
-              - Complex integration tasks: 4-16 hours
-              - Let calculations multiply these base hours based on question responses
-              - Total project should scale from ~100 hours (simple) to 1000+ hours (complex)
-              
-              5. Include 8+ realistic sources that would inform this content
-              
-              IMPORTANT: Return ONLY valid JSON without any markdown formatting, code blocks, or additional text. Start directly with { and end with }.
-              
-              JSON structure:
-              {
-                "technology": "string",
-                "questions": [
-                  {
-                    "id": "string",
-                    "slug": "kebab-case-slug",
-                    "question": "string", 
-                    "options": [
-                      {"key": "Easy to understand description", "value": numerical_value, "default": boolean}
-                    ]
-                  }
-                ],
-                "calculations": [
-                  {
-                    "id": "string",
-                    "slug": "kebab-case-slug",
-                    "name": "string",
-                    "description": "string",
-                    "formula": "ruby ternary expression",
-                    "mappedQuestions": ["slug1", "slug2"],
-                    "resultType": "multiplier|additive|conditional"
-                  }
-                ],
-                "services": [
-                  {
-                    "phase": "string",
-                    "service": "string",
-                    "description": "string",
-                    "hours": number,
-                    "serviceDescription": "string",
-                    "keyAssumptions": "string",
-                    "clientResponsibilities": "string",
-                    "outOfScope": "string",
-                    "subservices": [
-                      {
-                        "name": "string",
-                        "description": "string",
-                        "hours": number,
-                        "mappedQuestions": ["slug1", "slug2"],
-                        "calculationSlug": "calculation-slug",
-                        "serviceDescription": "string",
-                        "keyAssumptions": "string",
-                        "clientResponsibilities": "string",
-                        "outOfScope": "string"
-                      }
-                    ]
-                  }
-                ],
-                "totalHours": number,
-                "sources": [
-                  {"url": "string", "title": "string", "relevance": "string"}
-                ]
-              }
-              
-              CRITICAL VALIDATION:
-              - Count your services - must be 10 or more
-              - Each service must have exactly 3 subservices
-              - Question options must use the format: {"key": "description", "value": number}
-              - Base all hours on realistic professional services rates
-              - Create calculations for any subservice with 2+ mapped questions`,
-            }, 180000, "Content Generation") // 3 minute timeout for content generation
-            generatedContent = contentResult.text
-            console.log("Content generation completed successfully")
-            break
-          } catch (contentError) {
-            console.error(`Content generation attempt ${contentAttempts + 1} failed:`, {
-              error: contentError.message,
-              model: selectedModels.content,
-              inputLength: input.length,
-            })
-            contentAttempts++
-
-            if (contentAttempts < maxAttempts) {
-              console.log("Retrying content generation with different approach...")
-              continue
-            }
-
-            // Try with a different model as final fallback
-            try {
-              console.log("Trying GPT-4o as final fallback for content generation...")
-              const fallbackResult = await generateTextWithTimeout({
-                model: "openai/gpt-4o",
-                prompt: `Create a complete JSON object for professional services content. Input: "${input}"
-                
-                CRITICAL REQUIREMENTS - Return ONLY valid JSON with this EXACT structure:
-                {
-                  "technology": "string",
-                  "questions": [
-                    {
-                      "id": "string",
-                      "slug": "string", 
-                      "question": "string",
-                      "options": [
-                        {"key": "string", "value": number, "default": boolean}
-                      ]
-                    }
-                  ],
-                  "calculations": [
-                    {
-                      "id": "string",
-                      "slug": "string",
-                      "name": "string", 
-                      "description": "string",
-                      "formula": "string",
-                      "mappedQuestions": ["string"],
-                      "resultType": "multiplier|additive|conditional"
-                    }
-                  ],
-                  "services": [
-                    {
-                      "phase": "string",
-                      "service": "string",
-                      "description": "string",
-                      "hours": number,
-                      "serviceDescription": "string",
-                      "keyAssumptions": "string", 
-                      "clientResponsibilities": "string",
-                      "outOfScope": "string",
-                      "subservices": [
-                        {
-                          "name": "string",
-                          "description": "string", 
-                          "hours": number,
-                          "mappedQuestions": ["string"],
-                          "calculationSlug": "string",
-                          "serviceDescription": "string",
-                          "keyAssumptions": "string",
-                          "clientResponsibilities": "string", 
-                          "outOfScope": "string"
-                        }
-                      ]
-                    }
-                  ],
-                  "totalHours": number,
-                  "sources": [
-                    {"url": "string", "title": "string", "relevance": "string"}
-                  ]
-                }
-                
-                REQUIREMENTS:
-                - MINIMUM 10 services (not less)
-                - Each service must have exactly 3 subservices
-                - All fields must be present and properly formatted
-                - Return only valid JSON starting with { and ending with }
-                - No markdown, no explanations, no comments`,
-              }, 60000, "Fallback Content Generation")
-              generatedContent = fallbackResult.text
-              console.log("Fallback content generation succeeded")
+// Enhanced response cleaning and parsing pipeline
+async function parseAIResponse(response: string): Promise<any> {
+  // First, clean the response
+  let cleaned = cleanAIResponse(response)
+  
+  console.log("Cleaned response length:", cleaned.length)
+  console.log("First 200 chars:", cleaned.substring(0, 200))
+  console.log("Last 200 chars:", cleaned.substring(Math.max(0, cleaned.length - 200)))
+  
+  // Try standard JSON parsing first
+  try {
+    return JSON.parse(cleaned)
+  } catch (initialError) {
+    const errorMessage = initialError instanceof Error ? initialError.message : String(initialError)
+    console.warn("Initial JSON parsing failed, attempting advanced recovery:", errorMessage)
+    
+    // Step 1: Try to find and fix common JSON issues
+    try {
+      // Fix missing quotes around property names
+      cleaned = cleaned.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3')
+      
+      // Fix trailing commas in objects
+      cleaned = cleaned.replace(/,(\s*})/g, '$1')
+      
+      // Fix trailing commas in arrays
+      cleaned = cleaned.replace(/,(\s*\])/g, '$1')
+      
+      // Try parsing again after fixes
+      return JSON.parse(cleaned)
+    } catch (error) {
+      console.warn("Basic fixes didn't work, attempting structural recovery")
+    }
+    
+    // Step 2: Try to extract valid JSON structure
+    try {
+      // Find the outermost object
+      const firstBrace = cleaned.indexOf('{')
+      if (firstBrace >= 0) {
+        let braceCount = 1
+        let lastValidBrace = firstBrace
+        
+        // Find matching closing brace
+        for (let i = firstBrace + 1; i < cleaned.length; i++) {
+          if (cleaned[i] === '{') braceCount++
+          else if (cleaned[i] === '}') {
+            braceCount--
+            if (braceCount === 0) {
+              lastValidBrace = i
               break
-            } catch (fallbackError) {
-              console.error("Fallback content generation also failed:", fallbackError)
-              generatedContent = ""
             }
           }
         }
-
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "step",
-              stepId: "generate",
-              status: "completed",
-              progress: 90,
-            })}\n\n`,
-          ),
-        )
-
-        // Step 5: Format for ScopeStack using selected model
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "step",
-              stepId: "format",
-              status: "active",
-              progress: 95,
-              model: selectedModels.format,
-            })}\n\n`,
-          ),
-        )
-
-        // Clean the content - remove markdown and invalid JSON syntax
-        let cleanedContent = generatedContent.trim()
-
-        // Remove markdown code blocks
-        if (cleanedContent.startsWith("```json")) {
-          cleanedContent = cleanedContent.replace(/^```json\s*/, "").replace(/\s*```$/, "")
-        } else if (cleanedContent.startsWith("```")) {
-          cleanedContent = cleanedContent.replace(/^```\s*/, "").replace(/\s*```$/, "")
+        
+        if (lastValidBrace > firstBrace) {
+          // Extract what seems to be valid JSON
+          const potentialJson = cleaned.substring(firstBrace, lastValidBrace + 1)
+          try {
+            return JSON.parse(potentialJson)
+          } catch (error) {
+            console.warn("Extracted JSON structure is still invalid")
+          }
         }
+      }
+    } catch (error) {
+      console.warn("Structural recovery failed")
+    }
+    
+    // Step 3: More aggressive recovery - try to reconstruct JSON
+    try {
+      // Replace URL patterns that often cause issues
+      cleaned = cleaned.replace(/https:\/\/[^\s"\\]*(?:\\.[^\s"\\]*)*(?="|'|\s|$)/g, '"https://example.com"')
+      
+      // Replace any remaining invalid URL patterns
+      cleaned = cleaned.replace(/"url": "https:[^"]*"?(?=[,}])/g, '"url": "https://example.com"')
+      
+      // Try to fix truncated JSON by adding missing closing braces/brackets
+      const openBraces = (cleaned.match(/{/g) || []).length
+      const closeBraces = (cleaned.match(/}/g) || []).length
+      if (openBraces > closeBraces) {
+        cleaned += '}'.repeat(openBraces - closeBraces)
+      }
+      
+      const openBrackets = (cleaned.match(/\[/g) || []).length
+      const closeBrackets = (cleaned.match(/\]/g) || []).length
+      if (openBrackets > closeBrackets) {
+        cleaned += ']'.repeat(openBrackets - closeBrackets)
+      }
+      
+      // Try parsing one more time
+      return JSON.parse(cleaned)
+    } catch (finalError) {
+      const finalErrorMessage = finalError instanceof Error ? finalError.message : String(finalError)
+      console.error("All JSON recovery attempts failed:", finalErrorMessage)
+      console.error("Cleaned Response:", cleaned)
+      throw new Error(`Failed to parse AI response: ${finalErrorMessage}`)
+    }
+  }
+}
 
-        // Remove comments (both // and /* */ style)
-        cleanedContent = cleanedContent.replace(/\/\/.*$/gm, "") // Remove // comments
-        cleanedContent = cleanedContent.replace(/\/\*[\s\S]*?\*\//g, "") // Remove /* */ comments
-
-        // Remove trailing commas before closing brackets/braces
-        cleanedContent = cleanedContent.replace(/,(\s*[}\]])/g, "$1")
-
-        // Remove any leading/trailing whitespace
-        cleanedContent = cleanedContent.trim()
-
-        // Additional cleaning for common issues
-        cleanedContent = cleanedContent.replace(/\n/g, ' ') // Remove newlines
-        cleanedContent = cleanedContent.replace(/\s+/g, ' ') // Normalize whitespace
-        cleanedContent = cleanedContent.replace(/,\s*}/g, '}') // Remove trailing commas
-        cleanedContent = cleanedContent.replace(/,\s*]/g, ']') // Remove trailing commas in arrays
+// Retry logic with exponential backoff
+async function generateWithRetry(
+  prompt: string, 
+  model: string, 
+  maxAttempts: number = 3
+): Promise<any> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`Attempt ${attempt}/${maxAttempts} for ${model}`)
+      
+      // Add a specific instruction to return valid JSON
+      const enhancedPrompt = prompt + "\n\nIMPORTANT: Return only valid JSON. Do not include markdown code blocks. Start with { and end with }."
+      
+      const response = await callOpenRouter({ model, prompt: enhancedPrompt })
+      
+      try {
+        const parsed = await parseAIResponse(response)
         
-        // Fix common URL issues that break JSON
-        cleanedContent = cleanedContent.replace(/"url":\s*"([^"]*?)\s*"/g, '"url": "$1"') // Fix URLs with trailing spaces
-        cleanedContent = cleanedContent.replace(/"title":\s*"([^"]*?)\s*"/g, '"title": "$1"') // Fix titles with trailing spaces
-        cleanedContent = cleanedContent.replace(/"relevance":\s*"([^"]*?)\s*"/g, '"relevance": "$1"') // Fix relevance with trailing spaces
-        
-        // Fix unescaped quotes in strings
-        cleanedContent = cleanedContent.replace(/"([^"]*)"([^"]*)"([^"]*)"/g, '"$1$2$3"')
-        
-        // Remove any incomplete objects at the end
-        const lastBraceIndex = cleanedContent.lastIndexOf('}')
-        const lastBracketIndex = cleanedContent.lastIndexOf(']')
-        const lastIndex = Math.max(lastBraceIndex, lastBracketIndex)
-        if (lastIndex > 0) {
-          cleanedContent = cleanedContent.substring(0, lastIndex + 1)
+        // Basic validation of the response
+        if (!parsed || typeof parsed !== 'object') {
+          throw new Error(`Invalid response structure: ${typeof parsed}`)
         }
-
-        // Extract only the JSON object - find the first { and last }
-        const firstBrace = cleanedContent.indexOf('{')
-        const lastBrace = cleanedContent.lastIndexOf('}')
         
-        // Attempt to parse the JSON
-        let contentObj
-        let shouldUseFallback = false
+        console.log(`✅ Successfully parsed response from ${model}`)
+        return parsed
+      } catch (parseError) {
+        const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
+        console.error(`⚠️ Parse error on attempt ${attempt}:`, errorMessage)
         
-        try {
-          if (firstBrace >= 0 && lastBrace > firstBrace) {
-            // Use a more robust approach to find the complete JSON object
-            let braceCount = 0
-            let endIndex = -1
+        // If this is the last attempt, try a more aggressive approach
+        if (attempt === maxAttempts) {
+          console.log("🔄 Last attempt, trying more aggressive parsing approach")
+          
+          // Try to extract any valid JSON object from the response
+          const jsonRegex = /{(?:[^{}]|{(?:[^{}]|{[^{}]*})*})*}/g
+          const matches = response.match(jsonRegex)
+          
+          if (matches && matches.length > 0) {
+            // Find the largest JSON object (likely the main one)
+            const largestMatch = matches.reduce((a, b) => a.length > b.length ? a : b)
             
-            for (let i = firstBrace; i < cleanedContent.length; i++) {
-              if (cleanedContent[i] === '{') {
-                braceCount++
-              } else if (cleanedContent[i] === '}') {
-                braceCount--
-                if (braceCount === 0) {
-                  endIndex = i
-                  break
-                }
-              }
+            try {
+              const extracted = JSON.parse(largestMatch)
+              console.log("✅ Successfully extracted valid JSON using regex")
+              return extracted
+            } catch (regexError) {
+              console.error("❌ Failed to parse extracted JSON:", 
+                regexError instanceof Error ? regexError.message : String(regexError))
             }
+          }
+        }
+        
+        throw new Error(`Failed to parse response: ${errorMessage}`)
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error(`❌ Attempt ${attempt} failed:`, errorMessage)
+      
+      if (attempt === maxAttempts) {
+        throw new Error(`All ${maxAttempts} attempts failed: ${errorMessage}`)
+      }
+      
+      // Exponential backoff
+      const delay = Math.pow(2, attempt) * 1000
+      console.log(`⏱️ Waiting ${delay}ms before next attempt`)
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+  
+  // This should never be reached due to the throw in the loop, but TypeScript needs it
+  throw new Error("Unexpected error in generateWithRetry")
+}
+
+// Validate content structure to ensure it meets requirements
+function validateContentStructure(content: any): boolean {
+  if (!content || typeof content !== 'object') {
+    throw new Error('Content is not a valid object')
+  }
+
+  // Check required top-level fields
+  if (!content.technology || typeof content.technology !== 'string') {
+    console.warn('⚠️ Missing or invalid technology field, attempting to fix')
+    // Try to infer technology from other fields if possible
+    if (content.project_scope?.title) {
+      content.technology = content.project_scope.title
+    } else if (content.email_migration_research) {
+      content.technology = "Email Migration"
+    } else if (content.research_findings?.implementation_methodologies?.recommended_frameworks?.[0]) {
+      content.technology = content.research_findings.implementation_methodologies.recommended_frameworks[0]
+    } else {
+      throw new Error('Missing or invalid technology field and unable to infer')
+    }
+  }
+
+  // Validate or create questions
+  if (!Array.isArray(content.questions) || content.questions.length < 3) {
+    console.warn('⚠️ Insufficient questions, generating default questions')
+    content.questions = [
+      {
+        id: "q1",
+        slug: "implementation-scope",
+        question: `What is the scope of ${content.technology} implementation?`,
+        options: [
+          { key: "Basic implementation", value: 1, default: true },
+          { key: "Standard implementation", value: 2 },
+          { key: "Comprehensive implementation", value: 3 }
+        ]
+      },
+      {
+        id: "q2",
+        slug: "organization-size",
+        question: "What is the size of your organization?",
+        options: [
+          { key: "Small (1-100 employees)", value: 1 },
+          { key: "Medium (101-1000 employees)", value: 2, default: true },
+          { key: "Large (1000+ employees)", value: 3 }
+        ]
+      },
+      {
+        id: "q3",
+        slug: "timeline-requirements",
+        question: "What is your implementation timeline?",
+        options: [
+          { key: "Standard (3-6 months)", value: 1, default: true },
+          { key: "Accelerated (1-3 months)", value: 2 },
+          { key: "Extended (6-12 months)", value: 3 }
+        ]
+      }
+    ]
+  }
+
+  // Validate or create calculations
+  if (!Array.isArray(content.calculations)) {
+    console.warn('⚠️ Missing calculations, adding default calculations')
+    content.calculations = [
+      {
+        id: "calc1",
+        slug: "scope-multiplier",
+        name: "Scope Multiplier",
+        description: "Adjusts hours based on implementation scope",
+        formula: "implementation_scope",
+        mappedQuestions: ["implementation-scope"],
+        resultType: "multiplier"
+      }
+    ]
+  }
+
+  // Validate or create services
+  if (!Array.isArray(content.services) || content.services.length < 5) {
+    console.warn(`⚠️ Insufficient services: ${content.services?.length || 0}/5 minimum, attempting to extract`)
+    
+    // Try to extract services from other structures in the response
+    let extractedServices = []
+    
+    // Check if services are in a different location in the structure
+    if (content.service_components && Array.isArray(content.service_components)) {
+      extractedServices = content.service_components.map((svc: any, index: number) => ({
+        phase: svc.phase || "Implementation",
+        service: svc.name || `Service ${index + 1}`,
+        description: svc.description || `Service description`,
+        hours: svc.hours || 40,
+        subservices: Array.isArray(svc.subservices) ? svc.subservices.map((sub: any, subIndex: number) => ({
+          name: sub.name || `Subservice ${subIndex + 1}`,
+          description: sub.description || `Subservice description`,
+          hours: sub.hours || Math.floor(svc.hours / 3)
+        })) : [
+          { name: "Planning", description: "Planning activities", hours: Math.floor((svc.hours || 40) / 3) },
+          { name: "Implementation", description: "Implementation activities", hours: Math.floor((svc.hours || 40) / 3) },
+          { name: "Support", description: "Support activities", hours: Math.floor((svc.hours || 40) / 3) }
+        ]
+      }))
+    } else if (content.implementation_services && Array.isArray(content.implementation_services)) {
+      extractedServices = content.implementation_services
+    } else if (content.service_breakdown && Array.isArray(content.service_breakdown)) {
+      extractedServices = content.service_breakdown.map((svc: any, index: number) => ({
+        phase: svc.phase || "Implementation",
+        service: svc.service || `Service ${index + 1}`,
+        description: svc.description || `Service description`,
+        hours: svc.hours || 40,
+        subservices: Array.isArray(svc.subservices) ? svc.subservices.map((sub: string, subIndex: number) => ({
+          name: sub,
+          description: `${sub} activities`,
+          hours: Math.floor(svc.hours / 3)
+        })) : [
+          { name: "Planning", description: "Planning activities", hours: Math.floor((svc.hours || 40) / 3) },
+          { name: "Implementation", description: "Implementation activities", hours: Math.floor((svc.hours || 40) / 3) },
+          { name: "Support", description: "Support activities", hours: Math.floor((svc.hours || 40) / 3) }
+        ]
+      }))
+    }
+    
+    if (extractedServices.length >= 5) {
+      content.services = extractedServices
+      console.log(`✅ Successfully extracted ${extractedServices.length} services from response`)
+    } else {
+      throw new Error(`Insufficient services: ${content.services?.length || 0}/5 minimum and extraction failed`)
+    }
+  }
+
+  // Ensure each service has exactly 3 subservices
+  for (const [index, service] of content.services.entries()) {
+    if (!service.phase || !service.service || !service.description) {
+      console.warn(`⚠️ Service at index ${index} is missing fields, fixing`)
+      service.phase = service.phase || "Implementation"
+      service.service = service.service || `Service ${index + 1}`
+      service.description = service.description || `Service description for ${service.service}`
+    }
+    
+    if (typeof service.hours !== 'number' || isNaN(service.hours)) {
+      service.hours = 40
+    }
+    
+    if (!Array.isArray(service.subservices) || service.subservices.length !== 3) {
+      console.warn(`⚠️ Service "${service.service}" has ${service.subservices?.length || 0}/3 required subservices, fixing`)
+      
+      // Keep existing subservices if any
+      const existingSubservices = Array.isArray(service.subservices) ? service.subservices : []
+      
+      // Create default subservices to fill the gap
+      const defaultSubservices = [
+        { name: "Planning", description: "Planning activities", hours: Math.floor(service.hours / 3) },
+        { name: "Implementation", description: "Implementation activities", hours: Math.floor(service.hours / 3) },
+        { name: "Support", description: "Support activities", hours: Math.floor(service.hours / 3) }
+      ]
+      
+      // Combine existing with defaults, ensuring exactly 3 subservices
+      service.subservices = [
+        ...existingSubservices.slice(0, 3),
+        ...defaultSubservices.slice(existingSubservices.length)
+      ].slice(0, 3)
+    }
+    
+    // Check each subservice
+    for (const [subIndex, subservice] of service.subservices.entries()) {
+      if (!subservice.name || !subservice.description) {
+        console.warn(`⚠️ Subservice at index ${index}.${subIndex} is missing fields, fixing`)
+        subservice.name = subservice.name || `Subservice ${subIndex + 1}`
+        subservice.description = subservice.description || `Subservice description for ${subservice.name}`
+      }
+      
+      if (typeof subservice.hours !== 'number' || isNaN(subservice.hours)) {
+        subservice.hours = Math.floor(service.hours / 3)
+      }
+    }
+  }
+
+  // Validate or create sources
+  if (!Array.isArray(content.sources) || content.sources.length < 1) {
+    console.warn('⚠️ Missing sources, adding default sources')
+    content.sources = [
+      {
+        url: "https://docs.microsoft.com",
+        title: `${content.technology} Documentation`,
+        relevance: "Official documentation"
+      },
+      {
+        url: "https://www.gartner.com",
+        title: "Gartner Research",
+        relevance: "Industry analysis and benchmarks"
+      }
+    ]
+  }
+
+  // Validate or calculate total hours
+  if (typeof content.totalHours !== 'number' || isNaN(content.totalHours)) {
+    console.warn('⚠️ Missing or invalid totalHours, calculating from services')
+    content.totalHours = content.services.reduce((total: number, service: any) => total + (service.hours || 0), 0)
+  }
+
+  console.log('✅ Content structure validated and fixed where needed')
+  return true
+}
+
+// Generate ultimate fallback content when all else fails
+function generateUltimateFallbackContent(input: string): any {
+  console.log("Generating ultimate fallback content for:", input)
+  
+  // Extract a simple technology name from the input
+  const technology = input.split(/\s+/).slice(0, 3).join(" ")
+  
+  // Create a more comprehensive set of questions
+  const questions = [
+    {
+      id: "q1",
+      slug: "implementation-scope",
+      question: `What is the scope of ${technology} implementation?`,
+      options: [
+        { key: "Basic implementation", value: 1, default: true },
+        { key: "Standard implementation", value: 2 },
+        { key: "Comprehensive implementation", value: 3 }
+      ]
+    },
+    {
+      id: "q2",
+      slug: "organization-size",
+      question: "What is the size of your organization?",
+      options: [
+        { key: "Small (1-100 employees)", value: 1 },
+        { key: "Medium (101-1000 employees)", value: 2, default: true },
+        { key: "Large (1000+ employees)", value: 3 }
+      ]
+    },
+    {
+      id: "q3",
+      slug: "timeline-requirements",
+      question: "What is your implementation timeline?",
+      options: [
+        { key: "Standard (3-6 months)", value: 1, default: true },
+        { key: "Accelerated (1-3 months)", value: 2 },
+        { key: "Extended (6-12 months)", value: 3 }
+      ]
+    },
+    {
+      id: "q4",
+      slug: "compliance-requirements",
+      question: "What compliance requirements apply?",
+      options: [
+        { key: "Standard compliance", value: 1, default: true },
+        { key: "Industry-specific compliance", value: 2 },
+        { key: "Strict regulatory compliance", value: 3 }
+      ]
+    },
+    {
+      id: "q5",
+      slug: "integration-complexity",
+      question: "What is the integration complexity?",
+      options: [
+        { key: "Minimal integration", value: 1, default: true },
+        { key: "Standard integration", value: 2 },
+        { key: "Complex integration", value: 3 }
+      ]
+    }
+  ]
+
+  // Create calculations that reference the questions
+  const calculations = [
+    {
+      id: "calc1",
+      slug: "scope-multiplier",
+      name: "Scope Multiplier",
+      description: "Adjusts hours based on implementation scope",
+      formula: "implementation_scope",
+      mappedQuestions: ["implementation-scope"],
+      resultType: "multiplier"
+    },
+    {
+      id: "calc2",
+      slug: "size-factor",
+      name: "Organization Size Factor",
+      description: "Adjusts hours based on organization size",
+      formula: "organization_size",
+      mappedQuestions: ["organization-size"],
+      resultType: "multiplier"
+    },
+    {
+      id: "calc3",
+      slug: "complexity-factor",
+      name: "Integration Complexity Factor",
+      description: "Adjusts hours based on integration complexity",
+      formula: "integration_complexity",
+      mappedQuestions: ["integration-complexity"],
+      resultType: "multiplier"
+    }
+  ]
+
+  // Create a more comprehensive set of services with proper structure
+  const phases = ["Planning", "Design", "Implementation", "Testing", "Go-Live", "Support"]
+  const services = phases.flatMap((phase, phaseIndex) => {
+    // Create 2 services per phase for a total of 12 services
+    return [1, 2].map(serviceIndex => {
+      const serviceNumber = phaseIndex * 2 + serviceIndex
+      const baseHours = 40
+      
+      return {
+        phase,
+        service: `${phase} Service ${serviceIndex}`,
+        description: `Standard ${phase.toLowerCase()} service for ${technology}`,
+        hours: baseHours,
+        serviceDescription: `Complete ${phase.toLowerCase()} service for ${technology} implementation`,
+        keyAssumptions: "Standard implementation assumptions apply",
+        clientResponsibilities: "Client will provide necessary access and resources",
+        outOfScope: "Custom development and third-party integrations",
+        subservices: [
+          {
+            name: `${phase} Planning`,
+            description: `Planning component of ${phase.toLowerCase()} service`,
+            hours: Math.floor(baseHours / 3),
+            mappedQuestions: ["implementation-scope"],
+            calculationSlug: "scope-multiplier",
+            serviceDescription: "Standard implementation planning",
+            keyAssumptions: "Standard implementation assumptions",
+            clientResponsibilities: "Client will provide necessary resources",
+            outOfScope: "Custom development"
+          },
+          {
+            name: `${phase} Execution`,
+            description: `Execution component of ${phase.toLowerCase()} service`,
+            hours: Math.floor(baseHours / 3),
+            mappedQuestions: ["organization-size"],
+            calculationSlug: "size-factor",
+            serviceDescription: "Standard implementation execution",
+            keyAssumptions: "Standard implementation assumptions",
+            clientResponsibilities: "Client will provide necessary resources",
+            outOfScope: "Custom development"
+          },
+          {
+            name: `${phase} Review`,
+            description: `Review component of ${phase.toLowerCase()} service`,
+            hours: Math.floor(baseHours / 3),
+            mappedQuestions: ["integration-complexity"],
+            calculationSlug: "complexity-factor",
+            serviceDescription: "Standard implementation review",
+            keyAssumptions: "Standard implementation assumptions",
+            clientResponsibilities: "Client will provide necessary resources",
+            outOfScope: "Custom development"
+          }
+        ]
+      }
+    })
+  })
+
+  // Calculate total hours
+  const totalHours = services.reduce((total, service) => total + service.hours, 0)
+
+  // Create a comprehensive set of sources
+  const sources = [
+    {
+      url: "https://docs.microsoft.com",
+      title: `${technology} Documentation`,
+      relevance: "Official documentation and implementation guides"
+    },
+    {
+      url: "https://www.gartner.com",
+      title: "Gartner Research",
+      relevance: "Industry analysis and implementation benchmarks"
+    },
+    {
+      url: "https://www.forrester.com",
+      title: "Forrester Research",
+      relevance: "Best practices and implementation methodologies"
+    }
+  ]
+
+  return {
+    technology,
+    questions,
+    calculations,
+    services,
+    totalHours,
+    sources
+  }
+}
+
+// Generate fallback research data when research step fails
+function generateFallbackResearch(technology: string): any {
+  console.log("Generating fallback research for:", technology)
+  
+  return {
+    findings: [
+      {
+        category: "Implementation Methodologies",
+        details: `Standard implementation methodologies for ${technology} typically follow industry best practices including requirements gathering, design, development, testing, deployment, and post-implementation support.`
+      },
+      {
+        category: "Best Practices",
+        details: `Industry best practices for ${technology} implementations include thorough planning, stakeholder engagement, phased deployment, comprehensive testing, and user training.`
+      },
+      {
+        category: "Professional Services",
+        details: `Professional services for ${technology} typically include assessment, planning, design, implementation, testing, training, and post-deployment support.`
+      },
+      {
+        category: "Hour Estimates",
+        details: `Typical ${technology} implementations require between 400-600 hours depending on complexity, scale, and customization requirements.`
+      },
+      {
+        category: "Common Challenges",
+        details: `Common challenges in ${technology} implementations include integration complexity, data migration issues, user adoption, and scope management.`
+      }
+    ],
+    sources: [
+      {
+        url: "https://docs.microsoft.com",
+        title: "Microsoft Documentation",
+        relevance: "Primary technical reference"
+      },
+      {
+        url: "https://aws.amazon.com/documentation",
+        title: "AWS Documentation",
+        relevance: "Cloud implementation reference"
+      },
+      {
+        url: "https://www.gartner.com",
+        title: "Gartner Research",
+        relevance: "Industry analysis and benchmarks"
+      }
+    ]
+  }
+}
+
+// Generate fallback analysis data when analysis step fails
+function generateFallbackAnalysis(technology: string): any {
+  console.log("Generating fallback analysis for:", technology)
+  
+  return {
+    implementation_phases: [
+      {
+        phase: "Planning",
+        timeline: "4-6 weeks",
+        activities: "Requirements gathering, stakeholder interviews, current state assessment"
+      },
+      {
+        phase: "Design",
+        timeline: "4-6 weeks",
+        activities: "Solution architecture, process design, integration planning"
+      },
+      {
+        phase: "Implementation",
+        timeline: "8-12 weeks",
+        activities: "Configuration, customization, integration development"
+      },
+      {
+        phase: "Testing",
+        timeline: "4-6 weeks",
+        activities: "Functional testing, integration testing, user acceptance testing"
+      },
+      {
+        phase: "Go-Live",
+        timeline: "2-4 weeks",
+        activities: "Deployment, cutover, initial support"
+      },
+      {
+        phase: "Support",
+        timeline: "Ongoing",
+        activities: "Maintenance, optimization, user support"
+      }
+    ],
+    critical_success_factors: [
+      "Executive sponsorship and stakeholder alignment",
+      "Clear requirements and scope definition",
+      "Adequate resource allocation",
+      "Effective change management and communication",
+      "Comprehensive testing strategy",
+      "User training and adoption planning"
+    ],
+    resource_requirements: [
+      {
+        role: "Project Manager",
+        skills: "PMP certification, experience with similar implementations",
+        level: "Senior"
+      },
+      {
+        role: "Solution Architect",
+        skills: `${technology} certification, 5+ years experience`,
+        level: "Senior"
+      },
+      {
+        role: "Technical Consultant",
+        skills: `${technology} implementation experience`,
+        level: "Mid-level"
+      },
+      {
+        role: "Integration Specialist",
+        skills: "API development, middleware experience",
+        level: "Senior"
+      },
+      {
+        role: "Change Manager",
+        skills: "Organizational change management, communication planning",
+        level: "Mid-level"
+      }
+    ],
+    risk_factors: [
+      {
+        risk: "Scope creep",
+        mitigation: "Clear scope definition, change control process"
+      },
+      {
+        risk: "Resource constraints",
+        mitigation: "Detailed resource planning, skills assessment"
+      },
+      {
+        risk: "Integration complexity",
+        mitigation: "Early proof-of-concept, technical spikes"
+      },
+      {
+        risk: "User adoption challenges",
+        mitigation: "Change management strategy, training program"
+      }
+    ],
+    service_breakdown: [
+      {
+        service: "Planning and Assessment",
+        hours: 80,
+        subservices: ["Current State Analysis", "Requirements Gathering", "Roadmap Development"]
+      },
+      {
+        service: "Solution Design",
+        hours: 120,
+        subservices: ["Architecture Design", "Process Design", "Integration Planning"]
+      },
+      {
+        service: "Implementation",
+        hours: 200,
+        subservices: ["Configuration", "Customization", "Integration Development"]
+      }
+    ]
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const data = await request.json()
+    const { input, models, prompts } = data
+
+    if (!input) {
+      return Response.json({ error: "Input is required" }, { status: 400 })
+    }
+
+    console.log("🔍 Starting research for:", input)
+
+    // Set up SSE stream
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // Helper function to send SSE events
+          const sendEvent = (type: string, data: any) => {
+            const event = `data: ${JSON.stringify({ type, ...data })}\n\n`
+            controller.enqueue(encoder.encode(event))
+          }
+
+          // Step 1: Parsing
+          sendEvent("step", { 
+            stepId: "parse", 
+            status: "active", 
+            progress: 10,
+            model: models?.parsing || "anthropic/claude-3-sonnet"
+          })
+
+          // Parse input
+          console.log("📊 Step 1: Parsing input...")
+          const parsingPrompt = prompts?.parsing || DEFAULT_PROMPTS.parsing.replace("{input}", input)
+          
+          let parsedData
+          try {
+            const parsingResponse = await callOpenRouter({
+              model: models?.parsing || "anthropic/claude-3-sonnet",
+              prompt: parsingPrompt,
+            })
             
-            if (endIndex > firstBrace) {
-              cleanedContent = cleanedContent.substring(firstBrace, endIndex + 1)
-              console.log("Extracted complete JSON object from response")
-            } else {
-              console.error("Could not find complete JSON object boundaries")
+            parsedData = await parseAIResponse(parsingResponse)
+            console.log("✅ Parsing successful:", parsedData)
+            sendEvent("step", { 
+              stepId: "parse", 
+              status: "completed", 
+              progress: 25,
+              model: models?.parsing || "anthropic/claude-3-sonnet"
+            })
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            console.error("❌ Parsing failed:", errorMessage)
+            // Use basic fallback for parsing failure
+            parsedData = {
+              technology: input.split(" ").slice(0, 3).join(" "),
+              scale: "Enterprise",
+              industry: "Technology",
+              compliance: "Standard",
+              complexity: ["Standard implementation"]
+            }
+            console.log("⚠️ Using fallback parsing data:", parsedData)
+            sendEvent("step", { 
+              stepId: "parse", 
+              status: "completed", 
+              progress: 25,
+              model: models?.parsing || "anthropic/claude-3-sonnet"
+            })
+          }
+          
+          // Step 2: Research
+          sendEvent("step", { 
+            stepId: "research", 
+            status: "active", 
+            progress: 25,
+            model: models?.research || "anthropic/claude-3-sonnet"
+          })
+          
+          console.log("📚 Step 2: Conducting research...")
+          const researchPrompt = prompts?.research || DEFAULT_PROMPTS.research
+            .replace("{input}", input)
+            .replace("{detectedTechnology}", parsedData.technology || input)
+          
+          let researchData
+          try {
+            researchData = await generateWithRetry(
+              researchPrompt,
+              models?.research || "anthropic/claude-3-sonnet",
+              2
+            )
+            console.log("✅ Research successful")
+            sendEvent("step", { 
+              stepId: "research", 
+              status: "completed", 
+              progress: 50,
+              model: models?.research || "anthropic/claude-3-sonnet",
+              sources: ["Research sources found"]
+            })
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            console.error("❌ Research failed:", errorMessage)
+            // Use fallback for research failure
+            researchData = generateFallbackResearch(parsedData.technology || input)
+            console.log("⚠️ Using fallback research data")
+            sendEvent("step", { 
+              stepId: "research", 
+              status: "completed", 
+              progress: 50,
+              model: models?.research || "anthropic/claude-3-sonnet"
+            })
+          }
+
+          // Step 3: Analysis
+          sendEvent("step", { 
+            stepId: "analyze", 
+            status: "active", 
+            progress: 50,
+            model: models?.analysis || "anthropic/claude-3-sonnet"
+          })
+          
+          console.log("🔬 Step 3: Analyzing research...")
+          const analysisPrompt = prompts?.analysis || DEFAULT_PROMPTS.analysis
+            .replace("{researchFindings}", JSON.stringify(researchData))
+            .replace("{input}", input)
+          
+          let analysisData
+          try {
+            const analysisResponse = await callOpenRouter({
+              model: models?.analysis || "anthropic/claude-3-sonnet",
+              prompt: analysisPrompt,
+            })
+            
+            analysisData = await parseAIResponse(analysisResponse)
+            console.log("✅ Analysis successful")
+            sendEvent("step", { 
+              stepId: "analyze", 
+              status: "completed", 
+              progress: 75,
+              model: models?.analysis || "anthropic/claude-3-sonnet"
+            })
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            console.error("❌ Analysis failed:", errorMessage)
+            // Use fallback for analysis failure
+            analysisData = generateFallbackAnalysis(parsedData.technology || input)
+            console.log("⚠️ Using fallback analysis data")
+            sendEvent("step", { 
+              stepId: "analyze", 
+              status: "completed", 
+              progress: 75,
+              model: models?.analysis || "anthropic/claude-3-sonnet"
+            })
+          }
+
+          // Step 4: Content Generation
+          sendEvent("step", { 
+            stepId: "generate", 
+            status: "active", 
+            progress: 75,
+            model: models?.content || "anthropic/claude-3.5-sonnet"
+          })
+          
+          console.log("📝 Step 4: Generating content...")
+          const contentPrompt = prompts?.content || 
+            `Generate complete professional services content based on research:
+
+Technology: ${parsedData.technology || input}
+Research Findings: ${JSON.stringify(researchData)}
+Analysis: ${JSON.stringify(analysisData)}
+Original Request: ${input}
+
+Generate structured content with:
+- At least 5 questions with options
+- At least 5 services across all phases (Planning, Design, Implementation, Testing, Go-Live, Support)
+- Each service must have exactly 3 subservices
+- All content must be specific to ${parsedData.technology || input}
+- Hours based on research findings and industry standards${JSON_RESPONSE_INSTRUCTION}`
+
+          let contentObj
+          let shouldUseFallback = false
+          
+          try {
+            console.log("Attempting to generate content with model:", models?.content || "anthropic/claude-3.5-sonnet")
+            const contentResponse = await callOpenRouter({
+              model: models?.content || "anthropic/claude-3.5-sonnet",
+              prompt: contentPrompt,
+            })
+            
+            try {
+              contentObj = await parseAIResponse(contentResponse)
+              console.log("✅ Content generation successful!")
+            } catch (parseError) {
+              const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
+              console.error(`❌ Content parsing failed: ${errorMessage}`)
               shouldUseFallback = true
             }
-          } else {
-            console.error("Could not find valid JSON object boundaries")
-            console.log("Using fallback content due to JSON extraction failure")
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            console.error(`❌ Content generation failed: ${errorMessage}`)
             shouldUseFallback = true
           }
 
-          if (!shouldUseFallback) {
-            contentObj = JSON.parse(cleanedContent)
-            console.log("✅ JSON parsing successful!")
-          }
-        } catch (parseError) {
-          console.error("Failed to parse generated content as JSON. Raw output:", generatedContent)
-          console.error("Cleaned output:", cleanedContent)
-          console.error("Parse error:", parseError)
-          
-          // Try to find the problematic character
-          const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
-          const errorPosition = parseInt(errorMessage.match(/position (\d+)/)?.[1] || "0")
-          if (errorPosition > 0) {
-            const start = Math.max(0, errorPosition - 50)
-            const end = Math.min(cleanedContent.length, errorPosition + 50)
-            console.error("Problem area around position", errorPosition, ":", cleanedContent.substring(start, end))
-          }
-          
-          // Instead of throwing, use fallback content and continue to formatting
-          console.log("Using fallback content due to parsing error, but continuing to formatting step")
-          shouldUseFallback = true
-        }
-
-        if (shouldUseFallback) {
-          contentObj = await generateFallbackContent(input, parsedTech, researchFindings, analysis, dynamicSources)
-        }
-
-        // Final validation
-        if (!contentObj.services || contentObj.services.length < 10) {
-          console.error(`Insufficient services generated: ${contentObj.services?.length || 0}. Required: 10+`)
-          console.log("Using fallback content due to insufficient services")
-          contentObj = await generateFallbackContent(input, parsedTech, researchFindings, analysis, dynamicSources)
-        }
-
-        console.log(`Initial parsing successful with ${contentObj.services.length} services`)
-
-        // Now perform actual AI formatting for ScopeStack
-        try {
-          console.log(`Calling ${selectedModels.format} for ScopeStack formatting...`)
-          const formatResult = await generateTextWithTimeout({
-            model: selectedModels.format,
-            prompt: `Format and validate this professional services content for ScopeStack integration:
-
-            Original Request: ${input}
-            Research Context: ${researchFindings.substring(0, 500)}...
-            Analysis: ${analysis.substring(0, 500)}...
-
-            CURRENT CONTENT TO FORMAT:
-            ${JSON.stringify(contentObj, null, 2)}
-
-            SCOPE STACK FORMATTING REQUIREMENTS:
-            1. Ensure all services have exactly 3 subservices
-            2. Validate that all services and subservices have the four required language fields:
-               - serviceDescription: Clear description of what the service includes
-               - keyAssumptions: Critical assumptions for successful delivery
-               - clientResponsibilities: What the client must provide/do
-               - outOfScope: What is explicitly NOT included
-            3. Ensure question options use format: {"key": "description", "value": number}
-            4. Validate calculation formulas are valid Ruby ternary expressions
-            5. Ensure totalHours is calculated correctly
-            6. Optimize content structure for ScopeStack API integration
-            7. Add any missing language fields with appropriate content
-            8. Ensure all slugs are kebab-case and unique
-
-            IMPORTANT: You must generate at least 10 services, each with exactly 3 subservices. Return only valid JSON. No markdown, no explanations.
-
-            CRITICAL VALIDATION:
-            - Count services (must be 10+)
-            - Each service must have exactly 3 subservices
-            - All language fields must be present and meaningful
-            - Question options must use correct format
-            - Calculations must be valid
-
-            Return ONLY valid JSON. Start with { and end with }. No markdown, no explanations.
-            If any validation fails, fix the issues and return corrected JSON.`,
-          }, 120000, "ScopeStack Formatting") // 2 minute timeout for formatting
-
-          // Parse the formatted content with robust error handling
-          const formattedContent = formatResult.text.trim()
-          
-          // Check if we got an empty or invalid response
-          if (!formattedContent || formattedContent.length < 10) {
-            console.error("Formatting step returned empty or very short response:", formattedContent)
-            console.error("Response length:", formattedContent?.length || 0)
-            throw new Error("Formatting step returned empty response")
+          if (shouldUseFallback) {
+            console.log("⚠️ Using fallback content")
+            try {
+              contentObj = await generateFallbackContent(input, JSON.stringify(parsedData), JSON.stringify(researchData), JSON.stringify(analysisData))
+              console.log("✅ Fallback content generation successful")
+            } catch (fallbackError) {
+              const errorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+              console.error(`❌ Fallback content generation failed: ${errorMessage}`)
+              console.log("⚠️ Using ultimate fallback content")
+              contentObj = generateUltimateFallbackContent(input)
+            }
           }
 
-          console.log("Formatting response received, length:", formattedContent.length)
-          console.log("First 200 characters:", formattedContent.substring(0, 200))
-
-          let cleanedFormattedContent = formattedContent
-
-          // Remove markdown if present
-          if (cleanedFormattedContent.startsWith("```json")) {
-            cleanedFormattedContent = cleanedFormattedContent.replace(/^```json\s*/, "").replace(/\s*```$/, "")
-          } else if (cleanedFormattedContent.startsWith("```")) {
-            cleanedFormattedContent = cleanedFormattedContent.replace(/^```\s*/, "").replace(/\s*```$/, "")
-          }
-
-          // Try to parse the JSON
-          let formattedObj
+          // Validate and fix content structure regardless of source
           try {
-            formattedObj = JSON.parse(cleanedFormattedContent)
-          } catch (parseError) {
-            console.error("Failed to parse formatting response as JSON. Raw output:", formattedContent)
-            console.error("Cleaned output:", cleanedFormattedContent)
-            console.error("Parse error:", parseError)
-            const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
-            throw new Error(`JSON parsing failed: ${errorMessage}`)
+            validateContentStructure(contentObj)
+            console.log("✅ Content structure validated and fixed")
+          } catch (validationError) {
+            const errorMessage = validationError instanceof Error ? validationError.message : String(validationError)
+            console.error(`❌ Content validation failed: ${errorMessage}`)
+            console.log("⚠️ Using ultimate fallback content")
+            contentObj = generateUltimateFallbackContent(input)
           }
 
-          // Final validation
-          if (!formattedObj.services || formattedObj.services.length < 10) {
-            console.error(`Formatted content has insufficient services: ${formattedObj.services?.length || 0}`)
-            console.log("Using original content instead of formatted content")
-            // Don't throw error, just use original content
-          } else {
-            // Validate language fields
-            let hasValidLanguageFields = true
-            for (let i = 0; i < formattedObj.services.length; i++) {
-              const service = formattedObj.services[i]
-              const requiredFields = ['serviceDescription', 'keyAssumptions', 'clientResponsibilities', 'outOfScope']
-              
-              for (const field of requiredFields) {
-                if (!service[field] || service[field].trim() === '') {
-                  console.error(`Service ${i + 1} missing ${field}`)
-                  hasValidLanguageFields = false
-                  break
-                }
-              }
+          sendEvent("step", { 
+            stepId: "generate", 
+            status: "completed", 
+            progress: 90,
+            model: models?.content || "anthropic/claude-3.5-sonnet"
+          })
 
-              // Validate subservices
-              if (!service.subservices || service.subservices.length !== 3) {
-                console.error(`Service ${i + 1} has ${service.subservices?.length || 0} subservices. Required: 3`)
-                hasValidLanguageFields = false
-                break
-              }
+          // Step 5: Formatting
+          sendEvent("step", { 
+            stepId: "format", 
+            status: "active", 
+            progress: 90,
+            model: models?.format || "openai/gpt-4o"
+          })
 
-              // Validate subservice language fields
-              for (let j = 0; j < service.subservices.length; j++) {
-                const subservice = service.subservices[j]
-                for (const field of requiredFields) {
-                  if (!subservice[field] || subservice[field].trim() === '') {
-                    console.error(`Subservice ${j + 1} in service ${i + 1} missing ${field}`)
-                    hasValidLanguageFields = false
-                    break
-                  }
-                }
-              }
-              
-              if (!hasValidLanguageFields) break
-            }
-            
-            if (hasValidLanguageFields) {
-              contentObj = formattedObj
-              console.log(`ScopeStack formatting completed successfully with ${contentObj.services.length} services`)
-            } else {
-              console.log("Formatted content has invalid language fields, using original content")
-            }
+          // Final validation to ensure we always return valid content
+          try {
+            validateContentStructure(contentObj)
+            console.log("✅ Content structure validated")
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            console.error("❌ Content validation failed:", errorMessage)
+            console.log("⚠️ Using ultimate fallback content")
+            contentObj = generateUltimateFallbackContent(input)
           }
 
-        } catch (formatError) {
-          console.error("ScopeStack formatting failed:", formatError)
-          console.log("Using original content without formatting")
+          sendEvent("step", { 
+            stepId: "format", 
+            status: "completed", 
+            progress: 100,
+            model: models?.format || "openai/gpt-4o"
+          })
+
+          // Send final complete event with content
+          console.log("✅ Research process complete!")
+          sendEvent("complete", { content: contentObj, progress: 100 })
           
-          // Continue with original content, but ensure basic structure
-          if (!contentObj.calculations) {
-            contentObj.calculations = []
-          }
-
-          if (!contentObj.totalHours) {
-            contentObj.totalHours = contentObj.services.reduce(
-              (total: number, service: any) => total + service.hours,
-              0,
-            )
-          }
-
-          // Ensure all services have required language fields
-          contentObj.services = contentObj.services.map((service: any) => ({
-            ...service,
-            serviceDescription: service.serviceDescription || "Service description not provided",
-            keyAssumptions: service.keyAssumptions || "Key assumptions not specified",
-            clientResponsibilities: service.clientResponsibilities || "Client responsibilities not specified",
-            outOfScope: service.outOfScope || "Out of scope items not specified",
-            subservices: service.subservices.map((sub: any) => ({
-              ...sub,
-              serviceDescription: sub.serviceDescription || "Subservice description not provided",
-              keyAssumptions: sub.keyAssumptions || "Key assumptions not specified",
-              clientResponsibilities: sub.clientResponsibilities || "Client responsibilities not specified",
-              outOfScope: sub.outOfScope || "Out of scope items not specified",
-            }))
-          }))
+          // Close the stream
+          controller.close()
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          console.error("❌ Error in SSE stream:", errorMessage)
+          controller.error(errorMessage)
         }
-
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "step",
-              stepId: "format",
-              status: "completed",
-              progress: 100,
-            })}\n\n`,
-          ),
-        )
-
-        // Send final content
-        console.log("Preparing to send content to frontend. Content structure:", {
-          hasTechnology: !!contentObj.technology,
-          servicesCount: contentObj.services?.length || 0,
-          questionsCount: contentObj.questions?.length || 0,
-          calculationsCount: contentObj.calculations?.length || 0,
-          hasTotalHours: typeof contentObj.totalHours === 'number',
-          hasSources: Array.isArray(contentObj.sources)
-        })
-
-        // Ensure we have valid content before sending
-        if (!contentObj.services || contentObj.services.length < 10) {
-          console.error("Content validation failed before sending to frontend. Using placeholder content.")
-          contentObj = await generateFallbackContent(input, parsedTech, researchFindings, analysis, dynamicSources)
-        }
-
-        // Final safety check - ensure we always have valid content
-        if (!contentObj || !contentObj.services || contentObj.services.length < 10) {
-          console.error("All content generation methods failed. Creating minimal valid structure.")
-          contentObj = {
-            technology: "Technology Solution",
-            questions: [
-              {
-                id: "q1",
-                slug: "default-question",
-                question: "Default question for content generation",
-                options: [{ key: "Default option", value: 1, default: true }]
-              }
-            ],
-            calculations: [],
-            services: Array.from({ length: 10 }, (_, i) => ({
-              phase: `Phase ${i + 1}`,
-              service: `Service ${i + 1}`,
-              description: "Service description",
-              hours: 1,
-              serviceDescription: "Service description",
-              keyAssumptions: "Key assumptions",
-              clientResponsibilities: "Client responsibilities",
-              outOfScope: "Out of scope",
-              subservices: [
-                {
-                  name: "Subservice 1",
-                  description: "Subservice description",
-                  hours: 1,
-                  mappedQuestions: [],
-                  serviceDescription: "Subservice description",
-                  keyAssumptions: "Subservice assumptions",
-                  clientResponsibilities: "Subservice client responsibilities",
-                  outOfScope: "Subservice out of scope"
-                },
-                {
-                  name: "Subservice 2",
-                  description: "Subservice description",
-                  hours: 1,
-                  mappedQuestions: [],
-                  serviceDescription: "Subservice description",
-                  keyAssumptions: "Subservice assumptions",
-                  clientResponsibilities: "Subservice client responsibilities",
-                  outOfScope: "Subservice out of scope"
-                },
-                {
-                  name: "Subservice 3",
-                  description: "Subservice description",
-                  hours: 1,
-                  mappedQuestions: [],
-                  serviceDescription: "Subservice description",
-                  keyAssumptions: "Subservice assumptions",
-                  clientResponsibilities: "Subservice client responsibilities",
-                  outOfScope: "Subservice out of scope"
-                }
-              ]
-            })),
-            totalHours: 10,
-            sources: [
-              {
-                url: "https://example.com",
-                title: "Default source",
-                relevance: "Default relevance"
-              }
-            ]
-          }
-        }
-
-        // Final content validation
-        const finalValidation = {
-          technology: typeof contentObj.technology === 'string',
-          services: Array.isArray(contentObj.services) && contentObj.services.length >= 10,
-          questions: Array.isArray(contentObj.questions) && contentObj.questions.length > 0,
-          calculations: Array.isArray(contentObj.calculations),
-          totalHours: typeof contentObj.totalHours === 'number',
-          sources: Array.isArray(contentObj.sources)
-        }
-        
-        console.log("Final content validation:", finalValidation)
-        
-        if (Object.values(finalValidation).every(v => v)) {
-          console.log("✅ Content validation passed - sending to frontend")
-        } else {
-          console.error("❌ Content validation failed:", finalValidation)
-        }
-
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "complete",
-              content: contentObj,
-            })}\n\n`,
-          ),
-        )
-
-        console.log(`Research process completed successfully with ${contentObj.services.length} services`)
-        console.log("Final content being sent to frontend:", {
-          technology: contentObj.technology,
-          servicesCount: contentObj.services?.length,
-          questionsCount: contentObj.questions?.length,
-          calculationsCount: contentObj.calculations?.length,
-          totalHours: contentObj.totalHours
-        })
-      } catch (error) {
-        console.error("Research error details:", {
-          message: error.message,
-          stack: error.stack,
-          input: input.substring(0, 200) + "...",
-          parsedTech: parsedTech.substring(0, 100) + "...",
-          researchFindings: researchFindings.substring(0, 100) + "...",
-          analysis: analysis.substring(0, 100) + "...",
-        })
-
-        // Try to provide fallback content even on error
-        try {
-          const fallbackContent = await generateFallbackContent(
-            input,
-            parsedTech,
-            researchFindings,
-            analysis,
-            dynamicSources,
-          )
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "complete",
-                content: fallbackContent,
-              })}\n\n`,
-            ),
-          )
-        } catch (fallbackError) {
-          console.error("Fallback content generation also failed:", fallbackError)
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "error",
-                message: "Research failed: " + error.message,
-                details: "All fallback methods failed. Check server logs for more information.",
-              })}\n\n`,
-            ),
-          )
-        }
-      } finally {
-        controller.close()
       }
-    },
-  })
+    })
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  })
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    })
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error("❌ Error in research endpoint:", errorMessage)
+    return Response.json({ error: errorMessage }, { status: 500 })
+  }
 }

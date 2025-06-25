@@ -1,0 +1,10 @@
+{
+  "name": "sse-test",
+  "version": "1.0.0",
+  "description": "Test SSE implementation",
+  "type": "module",
+  "main": "test-sse.js",
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+} 

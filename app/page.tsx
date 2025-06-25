@@ -74,6 +74,12 @@ export default function ScopeStackContentEngine() {
     const savedContent = localStorage.getItem("generated_content")
     const savedInput = localStorage.getItem("user_input")
 
+    console.log("Initial load from localStorage:", {
+      savedContent: savedContent ? "exists" : "null",
+      savedInput,
+      savedInputLength: savedInput?.length || 0
+    })
+
     if (savedContent) {
       try {
         setGeneratedContent(JSON.parse(savedContent))
@@ -83,7 +89,10 @@ export default function ScopeStackContentEngine() {
     }
 
     if (savedInput) {
+      console.log("Setting userInput from localStorage:", savedInput)
       setUserInput(savedInput)
+    } else {
+      console.log("No saved input found in localStorage")
     }
 
     // Log current settings for debugging
@@ -114,7 +123,14 @@ export default function ScopeStackContentEngine() {
     if (userInput) {
       localStorage.setItem("user_input", userInput)
     }
-  }, [userInput])
+    // Debug why the button might be disabled
+    console.log("Input state updated:", {
+      userInput,
+      isEmpty: !userInput.trim(),
+      isProcessing,
+      buttonDisabled: !userInput.trim() || isProcessing
+    })
+  }, [userInput, isProcessing])
 
   const handleClearContent = () => {
     // Clear all state
@@ -156,6 +172,7 @@ export default function ScopeStackContentEngine() {
       setProgress(10)
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
+      console.log("Sending research request to API...")
       const response = await fetch("/api/research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -175,18 +192,25 @@ export default function ScopeStackContentEngine() {
         }),
       })
 
-      if (!response.ok) throw new Error("Research failed")
+      if (!response.ok) {
+        console.error("Research API response not OK:", response.status, response.statusText)
+        throw new Error(`Research failed with status ${response.status}`)
+      }
 
+      console.log("Research API response received, setting up SSE reader...")
       const reader = response.body?.getReader()
       if (!reader) throw new Error("No response stream")
 
-      const currentStep = 0
       const decoder = new TextDecoder()
       let buffer = ""
 
+      console.log("Starting to read SSE stream...")
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          console.log("SSE stream complete")
+          break
+        }
 
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split("\n")
@@ -195,9 +219,11 @@ export default function ScopeStackContentEngine() {
         for (const line of lines) {
           if (line.startsWith("data: ")) {
             try {
+              console.log("SSE event received:", line.slice(6, 100) + "...")
               const data = JSON.parse(line.slice(6))
 
               if (data.type === "step") {
+                console.log("Step update:", data.stepId, data.status, data.progress)
                 setResearchSteps((prev) =>
                   prev.map((step) =>
                     step.id === data.stepId
@@ -207,13 +233,12 @@ export default function ScopeStackContentEngine() {
                 )
                 setProgress(data.progress)
               } else if (data.type === "complete") {
-                console.log("Received complete data:", data)
-                console.log("Content received:", data.content)
+                console.log("Complete event received")
                 setGeneratedContent(data.content)
                 setProgress(100)
               }
             } catch (e) {
-              console.error("Error parsing SSE data:", e)
+              console.error("Error parsing SSE data:", e, "Raw data:", line)
             }
           }
         }
@@ -240,12 +265,34 @@ export default function ScopeStackContentEngine() {
               <RotateCcw className="h-4 w-4" />
               Reset
             </Button>
-            <Link href="/settings">
-              <Button variant="outline" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Settings
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => {
+                  console.log("Debug localStorage:", {
+                    userInput,
+                    savedInput: localStorage.getItem("user_input"),
+                    buttonDisabled: !userInput.trim() || isProcessing
+                  });
+                  
+                  // Force reset if needed
+                  if (!userInput && localStorage.getItem("user_input")) {
+                    const savedInput = localStorage.getItem("user_input");
+                    console.log("Force resetting userInput from localStorage:", savedInput);
+                    setUserInput(savedInput || "");
+                  }
+                }} 
+                variant="outline" 
+                className="flex items-center gap-2 text-orange-600"
+              >
+                Debug
               </Button>
-            </Link>
+              <Link href="/settings">
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </Button>
+              </Link>
+            </div>
           </div>
           <h1 className="text-4xl font-bold text-gray-900">ScopeStack Research-Driven Content Engine</h1>
           <p className="text-lg text-gray-600 max-w-3xl mx-auto">
@@ -266,17 +313,30 @@ export default function ScopeStackContentEngine() {
             <Textarea
               placeholder="e.g., Cisco ISE implementation for 500-user healthcare organization with HIPAA compliance requirements, including network segmentation and guest access management"
               value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
+              onChange={(e) => {
+                console.log("Textarea onChange:", e.target.value);
+                setUserInput(e.target.value);
+              }}
               rows={4}
               className="w-full"
             />
             <div className="flex justify-between items-center">
               <div className="text-sm text-gray-500">
                 Be specific about technology, scale, industry, and compliance requirements
+                <button 
+                  onClick={() => {
+                    const sampleInput = "Microsoft Email Migration to Office 365 for a Hospital with 1000 users";
+                    setUserInput(sampleInput);
+                    console.log("Sample input set:", sampleInput);
+                  }}
+                  className="ml-2 text-blue-600 hover:text-blue-800 underline text-xs"
+                >
+                  Use sample input
+                </button>
               </div>
               <Button
                 onClick={handleGenerate}
-                disabled={!userInput.trim() || isProcessing}
+                disabled={(userInput ? !userInput.trim() : true) || isProcessing}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 {isProcessing ? (
