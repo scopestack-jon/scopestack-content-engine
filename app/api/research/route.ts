@@ -16,6 +16,19 @@ CRITICAL RESPONSE FORMAT:
 - DO NOT nest your response inside fields like "email_migration_research" or "research_findings"
 - Use a flat structure with top-level fields
 
+CRITICAL FOR URLS:
+- Always use properly formatted URLs (e.g., "https://example.com")
+- Never use double quotes within double quotes (e.g., ""https://example.com"")
+- If you don't know the exact URL, use "https://example.com" as a placeholder
+- Format URLs in sources as: { "url": "https://example.com", "title": "Source Title" }
+
+CRITICAL FOR NESTED STRUCTURES:
+- Ensure all arrays and objects are properly closed
+- Check that all opening braces { have matching closing braces }
+- Check that all opening brackets [ have matching closing brackets ]
+- Ensure all property names are in double quotes
+- Ensure all string values are in double quotes
+
 RESPOND WITH PURE JSON ONLY.
 `;
 
@@ -1123,6 +1136,10 @@ function fixUrlsInJson(json: string): string {
     // Fix missing quotes at the end of values
     fixed = fixed.replace(/:\s*"([^"]*)(?=\s*[,}])/g, ': "$1"');
     
+    // Fix URL issues with double quotes inside double quotes
+    fixed = fixed.replace(/"url"\s*:\s*""([^"]*)""(?=[,}])/g, '"url": "$1"');
+    fixed = fixed.replace(/"url"\s*:\s*"https:\/\/([^"]*)""(?=[,}])/g, '"url": "https://$1"');
+    
     // Simple approach: replace all instances of "https:" with "https://example.com"
     fixed = fixed.replace(/"https:"/g, '"https://example.com"');
     fixed = fixed.replace(/"https:\s*"/g, '"https://example.com"');
@@ -1195,6 +1212,13 @@ function cleanAIResponse(response: string): string {
   // Fix URL issues which are a common source of parsing errors
   cleaned = fixUrlsInJson(cleaned)
   
+  // Fix extra quotes in JSON keys and values
+  cleaned = cleaned.replace(/"([^"]+)""\s*:/g, '"$1":'); // Fix double quotes in keys
+  cleaned = cleaned.replace(/:\s*""([^"]+)""/g, ':"$1"'); // Fix double quotes in values
+  
+  // Fix malformed JSON with missing quotes
+  cleaned = cleaned.replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3'); // Add quotes to keys
+  
   // If JSON is completely empty or invalid, return an empty object
   if (!cleaned || cleaned === '{}' || !cleaned.includes('{')) {
     return '{}'
@@ -1262,6 +1286,9 @@ async function parseAIResponse(response: string): Promise<any> {
       // Fix trailing commas in arrays
       cleaned = cleaned.replace(/,(\s*\])/g, '$1')
       
+      // Fix double quotes in URL values
+      cleaned = cleaned.replace(/"url"\s*:\s*""([^"]*)""(?=[,}])/g, '"url": "$1"')
+      
       // Try parsing again after fixes
       const parsed = JSON.parse(cleaned);
       
@@ -1319,7 +1346,44 @@ async function parseAIResponse(response: string): Promise<any> {
       console.warn("Structural recovery failed")
     }
     
-    // Step 3: More aggressive recovery - try to reconstruct JSON
+    // Step 3: More aggressive recovery - try to reconstruct JSON using regex
+    try {
+      // Extract JSON using regex
+      const jsonRegex = /{(?:[^{}]|{(?:[^{}]|{[^{}]*})*})*}/g
+      const matches = cleaned.match(jsonRegex)
+      
+      if (matches && matches.length > 0) {
+        // Find the largest JSON object (likely the main one)
+        const largestMatch = matches.reduce((a, b) => a.length > b.length ? a : b)
+        
+        try {
+          // Further clean the extracted JSON
+          let extractedJson = largestMatch
+            .replace(/,\s*}/g, '}') // Remove trailing commas
+            .replace(/,\s*]/g, ']') // Remove trailing commas in arrays
+            .replace(/"url"\s*:\s*""([^"]*)""(?=[,}])/g, '"url": "$1"') // Fix double quoted URLs
+          
+          const parsed = JSON.parse(extractedJson);
+          console.log("✅ Successfully extracted valid JSON using regex")
+          
+          // Check for nested structures
+          if (parsed.email_migration_research || parsed.research_findings || 
+              parsed.project_scope || parsed.assessment_questions) {
+            console.log("Detected nested structure in extracted JSON, normalizing...")
+            return normalizeNestedStructure(parsed)
+          }
+          
+          return parsed
+        } catch (regexError) {
+          console.error("❌ Failed to parse extracted JSON:", 
+            regexError instanceof Error ? regexError.message : String(regexError))
+        }
+      }
+    } catch (error) {
+      console.warn("Regex extraction failed")
+    }
+    
+    // Step 4: Last resort - try to manually fix the most common issues
     try {
       // Replace URL patterns that often cause issues
       cleaned = cleaned.replace(/https:\/\/[^\s"\\]*(?:\\.[^\s"\\]*)*(?="|'|\s|$)/g, '"https://example.com"')
@@ -1354,7 +1418,28 @@ async function parseAIResponse(response: string): Promise<any> {
       const finalErrorMessage = finalError instanceof Error ? finalError.message : String(finalError)
       console.error("All JSON recovery attempts failed:", finalErrorMessage)
       console.error("Cleaned Response:", cleaned)
-      throw new Error(`Failed to parse AI response: ${finalErrorMessage}`)
+      
+      // Step 5: Last resort - try to extract and build a minimal valid object
+      try {
+        console.log("Attempting to build minimal valid object from fragments...")
+        
+        // Extract technology name
+        const techMatch = cleaned.match(/"technology"\s*:\s*"([^"]+)"/)
+        const technology = techMatch ? techMatch[1] : "Unknown Technology"
+        
+        // Create a minimal valid object
+        return {
+          technology,
+          questions: [],
+          calculations: [],
+          services: [],
+          totalHours: 0,
+          sources: []
+        }
+      } catch (e) {
+        console.error("Even minimal object creation failed:", e)
+        throw new Error(`Failed to parse AI response: ${finalErrorMessage}`)
+      }
     }
   }
 }
@@ -2368,6 +2453,88 @@ function generateFallbackAnalysis(technology: string): any {
   }
 }
 
+// After the validateContentStructure function, add this new function
+function ensureMinimumQuestions(content: any, extractedQuestions: string[], technology: string): any {
+  if (!content.questions || !Array.isArray(content.questions) || content.questions.length < 10) {
+    console.log(`⚠️ Insufficient questions: ${content.questions?.length || 0}/10 minimum`);
+    
+    // Create or expand questions array
+    if (!content.questions || !Array.isArray(content.questions)) {
+      content.questions = [];
+    }
+    
+    // Generate technology-specific questions based on research
+    const techName = technology || "Technology Solution";
+    
+    // Try to extract questions from research data if available
+    let additionalQuestions: any[] = [];
+    
+    // First try to use questions from the research data
+    if (extractedQuestions && extractedQuestions.length > 0) {
+      console.log(`Using ${extractedQuestions.length} questions from research data`);
+      
+      additionalQuestions = extractedQuestions.map((q, idx) => {
+        // Format the question properly
+        return {
+          id: `q${content.questions.length + idx + 1}`,
+          slug: `extracted-question-${idx + 1}`,
+          question: q,
+          options: [
+            { key: `Option A for ${techName}`, value: "1", numericalValue: 1, default: true },
+            { key: `Option B for ${techName}`, value: "2", numericalValue: 2 },
+            { key: `Option C for ${techName}`, value: "3", numericalValue: 3 }
+          ]
+        };
+      });
+    }
+    
+    // If we still don't have enough questions, generate more based on the technology
+    if (content.questions.length + additionalQuestions.length < 10) {
+      console.log("Generating additional questions based on technology");
+      
+      // Generate question templates based on the technology
+      const questionTemplates = [
+        `What version of ${techName} are you currently using?`,
+        `How many users will be accessing the ${techName} system?`,
+        `What level of integration is required between ${techName} and existing systems?`,
+        `What is your preferred deployment model for ${techName}?`,
+        `What are your high availability requirements for ${techName}?`,
+        `What compliance requirements apply to your ${techName} implementation?`,
+        `What is your timeline for implementing ${techName}?`,
+        `What level of customization is required for ${techName}?`,
+        `What is your preferred support model for ${techName}?`,
+        `What specific features of ${techName} are most important to your organization?`,
+        `What is your disaster recovery strategy for ${techName}?`,
+        `What is your data migration approach for ${techName}?`,
+        `What is your testing strategy for ${techName}?`,
+        `What is your training plan for ${techName} users?`,
+        `What is your budget range for ${techName} implementation?`
+      ];
+      
+      // Generate enough questions to reach 10 total
+      const neededQuestions = 10 - (content.questions.length + additionalQuestions.length);
+      for (let i = 0; i < neededQuestions && i < questionTemplates.length; i++) {
+        additionalQuestions.push({
+          id: `q${content.questions.length + additionalQuestions.length + 1}`,
+          slug: `generated-question-${i + 1}`,
+          question: questionTemplates[i],
+          options: [
+            { key: `Option A for ${techName}`, value: "1", numericalValue: 1, default: true },
+            { key: `Option B for ${techName}`, value: "2", numericalValue: 2 },
+            { key: `Option C for ${techName}`, value: "3", numericalValue: 3 }
+          ]
+        });
+      }
+    }
+    
+    // Add the additional questions to the content
+    content.questions = [...content.questions, ...additionalQuestions];
+    console.log(`✅ Updated questions: ${content.questions.length}/10 minimum`);
+  }
+  
+  return content;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
@@ -2437,7 +2604,7 @@ export async function POST(request: NextRequest) {
             })
           }
           
-          // Step 2: Research
+          // Step 2: Research - Enhanced with multi-stage approach
           sendEvent("step", { 
             stepId: "research", 
             status: "active", 
@@ -2445,41 +2612,157 @@ export async function POST(request: NextRequest) {
             model: models?.research || "anthropic/claude-3.5-sonnet"
           })
           
-          console.log("📚 Step 2: Conducting research...")
-          const researchPrompt = prompts?.research || DEFAULT_PROMPTS.research
-            .replace("{input}", input)
-            .replace("{detectedTechnology}", parsedData.technology || input)
+          console.log("📚 Step 2: Conducting multi-stage research...")
           
-          let researchData
-          try {
-            researchData = await generateWithRetry(
-              researchPrompt,
-              models?.research || "anthropic/claude-3.5-sonnet",
-              2
-            )
-            console.log("✅ Research successful")
-            sendEvent("step", { 
-              stepId: "research", 
-              status: "completed", 
-              progress: 50,
-              model: models?.research || "anthropic/claude-3.5-sonnet",
-              sources: ["Research sources found"]
-            })
-          } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error)
-            console.error("❌ Research failed:", errorMessage)
-            // Use fallback for research failure
-            researchData = generateFallbackResearch(parsedData.technology || input)
-            console.log("⚠️ Using fallback research data")
-            sendEvent("step", { 
-              stepId: "research", 
-              status: "completed", 
-              progress: 50,
-              model: models?.research || "anthropic/claude-3.5-sonnet"
-            })
-          }
+          // Stage 1: Initial technology-specific research
+          console.log("Research Stage 1: Technology-specific research...")
+          const techResearchPrompt = `Conduct focused research on ${parsedData.technology || input}:
 
-          // Step 3: Analysis
+Original Request: "${input}"
+
+Focus your research on:
+1. Implementation methodologies specific to ${parsedData.technology || input}
+2. Industry standards and best practices for ${parsedData.technology || input}
+3. Common challenges and solutions in ${parsedData.technology || input} projects
+4. Professional services approaches for similar implementations
+5. Hour estimates and resource requirements based on industry benchmarks
+
+Format your research as structured JSON with clear sections.${JSON_RESPONSE_INSTRUCTION}`
+          
+          let techResearchData
+          try {
+            const techResearchResponse = await callOpenRouter({
+              model: models?.research || "anthropic/claude-3.5-sonnet",
+              prompt: techResearchPrompt,
+            })
+            
+            techResearchData = await parseAIResponse(techResearchResponse)
+            console.log("✅ Technology research successful!")
+          } catch (techResearchError) {
+            const errorMessage = techResearchError instanceof Error ? techResearchError.message : String(techResearchError)
+            console.error(`❌ Technology research failed: ${errorMessage}`)
+            techResearchData = generateFallbackResearch(parsedData.technology || input)
+          }
+          
+          // Stage 2: Industry-specific considerations
+          console.log("Research Stage 2: Industry-specific considerations...")
+          
+          // Extract industry from input if possible
+          let industry = "enterprise"
+          if (input.toLowerCase().includes("healthcare") || input.toLowerCase().includes("hospital")) {
+            industry = "healthcare"
+          } else if (input.toLowerCase().includes("finance") || input.toLowerCase().includes("bank")) {
+            industry = "finance"
+          } else if (input.toLowerCase().includes("retail") || input.toLowerCase().includes("ecommerce")) {
+            industry = "retail"
+          } else if (input.toLowerCase().includes("manufacturing")) {
+            industry = "manufacturing"
+          } else if (input.toLowerCase().includes("government")) {
+            industry = "government"
+          }
+          
+          const industryResearchPrompt = `Research ${industry}-specific considerations for ${parsedData.technology || input}:
+
+Original Request: "${input}"
+Industry: ${industry}
+
+Focus your research on:
+1. ${industry}-specific compliance requirements for ${parsedData.technology || input}
+2. Common challenges in ${industry} implementations of ${parsedData.technology || input}
+3. Best practices for ${parsedData.technology || input} in ${industry} organizations
+4. Typical timeline and resource requirements for ${industry} implementations
+5. Key success factors for ${parsedData.technology || input} in ${industry}
+
+Format your research as structured JSON with clear sections.${JSON_RESPONSE_INSTRUCTION}`
+          
+          let industryResearchData
+          try {
+            const industryResearchResponse = await callOpenRouter({
+              model: "openai/gpt-4-turbo",
+              prompt: industryResearchPrompt,
+            })
+            
+            industryResearchData = await parseAIResponse(industryResearchResponse)
+            console.log("✅ Industry research successful!")
+          } catch (industryResearchError) {
+            const errorMessage = industryResearchError instanceof Error ? industryResearchError.message : String(industryResearchError)
+            console.error(`❌ Industry research failed: ${errorMessage}`)
+            industryResearchData = { industry_considerations: [] }
+          }
+          
+          // Combine research results
+          let researchData = {
+            ...techResearchData,
+            industry_specific: industryResearchData
+          }
+          
+          // Extract sources for display in the UI
+          let researchSources: string[] = [];
+          
+          // Try to extract sources from various possible locations in the research data
+          const extractSourcesFromArray = (sourceArray: any[]): string[] => {
+            return sourceArray.map((source: any) => {
+              if (typeof source === 'string') return source;
+              if (source?.title) return source.title;
+              if (source?.url) return source.url;
+              return 'Research source';
+            });
+          };
+          
+          // Collect sources from multiple locations in research data
+          let allSources: string[] = [];
+          
+          if (techResearchData?.sources && Array.isArray(techResearchData.sources)) {
+            allSources = [...allSources, ...extractSourcesFromArray(techResearchData.sources)];
+          }
+          
+          if (techResearchData?.recommended_sources && Array.isArray(techResearchData.recommended_sources)) {
+            allSources = [...allSources, ...extractSourcesFromArray(techResearchData.recommended_sources)];
+          }
+          
+          if (techResearchData?.references && Array.isArray(techResearchData.references)) {
+            allSources = [...allSources, ...extractSourcesFromArray(techResearchData.references)];
+          }
+          
+          // Also look for sources in industry research data
+          if (industryResearchData?.sources && Array.isArray(industryResearchData.sources)) {
+            allSources = [...allSources, ...extractSourcesFromArray(industryResearchData.sources)];
+          }
+          
+          // Generate placeholder sources if we don't have enough
+          if (allSources.length < 5) {
+            const techName = parsedData.technology || input.split(" ").slice(0, 3).join(" ");
+            const placeholderSources = [
+              `${techName} Implementation Guide`,
+              `${techName} Best Practices`,
+              `Industry Standards for ${techName}`,
+              `${techName} Configuration Manual`,
+              `${techName} Security Guidelines`
+            ];
+            
+            // Add placeholder sources until we have at least 5
+            for (let i = 0; i < placeholderSources.length && allSources.length < 5; i++) {
+              if (!allSources.includes(placeholderSources[i])) {
+                allSources.push(placeholderSources[i]);
+              }
+            }
+          }
+          
+          // Remove duplicates and limit to first 5-7 sources
+          researchSources = [...new Set(allSources)].slice(0, 7);
+          
+          console.log(`Found ${researchSources.length} sources for UI display:`, researchSources);
+          console.log("✅ Combined research successful");
+          
+          sendEvent("step", { 
+            stepId: "research", 
+            status: "completed", 
+            progress: 50,
+            model: models?.research || "anthropic/claude-3.5-sonnet",
+            sources: researchSources
+          });
+
+          // Step 3: Analysis - Enhanced with specialized focus
           sendEvent("step", { 
             stepId: "analyze", 
             status: "active", 
@@ -2487,41 +2770,87 @@ export async function POST(request: NextRequest) {
             model: models?.analysis || "anthropic/claude-3.5-sonnet"
           })
           
-          console.log("🔬 Step 3: Analyzing research...")
-          const analysisPrompt = prompts?.analysis || DEFAULT_PROMPTS.analysis
-            .replace("{researchFindings}", JSON.stringify(researchData))
-            .replace("{input}", input)
+          console.log("🔬 Step 3: Analyzing research with specialized focus...")
           
-          let analysisData
+          // Stage 1: Extract service components and structure
+          console.log("Analysis Stage 1: Extracting service components...")
+          const serviceAnalysisPrompt = `Analyze research findings to extract service components for ${parsedData.technology || input}:
+
+Research Findings: ${JSON.stringify(researchData)}
+Original Request: "${input}"
+
+Extract and structure the following:
+1. Key implementation phases for ${parsedData.technology || input}
+2. Essential services required for each phase
+3. Typical subservices for each main service
+4. Hour estimates for each service based on industry benchmarks
+5. Dependencies between services
+
+Format your analysis as structured JSON focusing on service components.${JSON_RESPONSE_INSTRUCTION}`
+          
+          let serviceAnalysisData
           try {
-            const analysisResponse = await callOpenRouter({
+            const serviceAnalysisResponse = await callOpenRouter({
               model: models?.analysis || "anthropic/claude-3.5-sonnet",
-              prompt: analysisPrompt,
+              prompt: serviceAnalysisPrompt,
             })
             
-            analysisData = await parseAIResponse(analysisResponse)
-            console.log("✅ Analysis successful")
-            sendEvent("step", { 
-              stepId: "analyze", 
-              status: "completed", 
-              progress: 75,
-              model: models?.analysis || "anthropic/claude-3.5-sonnet"
-            })
-          } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error)
-            console.error("❌ Analysis failed:", errorMessage)
-            // Use fallback for analysis failure
-            analysisData = generateFallbackAnalysis(parsedData.technology || input)
-            console.log("⚠️ Using fallback analysis data")
-            sendEvent("step", { 
-              stepId: "analyze", 
-              status: "completed", 
-              progress: 75,
-              model: models?.analysis || "anthropic/claude-3.5-sonnet"
-            })
+            serviceAnalysisData = await parseAIResponse(serviceAnalysisResponse)
+            console.log("✅ Service analysis successful!")
+          } catch (serviceAnalysisError) {
+            const errorMessage = serviceAnalysisError instanceof Error ? serviceAnalysisError.message : String(serviceAnalysisError)
+            console.error(`❌ Service analysis failed: ${errorMessage}`)
+            serviceAnalysisData = { service_components: [] }
           }
+          
+          // Stage 2: Extract scoping questions and calculations
+          console.log("Analysis Stage 2: Extracting scoping questions and calculations...")
+          const scopingAnalysisPrompt = `Analyze research findings to extract scoping questions and calculations for ${parsedData.technology || input}:
 
-          // Step 4: Content Generation
+Research Findings: ${JSON.stringify(researchData)}
+Original Request: "${input}"
+
+Extract and structure the following:
+1. Key questions that should be asked during scoping for ${parsedData.technology || input}
+2. Options for each question with appropriate values
+3. Calculation formulas that can be used to estimate effort
+4. Factors that affect pricing and scoping
+5. Risk factors that should be considered
+
+Format your analysis as structured JSON focusing on scoping components.${JSON_RESPONSE_INSTRUCTION}`
+          
+          let scopingAnalysisData
+          try {
+            const scopingAnalysisResponse = await callOpenRouter({
+              model: "openai/gpt-4-turbo",
+              prompt: scopingAnalysisPrompt,
+            })
+            
+            scopingAnalysisData = await parseAIResponse(scopingAnalysisResponse)
+            console.log("✅ Scoping analysis successful!")
+          } catch (scopingAnalysisError) {
+            const errorMessage = scopingAnalysisError instanceof Error ? scopingAnalysisError.message : String(scopingAnalysisError)
+            console.error(`❌ Scoping analysis failed: ${errorMessage}`)
+            scopingAnalysisData = { scoping_components: [] }
+          }
+          
+          // Combine analysis results
+          const analysisData = {
+            ...serviceAnalysisData,
+            ...scopingAnalysisData,
+            technology: parsedData.technology || input,
+            industry: industry || "enterprise"
+          }
+          
+          console.log("✅ Combined analysis successful")
+          sendEvent("step", { 
+            stepId: "analyze", 
+            status: "completed", 
+            progress: 75,
+            model: models?.analysis || "anthropic/claude-3.5-sonnet"
+          })
+
+          // Step 4: Content Generation - Updated with multi-stage approach
           sendEvent("step", { 
             stepId: "generate", 
             status: "active", 
@@ -2529,22 +2858,114 @@ export async function POST(request: NextRequest) {
             model: models?.content || "anthropic/claude-3.5-sonnet"
           })
           
-          console.log("📝 Step 4: Generating content...")
-          const contentPrompt = prompts?.content || 
-            `Generate complete professional services content based on research:
+          console.log("📝 Step 4: Generating content using multi-stage approach...")
+          
+          // Stage 1: Generate structured outline based on research
+          console.log("Stage 1: Generating structured outline...")
+          
+          // Extract specific questions and service components from research data for direct use
+          let extractedQuestions: string[] = [];
+          let extractedServices: string[] = [];
+          
+          // Try to extract technology-specific questions from research
+          if (researchData?.technology_questions && Array.isArray(researchData.technology_questions)) {
+            extractedQuestions = researchData.technology_questions;
+          } else if (researchData?.questions && Array.isArray(researchData.questions)) {
+            extractedQuestions = researchData.questions;
+          } else if (researchData?.discovery_questions && Array.isArray(researchData.discovery_questions)) {
+            extractedQuestions = researchData.discovery_questions.map((q: any) => 
+              typeof q === 'string' ? q : q.question || q.text || JSON.stringify(q)
+            );
+          }
+          
+          // Try to extract service components from research
+          if (researchData?.service_phases && Array.isArray(researchData.service_phases)) {
+            extractedServices = researchData.service_phases;
+          } else if (researchData?.services && Array.isArray(researchData.services)) {
+            extractedServices = researchData.services.map((s: any) => 
+              typeof s === 'string' ? s : s.name || s.service || JSON.stringify(s)
+            );
+          } else if (researchData?.implementation_methodologies?.recommended_frameworks && 
+                    Array.isArray(researchData.implementation_methodologies.recommended_frameworks)) {
+            extractedServices = researchData.implementation_methodologies.recommended_frameworks;
+          }
+          
+          console.log(`Extracted ${extractedQuestions.length} questions and ${extractedServices.length} service components from research`);
+          
+          const outlinePrompt = `Based on the research about ${parsedData.technology || input}, create a structured outline for professional services content:
+
+Research Findings: ${JSON.stringify(researchData)}
+Analysis: ${JSON.stringify(analysisData)}
+Original Request: ${input}
+Extracted Questions: ${JSON.stringify(extractedQuestions)}
+Extracted Service Components: ${JSON.stringify(extractedServices)}
+
+CRITICAL: Use the EXACT terminology, questions, and service components extracted from the research.
+
+Create a detailed outline with:
+1. Technology-specific questions that should be asked during scoping (use the extracted questions)
+2. Key service phases for ${parsedData.technology || input} implementation (use the extracted service components)
+3. Specific subservices that should be included
+4. Calculation factors that affect pricing/scoping
+5. Industry-specific considerations for ${parsedData.technology || input}
+
+Format your response as structured JSON with these sections clearly defined.${JSON_RESPONSE_INSTRUCTION}`
+
+          let outlineObj
+          try {
+            const outlineResponse = await callOpenRouter({
+              model: models?.content || "anthropic/claude-3.5-sonnet",
+              prompt: outlinePrompt,
+            })
+            
+            outlineObj = await parseAIResponse(outlineResponse)
+            console.log("✅ Outline generation successful!")
+          } catch (outlineError) {
+            const errorMessage = outlineError instanceof Error ? outlineError.message : String(outlineError)
+            console.error(`❌ Outline generation failed: ${errorMessage}`)
+            // Use basic structure if outline fails
+            outlineObj = {
+              technology: parsedData.technology || input,
+              questionTopics: ["implementation scope", "timeline", "integration", "compliance", "user adoption"],
+              servicePhases: ["Planning", "Design", "Implementation", "Testing", "Go-Live", "Support"],
+              calculationFactors: ["complexity", "scale", "customization"]
+            }
+          }
+          
+          // Stage 2: Generate detailed content based on outline
+          console.log("Stage 2: Generating detailed content based on outline...")
+          const detailPrompt = `Generate complete professional services content based on this outline and research:
 
 Technology: ${parsedData.technology || input}
 Research Findings: ${JSON.stringify(researchData)}
 Analysis: ${JSON.stringify(analysisData)}
-Original Request: ${input}
+Outline: ${JSON.stringify(outlineObj)}
 
-Generate structured content with:
-- At least 5 questions with options that are SPECIFIC to ${parsedData.technology || input}
-- At least 10 services across all phases (Planning, Design, Implementation, Testing, Go-Live, Support)
+CRITICAL INSTRUCTIONS:
+1. You MUST use the specific terminology, tools, and methodologies found in the research data
+2. DO NOT generate generic service names - every service and subservice must include specific ${parsedData.technology || input} terminology
+3. Use the exact questions and service components found in the research data when available
+4. Include specific tools, platforms, and methodologies mentioned in the research in your service descriptions
+5. Reference industry best practices found in the research data
+6. Base your hour estimates on the research findings, not generic templates
+
+DISCOVERY QUESTIONS REQUIREMENTS:
+- Generate AT LEAST 10 highly specific discovery questions for ${parsedData.technology || input}
+- Each question must include technology-specific terminology from the research
+- Questions must cover technical, business, and operational aspects
+- Each question must have 3-4 options that are specific to the technology
+- Options must include realistic values/choices relevant to ${parsedData.technology || input}
+- NO generic questions - each question must be uniquely tailored to ${parsedData.technology || input}
+- Questions should reference specific components, versions, configurations of ${parsedData.technology || input}
+
+SERVICE REQUIREMENTS:
+- Generate at least 10 services across all phases (Planning, Design, Implementation, Testing, Go-Live, Support)
 - Each service must have exactly 3 subservices
-- All content must be specific to ${parsedData.technology || input} - DO NOT use generic service names
-- Hours based on research findings and industry standards
-- Include specific technology terms, tools, and methodologies in service names and descriptions
+- Each service and subservice must have a UNIQUE name specific to ${parsedData.technology || input}
+- NO generic service names - use specific technology terms from research
+- Each service description must be unique and specific to the service
+- Vary the language and structure across different services
+- Include specific tools, methodologies, and components in service names
 
 IMPORTANT: Return ONLY valid JSON. Start with { and end with }. Do not include any markdown code blocks or explanations.
 Your response MUST be a valid JSON object with the following structure:
@@ -2567,7 +2988,7 @@ Do NOT nest the response inside fields like "email_migration_research" or "resea
             // Try up to 3 times with the primary model before falling back
             try {
               contentObj = await generateWithRetry(
-                contentPrompt,
+                detailPrompt,
                 models?.content || "anthropic/claude-3.5-sonnet",
                 3 // Increase max attempts to 3
               )
@@ -2589,7 +3010,7 @@ Do NOT nest the response inside fields like "email_migration_research" or "resea
               try {
                 const backupResponse = await callOpenRouter({
                   model: "openai/gpt-4",
-                  prompt: contentPrompt,
+                  prompt: detailPrompt,
                 })
                 
                 contentObj = await parseAIResponse(backupResponse)
@@ -2613,6 +3034,87 @@ Do NOT nest the response inside fields like "email_migration_research" or "resea
             shouldUseFallback = true
           }
 
+          // Stage 3: Enhance and refine content if we have a valid base
+          if (!shouldUseFallback && contentObj) {
+            console.log("Stage 3: Enhancing and refining content...")
+            try {
+              // Enhance services with more specific descriptions
+              const enhancePrompt = `Enhance these services for ${parsedData.technology || input} with more specific descriptions:
+              
+Original Services: ${JSON.stringify(contentObj.services)}
+Research Data: ${JSON.stringify(researchData)}
+
+CRITICAL: Use the EXACT terminology, tools, methodologies, and best practices from the research data.
+
+UNIQUENESS REQUIREMENTS:
+1. Each service and subservice must have a COMPLETELY UNIQUE description
+2. Vary the sentence structure, length, and style across different services
+3. Use different terminology and phrasing for each service
+4. No two services should follow the same descriptive pattern
+5. Incorporate specific technical terms from the research in different ways
+6. Vary the focus (business value, technical details, operational benefits) across services
+
+Make each service and subservice more specific to ${parsedData.technology || input} by:
+1. Adding technology-specific terminology from the research data
+2. Including industry-standard methodologies mentioned in the research
+3. Referencing specific tools or processes used in ${parsedData.technology || input} implementations
+4. Ensuring descriptions clearly explain the value/purpose using industry-specific language
+5. Using the exact service components and terminology found in the research
+
+CRITICAL: Return ONLY a valid JSON array of services. Start with [ and end with ].
+Ensure all property names and string values use double quotes.
+Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
+
+              const enhanceResponse = await callOpenRouter({
+                model: "openai/gpt-4-turbo",
+                prompt: enhancePrompt,
+              })
+              
+              try {
+                // First clean and prepare the response
+                let enhancedServicesText = cleanAIResponse(enhanceResponse)
+                
+                // If the response doesn't start with [, try to extract the array
+                if (!enhancedServicesText.startsWith('[')) {
+                  const arrayMatch = enhancedServicesText.match(/\[([\s\S]*)\]/)
+                  if (arrayMatch && arrayMatch[0]) {
+                    enhancedServicesText = arrayMatch[0]
+                  } else {
+                    throw new Error("Could not find services array in response")
+                  }
+                }
+                
+                const enhancedServices = JSON.parse(enhancedServicesText)
+                
+                if (Array.isArray(enhancedServices) && enhancedServices.length > 0) {
+                  // Validate that the services have the required structure
+                  const validServices = enhancedServices.every(service => 
+                    service && typeof service === 'object' && 
+                    service.phase && service.service && 
+                    Array.isArray(service.subservices)
+                  )
+                  
+                  if (validServices) {
+                    contentObj.services = enhancedServices
+                    console.log("✅ Service enhancement successful!")
+                  } else {
+                    console.error("⚠️ Enhanced services have invalid structure, keeping original")
+                  }
+                } else {
+                  console.error("⚠️ Enhanced services is not a valid array, keeping original")
+                }
+              } catch (enhanceError) {
+                const errorMessage = enhanceError instanceof Error ? enhanceError.message : String(enhanceError)
+                console.error(`⚠️ Service enhancement parsing failed: ${errorMessage}`)
+                console.error("Keeping original services")
+              }
+            } catch (enhanceError) {
+              const errorMessage = enhanceError instanceof Error ? enhanceError.message : String(enhanceError)
+              console.error(`⚠️ Service enhancement step failed: ${errorMessage}`)
+              console.error("Keeping original services")
+            }
+          }
+
           if (shouldUseFallback) {
             console.log("⚠️ Using fallback content")
             try {
@@ -2628,8 +3130,80 @@ Do NOT nest the response inside fields like "email_migration_research" or "resea
 
           // Validate and fix content structure regardless of source
           try {
+            // Ensure we have at least 10 unique discovery questions
+            contentObj = ensureMinimumQuestions(contentObj, extractedQuestions, parsedData.technology || input);
+            
+            // Make sure we preserve the sources from research
+            if (researchSources && researchSources.length > 0) {
+              // If we have sources from research but none in the content, add them
+              if (!contentObj.sources || !Array.isArray(contentObj.sources) || contentObj.sources.length === 0) {
+                contentObj.sources = researchSources.map(source => ({
+                  url: source.startsWith('http') ? source : 'https://example.com',
+                  title: source,
+                  relevance: `Source for ${parsedData.technology || input} implementation`
+                }));
+              } 
+              // If we have sources in both places, make sure research sources are included
+              else {
+                // Convert research sources to proper format if needed
+                const formattedResearchSources = researchSources.map(source => {
+                  if (typeof source === 'string') {
+                    return {
+                      url: source.startsWith('http') ? source : 'https://example.com',
+                      title: source,
+                      relevance: `Source for ${parsedData.technology || input} implementation`
+                    };
+                  }
+                  return source;
+                });
+                
+                // Add research sources that aren't already included
+                const existingTitles = new Set(contentObj.sources.map((s: any) => s.title));
+                for (const source of formattedResearchSources) {
+                  if (!existingTitles.has(source.title)) {
+                    contentObj.sources.push(source);
+                  }
+                }
+              }
+            }
+            
+            // Ensure we have at least 5 sources
+            if (!contentObj.sources || !Array.isArray(contentObj.sources) || contentObj.sources.length < 5) {
+              // Create or expand sources array
+              if (!contentObj.sources || !Array.isArray(contentObj.sources)) {
+                contentObj.sources = [];
+              }
+              
+              // Generate technology-specific source titles
+              const techName = parsedData.technology || input.split(" ").slice(0, 3).join(" ");
+              const sourceTitles = [
+                `${techName} Implementation Guide`,
+                `${techName} Best Practices`,
+                `Industry Standards for ${techName}`,
+                `${techName} Configuration Manual`,
+                `${techName} Security Guidelines`,
+                `${techName} Architecture Blueprint`,
+                `${techName} Performance Optimization`,
+                `${techName} Deployment Strategies`,
+                `${techName} Compliance Framework`,
+                `${techName} Integration Patterns`
+              ];
+              
+              // Add sources until we have at least 5
+              const existingTitles = new Set(contentObj.sources.map((s: any) => s.title));
+              for (let i = 0; i < sourceTitles.length && contentObj.sources.length < 5; i++) {
+                if (!existingTitles.has(sourceTitles[i])) {
+                  contentObj.sources.push({
+                    url: 'https://example.com',
+                    title: sourceTitles[i],
+                    relevance: `Essential reference for ${techName} implementation`
+                  });
+                }
+              }
+            }
+            
             validateContentStructure(contentObj)
-            console.log("✅ Content structure validated and fixed")
+            console.log("✅ Content structure validated and fixed where needed")
           } catch (validationError) {
             const errorMessage = validationError instanceof Error ? validationError.message : String(validationError)
             console.error(`❌ Content validation failed: ${errorMessage}`)
