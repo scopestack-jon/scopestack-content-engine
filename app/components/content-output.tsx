@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, Download, Clock, Hash, Link2, Calculator } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
+import { useState } from "react"
 
 interface GeneratedContent {
   technology: string
@@ -59,9 +61,13 @@ interface GeneratedContent {
 
 interface ContentOutputProps {
   content: GeneratedContent
+  setContent: React.Dispatch<React.SetStateAction<GeneratedContent | null>>
 }
 
-export function ContentOutput({ content }: ContentOutputProps) {
+export function ContentOutput({ content, setContent }: ContentOutputProps) {
+  const [activeTab, setActiveTab] = useState("services")
+  const [isRegenerating, setIsRegenerating] = useState(false)
+
   // Debug logging
   console.log("ContentOutput received content:", {
     technology: content?.technology,
@@ -79,6 +85,30 @@ export function ContentOutput({ content }: ContentOutputProps) {
       console.log("Options structure for first question:", JSON.stringify(content.questions[0].options.slice(0, 2), null, 2));
     }
   }
+  
+  // Function to sort services by phase in the correct order
+  const sortServicesByPhase = (services: any[]) => {
+    if (!Array.isArray(services)) return [];
+    
+    const phaseOrder: Record<string, number> = {
+      "Initiating": 1,
+      "Planning": 2,
+      "Design": 2,
+      "Implementation": 3,
+      "Monitoring & Control": 4,
+      "Close Out": 5,
+    };
+    
+    return [...services].sort((a, b) => {
+      const phaseA = a.phase || "Implementation";
+      const phaseB = b.phase || "Implementation";
+      
+      const orderA = phaseOrder[phaseA] || 3; // Default to Implementation (3) if not found
+      const orderB = phaseOrder[phaseB] || 3;
+      
+      return orderA - orderB;
+    });
+  };
   
   // Defensive check for content
   if (!content) {
@@ -338,6 +368,124 @@ export function ContentOutput({ content }: ContentOutputProps) {
     return index + 1;
   }
 
+  // Function to regenerate scope language for a subservice
+  const regenerateScopeLanguage = async (serviceIndex: number, subserviceIndex: number) => {
+    if (!content) return;
+    
+    const service = content.services[serviceIndex];
+    const subservice = service.subservices[subserviceIndex];
+    
+    setIsRegenerating(true);
+    
+    try {
+      // Default prompt template
+      const defaultPrompt = `Generate professional scope language for the following IT service:
+
+Technology: {technology}
+Phase: {phase}
+Service: {serviceName}
+Subservice: {subserviceName}
+
+You are a senior IT Services Consultant and Statement of Work specialist. Your goal is to write clear, professional, and client-ready Statement of Work (SOW) descriptions that define deliverables, scope boundaries, assumptions, and client responsibilities for specific IT services tasks.
+
+Each SOW entry should be written at the subservice level, but should reflect the context of its parent Service and the Phase in which it occurs.
+
+Writing guidelines:
+- Use precise, outcome-oriented language
+- Anchor the language in the context of the Phase (e.g., Planning, Implementation, Post-Go Live)
+- Reference the parent Service when needed to provide clarity or grouping
+- Use active voice and professional tone
+- Avoid overly technical jargon unless necessary
+- Keep each section concise but comprehensive
+
+Return a JSON object with ONLY these four sections:
+{
+  "serviceDescription": "Comprehensive explanation of what this subservice entails and delivers",
+  "keyAssumptions": "List of assumptions made for this subservice",
+  "clientResponsibilities": "What the client must provide or do for this subservice",
+  "outOfScope": "What is explicitly excluded from this subservice"
+}
+
+IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON object.`;
+
+      // Get custom prompt from localStorage if available
+      let promptTemplate = defaultPrompt;
+      const storedPrompt = typeof window !== 'undefined' ? localStorage.getItem("scope_language_prompt") : null;
+      if (storedPrompt && typeof storedPrompt === 'string') {
+        promptTemplate = storedPrompt;
+      }
+      
+      // Replace placeholders with actual values
+      const prompt = promptTemplate
+        .replace(/{technology}/g, content.technology || '')
+        .replace(/{phase}/g, service.phase || '')
+        .replace(/{serviceName}/g, service.service || service.name || '')
+        .replace(/{subserviceName}/g, subservice.name || '');
+      
+      // Call the API to generate scope language
+      const response = await fetch("/api/test-openrouter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          model: "openai/gpt-4o"
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to regenerate scope language");
+      }
+      
+      const result = await response.json();
+      
+      if (result && result.text) {
+        try {
+          // Clean the response text
+          const cleaned = result.text.replace(/```json|```/g, "").trim();
+          const newScopeLanguage = JSON.parse(cleaned);
+          
+          // Update the content with the new scope language
+          const updatedServices = [...content.services];
+          updatedServices[serviceIndex].subservices[subserviceIndex] = {
+            ...subservice,
+            serviceDescription: newScopeLanguage.serviceDescription,
+            keyAssumptions: newScopeLanguage.keyAssumptions,
+            clientResponsibilities: newScopeLanguage.clientResponsibilities,
+            outOfScope: newScopeLanguage.outOfScope
+          };
+          
+          setContent({
+            ...content,
+            services: updatedServices
+          });
+          
+          toast({
+            title: "Scope language regenerated",
+            description: `Updated scope language for ${subservice.name}`,
+          });
+        } catch (parseError) {
+          console.error("Failed to parse scope language:", parseError);
+          toast({
+            title: "Error",
+            description: "Failed to parse the regenerated scope language",
+            variant: "destructive",
+          });
+        }
+      } else {
+        throw new Error("Invalid response from API");
+      }
+    } catch (error) {
+      console.error("Error regenerating scope language:", error);
+      toast({
+        title: "Error",
+        description: "Failed to regenerate scope language",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -493,7 +641,7 @@ export function ContentOutput({ content }: ContentOutputProps) {
               Professional services structure with question mapping and calculations for dynamic hour adjustments
             </div>
             {content.services && Array.isArray(content.services) && content.services.length > 0 ? (
-              content.services.map((service, index) => (
+              sortServicesByPhase(content.services).map((service, index) => (
                 <Card key={index} className="border-l-4 border-l-green-500">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-3">
@@ -591,6 +739,42 @@ export function ContentOutput({ content }: ContentOutputProps) {
                                 </div>
                               </div>
                             </div>
+
+                            {/* Scope Language */}
+                            {sub.serviceDescription && (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-sm font-medium text-gray-900">Scope Language</h4>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => regenerateScopeLanguage(index, subIndex)}
+                                    disabled={isRegenerating}
+                                  >
+                                    {isRegenerating ? "Regenerating..." : "Regenerate"}
+                                  </Button>
+                                </div>
+                                <div className="grid grid-cols-1 gap-3 text-sm">
+                                  <div>
+                                    <div className="font-medium text-gray-700">Service Description</div>
+                                    <div className="mt-1 text-gray-600">{sub.serviceDescription}</div>
+                                  </div>
+                                  <div>
+                                    <div className="font-medium text-gray-700">Key Assumptions</div>
+                                    <div className="mt-1 text-gray-600">{sub.keyAssumptions}</div>
+                                  </div>
+                                  <div>
+                                    <div className="font-medium text-gray-700">Client Responsibilities</div>
+                                    <div className="mt-1 text-gray-600">{sub.clientResponsibilities}</div>
+                                  </div>
+                                  <div>
+                                    <div className="font-medium text-gray-700">Out of Scope</div>
+                                    <div className="mt-1 text-gray-600">{sub.outOfScope}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
                             {sub.mappedQuestions && Array.isArray(sub.mappedQuestions) && sub.mappedQuestions.length > 0 ? (
                               <div className="flex items-center gap-1 flex-wrap mb-2">

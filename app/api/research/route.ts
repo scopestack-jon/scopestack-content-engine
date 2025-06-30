@@ -312,43 +312,66 @@ async function parseAIResponse(response: string): Promise<any> {
           questionWords.join('_') : 
           `question_${i+1}`;
         
-        // Extract options
+        // Extract options - look for actual option text strings
         const options: any[] = [];
-        const optionRegex = /"([^"]+)"/g;
-        const optionMatches = Array.from(optionsText.matchAll(optionRegex));
         
-        // Track used keys to avoid duplicates
-        const usedKeys = new Set();
+        // First try to extract complete option objects
+        const optionObjectsRegex = /{([^{}]*)}/g;
+        const optionObjectMatches = Array.from(optionsText.matchAll(optionObjectsRegex));
         
-        // Skip metadata fields that shouldn't be treated as options
-        const metadataFields = new Set(['label', 'value', 'hours', 'default', 'metadata', 'type', 'id', 'name', 'description']);
+        if (optionObjectMatches && optionObjectMatches.length > 0) {
+          // Process each option object
+          for (let j = 0; j < optionObjectMatches.length; j++) {
+            const optionText = optionObjectMatches[j][1];
+            
+            // Extract key/text/label from the option object
+            const keyMatch = optionText.match(/"(?:key|text|label|name|option)"\s*:\s*"([^"]+)"/);
+            if (keyMatch && keyMatch[1]) {
+              const key = keyMatch[1];
+              
+              // Skip metadata fields
+              if (!['label', 'value', 'hours', 'default', 'metadata', 'type', 'id', 'name', 'description'].includes(key.toLowerCase())) {
+                options.push({
+                  key: key,
+                  value: j + 1, // Use sequential values
+                  default: j === 0
+                });
+              }
+            }
+          }
+        }
         
-        if (optionMatches && optionMatches.length > 0) {
-          // First pass: collect all potential option strings
-          const potentialOptions: string[] = [];
-          for (let j = 0; j < optionMatches.length; j++) {
-            const key = optionMatches[j][1].trim();
-            if (!metadataFields.has(key.toLowerCase())) {
-              potentialOptions.push(key);
+        // If no valid options found using object extraction, try extracting option strings directly
+        if (options.length === 0) {
+          // Look for strings that are likely option values
+          const optionStringsRegex = /"([^"]{3,50})"/g; // Look for strings between 3-50 chars (likely options)
+          const optionStringMatches = Array.from(optionsText.matchAll(optionStringsRegex));
+          
+          // Filter out metadata fields and collect actual option strings
+          const metadataFields = new Set(['key', 'value', 'hours', 'default', 'metadata', 'type', 'id', 'name', 'description']);
+          const validOptionStrings: string[] = [];
+          
+          for (let j = 0; j < optionStringMatches.length; j++) {
+            const optionString = optionStringMatches[j][1];
+            if (!metadataFields.has(optionString.toLowerCase()) && optionString.length > 2) {
+              // Check if this looks like an actual option (not a property name)
+              if (optionString.includes(' ') || /^\d+-\d+/.test(optionString) || optionString.length > 10) {
+                validOptionStrings.push(optionString);
+              }
             }
           }
           
-          // Second pass: create proper option objects
-          for (let j = 0; j < potentialOptions.length; j++) {
-            const key = potentialOptions[j];
-            
-            // Skip duplicate keys
-            if (usedKeys.has(key)) continue;
-            usedKeys.add(key);
-            
+          // Create option objects from valid strings
+          for (let j = 0; j < validOptionStrings.length; j++) {
             options.push({
-              key: key,
-              value: j + 1, // Use sequential values for consistency
+              key: validOptionStrings[j],
+              value: j + 1, // Use sequential values
               default: j === 0
             });
           }
         }
         
+        // Only add the question if we have valid options
         if (options.length > 0 && question) {
           extractedQuestions.push({
             id: `q${i+1}`,
@@ -1926,6 +1949,118 @@ interface Service {
   subservices: Subservice[];
 }
 
+// Add the SOW prompt template
+const SOW_PROMPT_TEMPLATE = {
+  "role": "You are a senior IT Services Consultant and Statement of Work specialist.",
+  "goal": "Your goal is to write clear, professional, and client-ready Statement of Work (SOW) descriptions that define deliverables, scope boundaries, assumptions, and success criteria for specific IT services tasks.",
+  "context": "Each SOW entry should be written at the subservice level, but should reflect the context of its parent Service and the Phase in which it occurs.",
+  "writing_guidelines": [
+    "Use precise, outcome-oriented language",
+    "Anchor the language in the context of the Phase (e.g., Planning, Implementation, Post-Go Live)",
+    "Reference the parent Service when needed to provide clarity or grouping",
+    "Use active voice and professional tone",
+    "Avoid overly technical jargon unless necessary",
+    "Use bullets or short paragraphs for readability",
+    "Include these sections: Overview, Deliverables, Out of Scope, Assumptions, and Success Criteria"
+  ],
+  "output_rules": [
+    "Return only a structured JSON object",
+    "Each section should be written in full sentences with clear formatting",
+    "Total word count should be between 300 and 400 words"
+  ]
+};
+
+// SOW content generation is handled by the generateSowContent function below
+
+// Function to generate scope language for a subservice
+async function generateSowContent(
+  technology: string,
+  phase: string,
+  serviceName: string,
+  subserviceName: string,
+  model: string = "openai/gpt-4o"
+): Promise<any> {
+  try {
+    console.log(`Generating scope language for ${subserviceName} in ${serviceName} (${phase})...`);
+    
+    // Get the custom prompt from localStorage or use default
+    let promptTemplate = `Generate professional scope language for the following IT service:
+
+Technology: {technology}
+Phase: {phase}
+Service: {serviceName}
+Subservice: {subserviceName}
+
+You are a senior IT Services Consultant and Statement of Work specialist. Your goal is to write clear, professional, and client-ready Statement of Work (SOW) descriptions that define deliverables, scope boundaries, assumptions, and client responsibilities for specific IT services tasks.
+
+Each SOW entry should be written at the subservice level, but should reflect the context of its parent Service and the Phase in which it occurs.
+
+Writing guidelines:
+- Use precise, outcome-oriented language
+- Anchor the language in the context of the Phase (e.g., Planning, Implementation, Post-Go Live)
+- Reference the parent Service when needed to provide clarity or grouping
+- Use active voice and professional tone
+- Avoid overly technical jargon unless necessary
+- Keep each section concise but comprehensive
+
+Return a JSON object with ONLY these four sections:
+{
+  "serviceDescription": "Comprehensive explanation of what this subservice entails and delivers",
+  "keyAssumptions": "List of assumptions made for this subservice",
+  "clientResponsibilities": "What the client must provide or do for this subservice",
+  "outOfScope": "What is explicitly excluded from this subservice"
+}
+
+IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON object.`;
+
+    // Check if there's a custom prompt in localStorage
+    if (typeof localStorage !== 'undefined') {
+      const customPrompt = localStorage.getItem("scope_language_prompt");
+      if (customPrompt) {
+        promptTemplate = customPrompt;
+      }
+    }
+    
+    // Replace placeholders with actual values
+    const prompt = promptTemplate
+      .replace(/{technology}/g, technology)
+      .replace(/{phase}/g, phase)
+      .replace(/{serviceName}/g, serviceName)
+      .replace(/{subserviceName}/g, subserviceName);
+
+    const response = await callOpenRouter({
+      model,
+      prompt
+    });
+    
+    // Clean and parse the response
+    const cleaned = cleanAIResponse(response);
+    
+    try {
+      const parsed = JSON.parse(cleaned);
+      return parsed;
+    } catch (parseError) {
+      console.error(`Failed to parse scope language for ${subserviceName}:`, parseError);
+      // Return a basic structure if parsing fails
+      return {
+        serviceDescription: `This subservice provides ${subserviceName} as part of the ${serviceName} service for ${technology}.`,
+        keyAssumptions: `Client will provide necessary access and information for ${subserviceName}.`,
+        clientResponsibilities: `Provide timely access to systems and resources required for ${subserviceName}.`,
+        outOfScope: `Any activities not directly related to ${subserviceName}.`
+      };
+    }
+  } catch (error) {
+    console.error(`Error generating scope language for ${subserviceName}:`, error);
+    // Return a basic structure if generation fails
+    return {
+      serviceDescription: `This subservice provides ${subserviceName} as part of the ${serviceName} service for ${technology}.`,
+      keyAssumptions: `Client will provide necessary access and information for ${subserviceName}.`,
+      clientResponsibilities: `Provide timely access to systems and resources required for ${subserviceName}.`,
+      outOfScope: `Any activities not directly related to ${subserviceName}.`
+    };
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
@@ -2391,14 +2526,6 @@ Research Data: ${JSON.stringify(researchData)}
 
 CRITICAL: Use the EXACT terminology, tools, methodologies, and best practices from the research data.
 
-STATEMENT OF WORK CONTEXT:
-This content will be used in a formal Statement of Work document for professional services. All language must be:
-- Professional and precise
-- Technically accurate
-- Contractually appropriate
-- Specific to the technology and industry
-- Clear about responsibilities, assumptions, and scope boundaries
-
 UNIQUENESS REQUIREMENTS:
 1. Each service and subservice must have a COMPLETELY UNIQUE description
 2. Vary the sentence structure, length, and style across different services
@@ -2406,59 +2533,6 @@ UNIQUENESS REQUIREMENTS:
 4. No two services should follow the same descriptive pattern
 5. Incorporate specific technical terms from the research in different ways
 6. Vary the focus (business value, technical details, operational benefits) across services
-
-QUANTITATIVE MAPPING:
-1. Ensure services are properly mapped to quantitative questions like:
-   - "How many users will be migrated?"
-   - "How many locations/sites need to be configured?"
-   - "How many devices/servers/firewalls will be implemented?"
-   - "What is the total data volume to be migrated?"
-2. Service hours should scale based on these quantitative factors
-3. Each calculation should clearly impact specific services based on quantitative inputs
-4. Make sure service descriptions reference these quantitative factors
-
-SCOPING LANGUAGE REQUIREMENTS:
-1. For each service, include detailed scoping language fields:
-   - serviceDescription: Comprehensive explanation of the service (200-300 characters) ALWAYS starting with "We will..." (not "This service...")
-   - keyAssumptions: List of assumptions made for the service (150-200 characters) using passive voice without "Client will..." phrasing
-   - clientResponsibilities: What the client must provide or do (150-200 characters) using action verbs
-   - outOfScope: What is explicitly excluded from the service (150-200 characters) varying terminology
-
-2. For each subservice, include the same scoping language fields:
-   - serviceDescription: Detailed explanation specific to the subservice ALWAYS starting with "We will..." (not "This subservice...")
-   - keyAssumptions: Assumptions specific to this subservice component using passive voice
-   - clientResponsibilities: Client requirements for this specific subservice using varied action verbs
-   - outOfScope: Exclusions specific to this subservice component with varied terminology
-
-3. Ensure scoping language is contractually sound:
-   - Clear boundaries between client and provider responsibilities
-   - Specific assumptions that limit scope
-   - Precise language about what is excluded
-   - Measurable deliverables and outcomes
-
-FORMATTING REQUIREMENTS:
-1. Place each sentence on a new line using the newline character \\n
-2. For example:
-   "We will implement the core system components according to the approved design specifications.\\nOur team will configure all required modules and integrate with existing systems.\\nThis service includes comprehensive testing and validation of all implemented components."
-
-3. Each scope language field should follow this format with 3-4 sentences, each on its own line
-
-LANGUAGE VARIETY:
-1. For service descriptions, use varied action verbs beyond just "provide" and "deliver":
-   - "We will implement...", "We will execute...", "We will conduct...", "We will establish..."
-   - "We will develop...", "We will design...", "We will configure...", "We will deploy..."
-   
-2. For key assumptions, vary passive voice constructions:
-   - "Access will be provided...", "Documentation will be made available..."
-   - "Resources will be allocated...", "Systems will be accessible..."
-   
-3. For client responsibilities, use different action verbs:
-   - "Grant access...", "Provide feedback...", "Review deliverables..."
-   - "Assign resources...", "Ensure availability...", "Validate results..."
-   
-4. For out of scope items, use varied exclusion terminology:
-   - "Not included in this service...", "Excluded from this engagement..."
-   - "Beyond the scope of this service...", "Not covered in this work..."
 
 Make each service and subservice more specific to ${parsedData.technology || input} by:
 1. Adding technology-specific terminology from the research data
@@ -2474,115 +2548,93 @@ Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
               const enhanceResponse = await callOpenRouter({
                 model: "openai/gpt-4-turbo",
                 prompt: enhancePrompt,
-              })
+              });
               
               try {
                 // First clean and prepare the response
-                let enhancedServicesText = cleanAIResponse(enhanceResponse)
+                let enhancedServicesText = cleanAIResponse(enhanceResponse);
                 
                 // If the response doesn't start with [, try to extract the array
                 if (!enhancedServicesText.startsWith('[')) {
-                  const arrayMatch = enhancedServicesText.match(/\[([\s\S]*)\]/)
+                  const arrayMatch = enhancedServicesText.match(/\[([\s\S]*)\]/);
                   if (arrayMatch && arrayMatch[0]) {
-                    enhancedServicesText = arrayMatch[0]
+                    enhancedServicesText = arrayMatch[0];
                   } else {
-                    throw new Error("Could not find services array in response")
+                    throw new Error("Could not find services array in response");
                   }
                 }
                 
-                const enhancedServices = JSON.parse(enhancedServicesText)
+                const enhancedServices = JSON.parse(enhancedServicesText);
                 
                 if (Array.isArray(enhancedServices) && enhancedServices.length > 0) {
                   // Validate that the services have the required structure
                   const validServices = enhancedServices.every(service => 
                     service && typeof service === 'object' && 
-                    (service.name || service.service || service.phase) && 
-                    typeof service.description === 'string'
-                  )
+                    ((typeof service.name === 'string') || (typeof service.service === 'string')) && 
+                    (typeof service.description === 'string' || typeof service.description === 'undefined') && 
+                    Array.isArray(service.subservices)
+                  );
                   
                   if (validServices) {
-                    // Merge the enhanced services with the original services to preserve important fields
-                    contentObj.services = contentObj.services.map((originalService: any, index: number) => {
-                      // Find the corresponding enhanced service if available
-                      const enhancedService = index < enhancedServices.length ? enhancedServices[index] : null;
-                      
-                      if (!enhancedService) {
-                        return originalService;
-                      }
-                      
-                      // Create a merged service that preserves important fields from both
-                      const mergedService = {
-                        // Core fields - prefer enhanced version but fall back to original
-                        phase: enhancedService.phase || originalService.phase,
-                        service: enhancedService.service || enhancedService.name || originalService.service || originalService.name,
-                        name: enhancedService.name || enhancedService.service || originalService.name || originalService.service,
-                        description: enhancedService.description || originalService.description,
-                        hours: originalService.hours || enhancedService.hours || 40,
-                        
-                        // Preserve scoping language fields from original if they exist
-                        serviceDescription: enhancedService.serviceDescription || originalService.serviceDescription,
-                        keyAssumptions: enhancedService.keyAssumptions || originalService.keyAssumptions,
-                        clientResponsibilities: enhancedService.clientResponsibilities || originalService.clientResponsibilities,
-                        outOfScope: enhancedService.outOfScope || originalService.outOfScope,
-                        
-                        // Handle subservices
-                        subservices: []
-                      };
-                      
-                      // Process subservices - merge original with enhanced
-                      if (Array.isArray(originalService.subservices)) {
-                        mergedService.subservices = originalService.subservices.map((originalSub: any, subIndex: number) => {
-                          // Find the corresponding enhanced subservice if available
-                          const enhancedSub = enhancedService.subservices && 
-                                            Array.isArray(enhancedService.subservices) && 
-                                            subIndex < enhancedService.subservices.length ? 
-                                            enhancedService.subservices[subIndex] : null;
-                          
-                          if (!enhancedSub) {
-                            return originalSub;
-                          }
-                          
-                          // Create a merged subservice
-                          return {
-                            // Core fields - prefer enhanced version but fall back to original
-                            name: enhancedSub.name || originalSub.name,
-                            description: enhancedSub.description || originalSub.description,
-                            hours: originalSub.hours || enhancedSub.hours || Math.floor((mergedService.hours || 40) / 3),
-                            
-                            // Preserve mappings and calculations
-                            mappedQuestions: originalSub.mappedQuestions || enhancedSub.mappedQuestions,
-                            calculationSlug: originalSub.calculationSlug || enhancedSub.calculationSlug,
-                            
-                            // Preserve scoping language fields
-                            serviceDescription: enhancedSub.serviceDescription || originalSub.serviceDescription,
-                            keyAssumptions: enhancedSub.keyAssumptions || originalSub.keyAssumptions,
-                            clientResponsibilities: enhancedSub.clientResponsibilities || originalSub.clientResponsibilities,
-                            outOfScope: enhancedSub.outOfScope || originalSub.outOfScope
-                          };
-                        });
-                      } else if (enhancedService.subservices && Array.isArray(enhancedService.subservices)) {
-                        mergedService.subservices = enhancedService.subservices;
-                      }
-                      
-                      return mergedService;
-                    });
+                    contentObj.services = enhancedServices;
+                    console.log("✅ Service enhancement successful!");
                     
-                    console.log("✅ Service enhancement successful!")
+                    // Now generate SOW content for each subservice
+                    console.log("Generating SOW content for subservices...");
+                    
+                    // Use a model that's good at structured content
+                    const sowModel = models?.format || "openai/gpt-4o";
+                    
+                    // Process services sequentially to avoid overwhelming the API
+                    for (let i = 0; i < contentObj.services.length; i++) {
+                      const service = contentObj.services[i];
+                      const serviceName = service.name || service.service || `Service ${i+1}`;
+                      const phase = service.phase || "Implementation";
+                      
+                      // Process subservices for this service
+                      if (Array.isArray(service.subservices)) {
+                        for (let j = 0; j < service.subservices.length; j++) {
+                          const subservice = service.subservices[j];
+                          const subserviceName = subservice.name || `Subservice ${j+1}`;
+                          
+                          // Generate SOW content for this subservice
+                          try {
+                            const sowContent = await generateSowContent(
+                              contentObj.technology,
+                              phase,
+                              serviceName,
+                              subserviceName,
+                              sowModel
+                            );
+                            
+                            // Add SOW content to the subservice
+                            subservice.sowContent = sowContent;
+                            
+                            // Add a brief delay to avoid rate limiting
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                          } catch (sowError) {
+                            console.error(`Failed to generate SOW content for ${subserviceName}:`, sowError);
+                          }
+                        }
+                      }
+                    }
+                    
+                    console.log("✅ SOW content generation complete!");
                   } else {
-                    console.error("⚠️ Enhanced services have invalid structure, keeping original")
+                    console.error("⚠️ Enhanced services have invalid structure, keeping original");
                   }
                 } else {
-                  console.error("⚠️ Enhanced services is not a valid array, keeping original")
+                  console.error("⚠️ Enhanced services is not a valid array, keeping original");
                 }
               } catch (enhanceError) {
-                const errorMessage = enhanceError instanceof Error ? enhanceError.message : String(enhanceError)
-                console.error(`⚠️ Service enhancement parsing failed: ${errorMessage}`)
-                console.error("Keeping original services")
+                const errorMessage = enhanceError instanceof Error ? enhanceError.message : String(enhanceError);
+                console.error(`⚠️ Service enhancement parsing failed: ${errorMessage}`);
+                console.error("Keeping original services");
               }
             } catch (enhanceError) {
-              const errorMessage = enhanceError instanceof Error ? enhanceError.message : String(enhanceError)
-              console.error(`⚠️ Service enhancement step failed: ${errorMessage}`)
-              console.error("Keeping original services")
+              const errorMessage = enhanceError instanceof Error ? enhanceError.message : String(enhanceError);
+              console.error(`⚠️ Service enhancement step failed: ${errorMessage}`);
+              console.error("Keeping original services");
             }
           }
 

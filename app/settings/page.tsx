@@ -86,6 +86,35 @@ IMPORTANT: Ensure your analysis provides enough detail to support generating:
 - Realistic hour estimates for each component
 
 Base your analysis on current professional services benchmarks and proven methodologies.`,
+
+  scopeLanguage: `Generate professional scope language for the following IT service:
+
+Technology: {technology}
+Phase: {phase}
+Service: {serviceName}
+Subservice: {subserviceName}
+
+You are a senior IT Services Consultant and Statement of Work specialist. Your goal is to write clear, professional, and client-ready Statement of Work (SOW) descriptions that define deliverables, scope boundaries, assumptions, and client responsibilities for specific IT services tasks.
+
+Each SOW entry should be written at the subservice level, but should reflect the context of its parent Service and the Phase in which it occurs.
+
+Writing guidelines:
+- Use precise, outcome-oriented language
+- Anchor the language in the context of the Phase (e.g., Planning, Implementation, Post-Go Live)
+- Reference the parent Service when needed to provide clarity or grouping
+- Use active voice and professional tone
+- Avoid overly technical jargon unless necessary
+- Keep each section concise but comprehensive
+
+Return a JSON object with ONLY these four sections:
+{
+  "serviceDescription": "Comprehensive explanation of what this subservice entails and delivers",
+  "keyAssumptions": "List of assumptions made for this subservice",
+  "clientResponsibilities": "What the client must provide or do for this subservice",
+  "outOfScope": "What is explicitly excluded from this subservice"
+}
+
+IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON object.`
 }
 
 export default function SettingsPage() {
@@ -104,6 +133,7 @@ export default function SettingsPage() {
   const [parsingPrompt, setParsingPrompt] = useState(DEFAULT_PROMPTS.parsing)
   const [researchPrompt, setResearchPrompt] = useState(DEFAULT_PROMPTS.research)
   const [analysisPrompt, setAnalysisPrompt] = useState(DEFAULT_PROMPTS.analysis)
+  const [scopeLanguagePrompt, setScopeLanguagePrompt] = useState(DEFAULT_PROMPTS.scopeLanguage)
 
   const [availableModels, setAvailableModels] = useState([
     { id: "anthropic/claude-3.5-sonnet", name: "Claude-3.5-Sonnet", provider: "Anthropic" },
@@ -147,10 +177,12 @@ export default function SettingsPage() {
     const savedParsingPrompt = localStorage.getItem("parsing_prompt") || DEFAULT_PROMPTS.parsing
     const savedResearchPrompt = localStorage.getItem("research_prompt") || DEFAULT_PROMPTS.research
     const savedAnalysisPrompt = localStorage.getItem("analysis_prompt") || DEFAULT_PROMPTS.analysis
+    const savedScopeLanguagePrompt = localStorage.getItem("scope_language_prompt") || DEFAULT_PROMPTS.scopeLanguage
 
     setParsingPrompt(savedParsingPrompt)
     setResearchPrompt(savedResearchPrompt)
     setAnalysisPrompt(savedAnalysisPrompt)
+    setScopeLanguagePrompt(savedScopeLanguagePrompt)
   }, [])
 
   // Fetch all available models from OpenRouter when API key changes
@@ -180,7 +212,7 @@ export default function SettingsPage() {
     fetchModels()
   }, [openRouterKey])
 
-  const resetPromptToDefault = (promptType: "parsing" | "research" | "analysis") => {
+  const resetPromptToDefault = (promptType: "parsing" | "research" | "analysis" | "scopeLanguage") => {
     switch (promptType) {
       case "parsing":
         setParsingPrompt(DEFAULT_PROMPTS.parsing)
@@ -190,6 +222,9 @@ export default function SettingsPage() {
         break
       case "analysis":
         setAnalysisPrompt(DEFAULT_PROMPTS.analysis)
+        break
+      case "scopeLanguage":
+        setScopeLanguagePrompt(DEFAULT_PROMPTS.scopeLanguage)
         break
     }
   }
@@ -214,6 +249,7 @@ export default function SettingsPage() {
       localStorage.setItem("parsing_prompt", parsingPrompt)
       localStorage.setItem("research_prompt", researchPrompt)
       localStorage.setItem("analysis_prompt", analysisPrompt)
+      localStorage.setItem("scope_language_prompt", scopeLanguagePrompt)
 
       setSaveStatus("success")
       setTimeout(() => setSaveStatus("idle"), 3000)
@@ -236,6 +272,7 @@ export default function SettingsPage() {
     setParsingPrompt(DEFAULT_PROMPTS.parsing)
     setResearchPrompt(DEFAULT_PROMPTS.research)
     setAnalysisPrompt(DEFAULT_PROMPTS.analysis)
+    setScopeLanguagePrompt(DEFAULT_PROMPTS.scopeLanguage)
     
     // Save the defaults to localStorage
     localStorage.setItem("research_model", "anthropic/claude-3.5-sonnet")
@@ -245,6 +282,7 @@ export default function SettingsPage() {
     localStorage.setItem("parsing_prompt", DEFAULT_PROMPTS.parsing)
     localStorage.setItem("research_prompt", DEFAULT_PROMPTS.research)
     localStorage.setItem("analysis_prompt", DEFAULT_PROMPTS.analysis)
+    localStorage.setItem("scope_language_prompt", DEFAULT_PROMPTS.scopeLanguage)
     
     setSaveStatus("success")
     setTimeout(() => setSaveStatus("idle"), 3000)
@@ -527,6 +565,31 @@ export default function SettingsPage() {
                     rows={10}
                     className="font-mono text-sm"
                     placeholder="Enter your custom analysis prompt..."
+                  />
+                </div>
+
+                {/* Scope Language Prompt */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="scope-language-prompt" className="text-base font-medium">
+                      Scope Language Prompt
+                    </Label>
+                    <Button onClick={() => resetPromptToDefault("scopeLanguage")} variant="outline" size="sm">
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Reset to Default
+                    </Button>
+                  </div>
+                  <div className="text-sm text-gray-600 mb-2">
+                    Used to generate professional scope language for services. Available placeholders: <code>{"{technology}"}</code>,{" "}
+                    <code>{"{phase}"}</code>, <code>{"{serviceName}"}</code>, <code>{"{subserviceName}"}</code>
+                  </div>
+                  <Textarea
+                    id="scope-language-prompt"
+                    value={scopeLanguagePrompt}
+                    onChange={(e) => setScopeLanguagePrompt(e.target.value)}
+                    rows={10}
+                    className="font-mono text-sm"
+                    placeholder="Enter your custom scope language prompt..."
                   />
                 </div>
 
