@@ -300,6 +300,18 @@ async function parseAIResponse(response: string): Promise<any> {
         const question = match[1];
         const optionsText = match[2];
         
+        // Create a descriptive slug from the question
+        const questionWords = question.toLowerCase()
+          .replace(/[^a-z0-9\s]/g, '')
+          .split(/\s+/)
+          .filter(word => word.length > 2 && !['the', 'and', 'for', 'with', 'what', 'how', 'many'].includes(word))
+          .slice(0, 3);
+        
+        // Generate a descriptive slug based on the question content
+        const slug = questionWords.length > 0 ? 
+          questionWords.join('_') : 
+          `question_${i+1}`;
+        
         // Extract options
         const options: any[] = [];
         const optionRegex = /"([^"]+)"/g;
@@ -308,9 +320,22 @@ async function parseAIResponse(response: string): Promise<any> {
         // Track used keys to avoid duplicates
         const usedKeys = new Set();
         
+        // Skip metadata fields that shouldn't be treated as options
+        const metadataFields = new Set(['label', 'value', 'hours', 'default', 'metadata', 'type', 'id', 'name', 'description']);
+        
         if (optionMatches && optionMatches.length > 0) {
+          // First pass: collect all potential option strings
+          const potentialOptions: string[] = [];
           for (let j = 0; j < optionMatches.length; j++) {
             const key = optionMatches[j][1].trim();
+            if (!metadataFields.has(key.toLowerCase())) {
+              potentialOptions.push(key);
+            }
+          }
+          
+          // Second pass: create proper option objects
+          for (let j = 0; j < potentialOptions.length; j++) {
+            const key = potentialOptions[j];
             
             // Skip duplicate keys
             if (usedKeys.has(key)) continue;
@@ -318,7 +343,7 @@ async function parseAIResponse(response: string): Promise<any> {
             
             options.push({
               key: key,
-              value: j+1,
+              value: j + 1, // Use sequential values for consistency
               default: j === 0
             });
           }
@@ -327,7 +352,7 @@ async function parseAIResponse(response: string): Promise<any> {
         if (options.length > 0 && question) {
           extractedQuestions.push({
             id: `q${i+1}`,
-            slug: `question-${i+1}`,
+            slug: slug,
             question: question,
             options: options
           });
@@ -475,7 +500,17 @@ async function extractContentFromFragments(cleaned: string, extractedQuestions: 
                   `Client will designate a project manager to serve as the primary point of contact. Client will ensure all necessary hardware and software licenses are available prior to implementation. Client will provide appropriate access credentials and documentation for existing systems.`,
                 outOfScope: svc.outOfScope || 
                   `Hardware procurement is not included in this service. Training beyond knowledge transfer sessions is not included. Support for third-party applications not directly related to ${extractedContent.technology} is excluded.`,
-                subservices: [] as any[]
+                subservices: [] as Array<{
+                  name: string;
+                  description: string;
+                  hours: number;
+                  mappedQuestions?: string[];
+                  calculationSlug?: string;
+                  serviceDescription?: string;
+                  keyAssumptions?: string;
+                  clientResponsibilities?: string;
+                  outOfScope?: string;
+                }>
               };
               
               // Process subservices
@@ -541,7 +576,7 @@ async function extractContentFromFragments(cleaned: string, extractedQuestions: 
                   keyAssumptions: `Client will provide necessary access to systems and information. The environment meets minimum technical requirements. Work will be performed during standard business hours unless otherwise specified.`,
                   clientResponsibilities: `Client will designate appropriate technical contacts. Client will ensure timely review and approval of deliverables. Client will provide access to necessary systems and documentation.`,
                   outOfScope: `Custom development beyond standard configuration is not included. Integration with systems not specified in requirements is excluded. Extended support beyond the implementation period is not included.`
-                } as any);
+                });
               }
               
               return service;
@@ -628,7 +663,57 @@ function normalizeNestedStructure(parsed: any): any {
     
     // Extract questions from various possible locations
     if (Array.isArray(parsed.questions)) {
-      normalized.questions = parsed.questions;
+      // Clean up existing questions to ensure proper format
+      normalized.questions = parsed.questions.map((q: any, index: number) => {
+        // Create a proper slug if missing
+        const slug = q.slug || (q.id ? q.id.replace('question_', '') : `question-${index + 1}`);
+        
+        // Ensure options are properly formatted
+        let options = [];
+        if (Array.isArray(q.options)) {
+          // Skip metadata fields that shouldn't be treated as options
+          const metadataFields = new Set(['label', 'value', 'hours', 'default', 'metadata', 'type', 'id', 'name', 'description']);
+          
+          // First collect valid options
+          const validOptions = q.options.filter((opt: any) => {
+            // Skip if it's just a metadata field
+            if (typeof opt === 'object' && opt !== null && typeof opt.key === 'string') {
+              return !metadataFields.has(opt.key.toLowerCase());
+            }
+            return true;
+          });
+          
+          // Then create properly formatted options with sequential values
+          options = validOptions.map((opt: any, i: number) => {
+            if (typeof opt === 'string') {
+              return {
+                key: opt,
+                value: i + 1,
+                default: i === 0
+              };
+            } else if (typeof opt === 'object' && opt !== null) {
+              return {
+                key: opt.key || opt.text || opt.label || opt.name || `Option ${i + 1}`,
+                value: i + 1, // Always use sequential values for consistency
+                default: !!opt.default || i === 0
+              };
+            } else {
+              return {
+                key: `Option ${i + 1}`,
+                value: i + 1,
+                default: i === 0
+              };
+            }
+          });
+        }
+        
+        return {
+          id: q.id || `q${index + 1}`,
+          slug: slug,
+          question: q.question || `Question ${index + 1}`,
+          options: options
+        };
+      });
     } else if (parsed.assessment_questions) {
       // Convert assessment_questions to the expected format
       normalized.questions = Object.entries(parsed.assessment_questions).map(([id, q]: [string, any], index) => ({
@@ -647,11 +732,29 @@ function normalizeNestedStructure(parsed: any): any {
         id: `q${index + 1}`,
         slug: `question-${index + 1}`,
         question: q.question,
-        options: Array.isArray(q.options) ? q.options.map((opt: string, i: number) => ({
-          key: opt,
-          value: i + 1,
-          default: i === 0
-        })) : []
+        options: Array.isArray(q.options) ? q.options.map((opt: string | any, i: number) => {
+          // Handle both string options and object options
+          if (typeof opt === 'string') {
+            return {
+              key: opt,
+              value: i + 1,
+              default: i === 0
+            };
+          } else if (typeof opt === 'object' && opt !== null) {
+            // If it's an object, try to extract key and value
+            return {
+              key: opt.key || opt.text || opt.label || opt.name || `Option ${i + 1}`,
+              value: i + 1, // Always use sequential values for consistency
+              default: !!opt.default || i === 0
+            };
+          } else {
+            return {
+              key: `Option ${i + 1}`,
+              value: i + 1,
+              default: i === 0
+            };
+          }
+        }) : []
       }));
     } else if (parsed.email_migration_research?.assessment_questions) {
       normalized.questions = Object.entries(parsed.email_migration_research.assessment_questions).map(([id, q]: [string, any], index) => ({
@@ -677,11 +780,6 @@ function normalizeNestedStructure(parsed: any): any {
       }));
     }
     
-    // Extract calculations
-    if (Array.isArray(parsed.calculations)) {
-      normalized.calculations = parsed.calculations;
-    }
-    
     // Extract services from various possible locations
     if (Array.isArray(parsed.services)) {
       normalized.services = parsed.services;
@@ -704,9 +802,49 @@ function normalizeNestedStructure(parsed: any): any {
       
       for (const location of serviceLocations) {
         if (Array.isArray(location)) {
+          // Transform services to expected format
           normalized.services = location;
           foundServices = true;
           break;
+        }
+      }
+      
+      // If no services found yet, try to extract from implementation_phases
+      if (!foundServices && Array.isArray(parsed.implementation_phases)) {
+        const services = parsed.implementation_phases.map((phase: any, index: number) => {
+          const phaseName = phase.name || phase.phase || `Phase ${index+1}`;
+          const hours = phase.hours || phase.estimated_hours || 40;
+          
+          // Create subservices from activities if available
+          let subservices = [];
+          if (Array.isArray(phase.activities)) {
+            subservices = phase.activities.slice(0, 3).map((activity: string, i: number) => ({
+              name: activity,
+              description: `${activity} for ${phaseName}`,
+              hours: Math.floor(hours / 3)
+            }));
+          }
+          
+          // Ensure exactly 3 subservices
+          while (subservices.length < 3) {
+            subservices.push({
+              name: `Activity ${subservices.length + 1}`,
+              description: `Supporting activity for ${phaseName}`,
+              hours: Math.floor(hours / 3)
+            });
+          }
+          
+          return {
+            phase: "Implementation",
+            service: phaseName,
+            description: phase.description || `${phaseName} phase activities`,
+            hours,
+            subservices
+          };
+        });
+        
+        if (services.length > 0) {
+          normalized.services = services;
         }
       }
     }
@@ -715,13 +853,29 @@ function normalizeNestedStructure(parsed: any): any {
     if (Array.isArray(parsed.sources)) {
       normalized.sources = parsed.sources;
     } else if (parsed.reference_sources) {
-      normalized.sources = parsed.reference_sources;
+      normalized.sources = parsed.reference_sources.map((src: any) => ({
+        url: src.url || "https://example.com",
+        title: src.title || "Reference Source",
+        relevance: src.relevance || "Implementation guidance"
+      }));
     } else if (parsed.email_migration_research?.reference_sources) {
-      normalized.sources = parsed.email_migration_research.reference_sources;
+      normalized.sources = parsed.email_migration_research.reference_sources.map((src: any) => ({
+        url: src.url || "https://example.com",
+        title: src.title || "Reference Source",
+        relevance: src.relevance || "Implementation guidance"
+      }));
     } else if (parsed.research_findings?.reference_sources) {
-      normalized.sources = parsed.research_findings.reference_sources;
+      normalized.sources = parsed.research_findings.reference_sources.map((src: any) => ({
+        url: src.url || "https://example.com",
+        title: src.title || "Reference Source",
+        relevance: src.relevance || "Implementation guidance"
+      }));
     } else if (parsed.resources) {
-      normalized.sources = parsed.resources;
+      normalized.sources = parsed.resources.map((src: any) => ({
+        url: src.url || "https://example.com",
+        title: src.title || src.name || "Resource",
+        relevance: src.relevance || "Implementation resource"
+      }));
     }
     
     // Ensure we have at least one source
@@ -912,88 +1066,11 @@ function validateContentStructure(content: any): boolean {
     // Keep existing questions if any
     const existingQuestions = Array.isArray(content.questions) ? content.questions : [];
     
-    // Generate technology-specific questions based on the content
-    const defaultQuestions = [
-      {
-        id: "q_environment_complexity",
-        slug: "environment-complexity",
-        question: `What is the complexity of the ${content.technology} environment?`,
-        options: [
-          { key: "Simple (minimal customization)", value: 1, default: true },
-          { key: "Moderate (some customization)", value: 2 },
-          { key: "Complex (significant customization)", value: 3 }
-        ]
-      },
-      {
-        id: "q_user_count",
-        slug: "user-count",
-        question: `How many users will be using the ${content.technology} solution?`,
-        options: [
-          { key: "Small (1-100 users)", value: 1, default: true },
-          { key: "Medium (101-500 users)", value: 2 },
-          { key: "Large (501-1000 users)", value: 3 },
-          { key: "Enterprise (1000+ users)", value: 4 }
-        ]
-      },
-      {
-        id: "q_timeline",
-        slug: "implementation-timeline",
-        question: `What is your implementation timeline for ${content.technology}?`,
-        options: [
-          { key: "Standard (3-6 months)", value: 1, default: true },
-          { key: "Accelerated (1-3 months)", value: 2 },
-          { key: "Extended (6-12 months)", value: 3 }
-        ]
-      },
-      {
-        id: "q_integration",
-        slug: "integration-requirements",
-        question: `What level of integration is required for ${content.technology}?`,
-        options: [
-          { key: "Basic (minimal integration)", value: 1, default: true },
-          { key: "Standard (typical integrations)", value: 2 },
-          { key: "Complex (multiple custom integrations)", value: 3 }
-        ]
-      },
-      {
-        id: "q_data_migration",
-        slug: "data-migration-volume",
-        question: `What is the volume of data to be migrated to ${content.technology}?`,
-        options: [
-          { key: "Small (under 100GB)", value: 1, default: true },
-          { key: "Medium (100GB-1TB)", value: 2 },
-          { key: "Large (1TB-10TB)", value: 3 },
-          { key: "Very Large (10TB+)", value: 4 }
-        ]
-      },
-      {
-        id: "q_compliance",
-        slug: "compliance-requirements",
-        question: `What compliance requirements apply to your ${content.technology} implementation?`,
-        options: [
-          { key: "Standard (no specific requirements)", value: 1, default: true },
-          { key: "Industry-specific (e.g., HIPAA, PCI)", value: 2 },
-          { key: "Multiple frameworks (e.g., HIPAA, GDPR, SOX)", value: 3 }
-        ]
-      },
-      {
-        id: "q_training",
-        slug: "training-requirements",
-        question: `What level of training is required for ${content.technology}?`,
-        options: [
-          { key: "Basic (self-service materials)", value: 1, default: true },
-          { key: "Standard (group training sessions)", value: 2 },
-          { key: "Comprehensive (personalized training)", value: 3 }
-        ]
-      }
-    ];
+    // We should not add static questions - log a warning instead
+    console.log(`❗ Warning: Only ${existingQuestions.length} questions found. Using what's available.`);
     
-    // Combine existing with defaults, ensuring we have at least 10 questions
-    const additionalNeeded = Math.max(0, 10 - existingQuestions.length);
-    const additionalQuestions = defaultQuestions.slice(0, additionalNeeded);
-    
-    content.questions = [...existingQuestions, ...additionalQuestions];
-    console.log(`✅ Generated ${additionalQuestions.length} additional questions to meet minimum requirements`);
+    // Assign existing questions without adding default ones
+    content.questions = existingQuestions;
   }
 
   // Validate or create calculations
@@ -1007,57 +1084,78 @@ function validateContentStructure(content: any): boolean {
     const availableQuestionSlugs = Array.isArray(content.questions) ? 
       content.questions.map((q: any) => q.slug || '') : [];
     
+    // Categorize questions by type to map to appropriate calculations
+    const userCountQuestions = availableQuestionSlugs.filter((slug: string) => 
+      slug.includes('user') || slug.includes('count') || slug.includes('employees'));
+    
+    const volumeQuestions = availableQuestionSlugs.filter((slug: string) => 
+      slug.includes('volume') || slug.includes('size') || slug.includes('data'));
+    
+    const complexityQuestions = availableQuestionSlugs.filter((slug: string) => 
+      slug.includes('complex') || slug.includes('custom') || slug.includes('requirement'));
+    
+    const timelineQuestions = availableQuestionSlugs.filter((slug: string) => 
+      slug.includes('timeline') || slug.includes('schedule') || slug.includes('deadline'));
+    
+    const locationQuestions = availableQuestionSlugs.filter((slug: string) => 
+      slug.includes('location') || slug.includes('site') || slug.includes('office'));
+    
     // Generate technology-specific calculations that map to different questions
     const defaultCalculations = [
+      {
+        id: "scale_factor",
+        slug: "scale_factor",
+        name: `${content.technology} Scale Factor`,
+        description: `Adjusts hours based on the number of users/devices in the ${content.technology} implementation`,
+        formula: userCountQuestions.length > 0 ? userCountQuestions[0] : (availableQuestionSlugs.length > 0 ? availableQuestionSlugs[0] : "question_1"),
+        mappedQuestions: userCountQuestions.length > 0 ? [userCountQuestions[0]] : 
+                         (availableQuestionSlugs.length > 0 ? [availableQuestionSlugs[0]] : []),
+        resultType: "multiplier"
+      },
+      {
+        id: "data_volume",
+        slug: "data_volume",
+        name: `${content.technology} Data Volume Factor`,
+        description: `Adjusts hours based on the volume of data involved in the ${content.technology} implementation`,
+        formula: volumeQuestions.length > 0 ? volumeQuestions[0] : (availableQuestionSlugs.length > 1 ? availableQuestionSlugs[1] : "question_2"),
+        mappedQuestions: volumeQuestions.length > 0 ? [volumeQuestions[0]] : 
+                        (availableQuestionSlugs.length > 1 ? [availableQuestionSlugs[1]] : []),
+        resultType: "multiplier"
+      },
       {
         id: "complexity_factor",
         slug: "complexity_factor",
         name: `${content.technology} Complexity Factor`,
-        description: `Adjusts hours based on ${content.technology} environment complexity`,
-        formula: "environment_complexity * 1.5",
-        mappedQuestions: availableQuestionSlugs.length > 0 ? [availableQuestionSlugs[0]] : ["environment-complexity"],
+        description: `Adjusts hours based on the complexity of the ${content.technology} implementation`,
+        formula: complexityQuestions.length > 0 ? complexityQuestions[0] : (availableQuestionSlugs.length > 2 ? availableQuestionSlugs[2] : "question_3"),
+        mappedQuestions: complexityQuestions.length > 0 ? [complexityQuestions[0]] : 
+                        (availableQuestionSlugs.length > 2 ? [availableQuestionSlugs[2]] : []),
         resultType: "multiplier"
       },
       {
-        id: "user_count_factor",
-        slug: "user_count_factor",
-        name: "User Count Factor",
-        description: `Adjusts hours based on number of ${content.technology} users`,
-        formula: "user_count * 1.2",
-        mappedQuestions: availableQuestionSlugs.length > 1 ? [availableQuestionSlugs[1]] : ["user-count"],
+        id: "timeline_factor",
+        slug: "timeline_factor",
+        name: `${content.technology} Timeline Factor`,
+        description: `Adjusts hours based on the implementation timeline requirements`,
+        formula: timelineQuestions.length > 0 ? timelineQuestions[0] : (availableQuestionSlugs.length > 3 ? availableQuestionSlugs[3] : "question_4"),
+        mappedQuestions: timelineQuestions.length > 0 ? [timelineQuestions[0]] : 
+                        (availableQuestionSlugs.length > 3 ? [availableQuestionSlugs[3]] : []),
         resultType: "multiplier"
       },
       {
-        id: "integration_factor",
-        slug: "integration_factor",
-        name: "Integration Complexity Factor",
-        description: `Adjusts hours based on ${content.technology} integration requirements`,
-        formula: "integration_requirements * 1.3",
-        mappedQuestions: availableQuestionSlugs.length > 2 ? [availableQuestionSlugs[2]] : ["integration-requirements"],
-        resultType: "multiplier"
-      },
-      {
-        id: "data_migration_factor",
-        slug: "data_migration_factor",
-        name: "Data Migration Volume Factor",
-        description: `Adjusts hours based on ${content.technology} data migration volume`,
-        formula: "data_migration_volume * 1.4",
-        mappedQuestions: availableQuestionSlugs.length > 3 ? [availableQuestionSlugs[3]] : ["data-migration-volume"],
-        resultType: "multiplier"
-      },
-      {
-        id: "compliance_factor",
-        slug: "compliance_factor",
-        name: "Compliance Requirements Factor",
-        description: `Adjusts hours based on ${content.technology} compliance requirements`,
-        formula: "compliance_requirements * 1.25",
-        mappedQuestions: availableQuestionSlugs.length > 4 ? [availableQuestionSlugs[4]] : ["compliance-requirements"],
+        id: "location_factor",
+        slug: "location_factor",
+        name: `${content.technology} Location Factor`,
+        description: `Adjusts hours based on the number of locations/sites involved`,
+        formula: locationQuestions.length > 0 ? locationQuestions[0] : (availableQuestionSlugs.length > 4 ? availableQuestionSlugs[4] : "question_5"),
+        mappedQuestions: locationQuestions.length > 0 ? [locationQuestions[0]] : 
+                        (availableQuestionSlugs.length > 4 ? [availableQuestionSlugs[4]] : []),
         resultType: "multiplier"
       }
     ];
     
-    // Ensure existing calculations have descriptive slugs and proper question mappings
-    existingCalculations.forEach((calc: any, index: number) => {
+    // Ensure existing calculations have descriptive slugs
+    existingCalculations.forEach((calc: any) => {
       // Check if the slug is generic like "calc1" or missing
       if (!calc.slug || calc.slug.match(/^calc\d+$/)) {
         // Generate a descriptive slug based on the calculation name
@@ -1070,29 +1168,36 @@ function validateContentStructure(content: any): boolean {
         calc.name = `${content.technology} ${calc.id || "Factor"}`;
       }
       
-      // Ensure each calculation maps to a different question if possible
-      if (!calc.mappedQuestions || calc.mappedQuestions.length === 0 || 
-          (calc.mappedQuestions.length === 1 && calc.mappedQuestions[0] === availableQuestionSlugs[0])) {
-        const questionIndex = Math.min(index, availableQuestionSlugs.length - 1);
-        if (questionIndex >= 0 && availableQuestionSlugs[questionIndex]) {
-          calc.mappedQuestions = [availableQuestionSlugs[questionIndex]];
+      // Ensure each calculation is mapped to at least one question
+      if (!calc.mappedQuestions || !Array.isArray(calc.mappedQuestions) || calc.mappedQuestions.length === 0) {
+        if (availableQuestionSlugs.length > 0) {
+          // Try to find a quantitative question to map to
+          const quantitativeQuestionSlugs = availableQuestionSlugs.filter((slug: string) => 
+            slug.includes('user') || slug.includes('count') || 
+            slug.includes('volume') || slug.includes('number') || 
+            slug.includes('size') || slug.includes('quantity')
+          );
+          
+          if (quantitativeQuestionSlugs.length > 0) {
+            calc.mappedQuestions = [quantitativeQuestionSlugs[0]];
+          } else {
+            calc.mappedQuestions = [availableQuestionSlugs[0]];
+          }
+        } else {
+          calc.mappedQuestions = [];
         }
-      }
-      
-      // Ensure formula has a multiplier effect
-      if (!calc.formula || calc.formula === "1" || calc.formula === availableQuestionSlugs[0]) {
-        const questionSlug = calc.mappedQuestions && calc.mappedQuestions.length > 0 ? 
-          calc.mappedQuestions[0] : availableQuestionSlugs[0];
-        calc.formula = `${questionSlug} * ${(1 + (index * 0.1)).toFixed(1)}`;
       }
     });
     
-    // Combine existing with defaults, ensuring we have at least 5 calculations
+    // We'll use existing calculations first, then add default ones only if needed
     const additionalNeeded = Math.max(0, 5 - existingCalculations.length);
     const additionalCalculations = defaultCalculations.slice(0, additionalNeeded);
     
     content.calculations = [...existingCalculations, ...additionalCalculations];
-    console.log(`✅ Generated ${additionalCalculations.length} additional calculations to meet minimum requirements`);
+    
+    if (additionalNeeded > 0) {
+      console.log(`✅ Generated ${additionalNeeded} additional calculations to meet minimum requirements`);
+    }
   }
 
   // Validate or create services
@@ -1254,6 +1359,81 @@ function validateContentStructure(content: any): boolean {
         
         if (!subservice.outOfScope || subservice.outOfScope.length < 100) {
           subservice.outOfScope = generateSubserviceOutOfScope(content.technology, subservice.name, service.name || service.service);
+        }
+        
+        // Map subservices to questions and calculations
+        if (!subservice.mappedQuestions || !Array.isArray(subservice.mappedQuestions) || subservice.mappedQuestions.length === 0) {
+          // Categorize questions by type
+          const availableQuestionSlugs = Array.isArray(content.questions) ? 
+            content.questions.map((q: any) => q.slug || '') : [];
+            
+          // Find appropriate questions based on subservice type
+          const subserviceName = subservice.name.toLowerCase();
+          let mappedQuestions: string[] = [];
+          
+          if (subserviceName.includes('assessment') || subserviceName.includes('requirements') || subserviceName.includes('planning')) {
+            // Find complexity or requirement questions
+            const complexityQuestions = availableQuestionSlugs.filter((slug: string) => 
+              slug.includes('complex') || slug.includes('requirement') || slug.includes('assessment'));
+            if (complexityQuestions.length > 0) {
+              mappedQuestions = [complexityQuestions[0]];
+            }
+          } else if (subserviceName.includes('design') || subserviceName.includes('architecture')) {
+            // Find design or architecture questions
+            const designQuestions = availableQuestionSlugs.filter((slug: string) => 
+              slug.includes('design') || slug.includes('architecture') || slug.includes('custom'));
+            if (designQuestions.length > 0) {
+              mappedQuestions = [designQuestions[0]];
+            }
+          } else if (subserviceName.includes('deploy') || subserviceName.includes('implement') || subserviceName.includes('configuration')) {
+            // Find scale or volume questions
+            const scaleQuestions = availableQuestionSlugs.filter((slug: string) => 
+              slug.includes('user') || slug.includes('count') || slug.includes('volume'));
+            if (scaleQuestions.length > 0) {
+              mappedQuestions = [scaleQuestions[0]];
+            }
+          } else if (subserviceName.includes('test') || subserviceName.includes('validation')) {
+            // Find testing or validation questions
+            const testingQuestions = availableQuestionSlugs.filter((slug: string) => 
+              slug.includes('test') || slug.includes('validation') || slug.includes('quality'));
+            if (testingQuestions.length > 0) {
+              mappedQuestions = [testingQuestions[0]];
+            }
+          } else if (subserviceName.includes('migration') || subserviceName.includes('data')) {
+            // Find data or migration questions
+            const dataQuestions = availableQuestionSlugs.filter((slug: string) => 
+              slug.includes('data') || slug.includes('migration') || slug.includes('volume'));
+            if (dataQuestions.length > 0) {
+              mappedQuestions = [dataQuestions[0]];
+            }
+          }
+          
+          // If no specific questions found, use a question based on subservice index
+          if (mappedQuestions.length === 0 && availableQuestionSlugs.length > 0) {
+            const questionIndex = (index + subIndex) % availableQuestionSlugs.length;
+            mappedQuestions = [availableQuestionSlugs[questionIndex]];
+          }
+          
+          subservice.mappedQuestions = mappedQuestions;
+        }
+        
+        // Map to appropriate calculation if not already mapped
+        if (!subservice.calculationSlug && subservice.mappedQuestions && subservice.mappedQuestions.length > 0) {
+          const mappedQuestion = subservice.mappedQuestions[0];
+          const availableCalculations = Array.isArray(content.calculations) ? content.calculations : [];
+          
+          // Find a calculation that maps to this question
+          const matchingCalculation = availableCalculations.find((calc: any) => 
+            calc.mappedQuestions && Array.isArray(calc.mappedQuestions) && 
+            calc.mappedQuestions.includes(mappedQuestion));
+          
+          if (matchingCalculation) {
+            subservice.calculationSlug = matchingCalculation.slug;
+          } else if (availableCalculations.length > 0) {
+            // If no direct match, assign a calculation based on subservice index
+            const calcIndex = (index + subIndex) % availableCalculations.length;
+            subservice.calculationSlug = availableCalculations[calcIndex].slug;
+          }
         }
       }
     }
@@ -2109,54 +2289,28 @@ CRITICAL INSTRUCTIONS:
 4. Include specific tools, platforms, and methodologies mentioned in the research in your service descriptions
 5. Reference industry best practices found in the research data
 6. Base your hour estimates on the research findings, not generic templates
-7. All content must be suitable for a formal Statement of Work document - use professional language and terminology
 
 DISCOVERY QUESTIONS REQUIREMENTS:
 - Generate AT LEAST 10 highly specific discovery questions for ${parsedData.technology || input}
-- Each question MUST include specific technology terminology and components from ${parsedData.technology || input}
-- Questions must cover technical, business, and operational aspects
-- Each question must have 3-4 options that are specific to the technology
-- Options must include realistic values/choices relevant to ${parsedData.technology || input}
-- NO generic questions - each question must be uniquely tailored to ${parsedData.technology || input}
-- Questions should reference specific components, versions, configurations of ${parsedData.technology || input}
-- Each question must have a clear impact on scoping and service delivery
-- Include questions about scale, complexity, integration points, and specific technical requirements
-- Options should have meaningful differences that affect implementation effort
+- Questions MUST be reusable across multiple client engagements for ScopeStack
+- Each question must be quantitative and directly impact service scope/hours
+- Questions should focus on measurable attributes: user counts, data volumes, site counts, etc.
+- Each question must include 3-4 specific options with numerical values
+- Options must represent different scale/complexity levels (e.g., Small: 1-50, Medium: 51-200, Large: 201-500)
+- Questions must be directly mappable to specific services and subservices
+- Include questions that help determine which services are needed and their scope
+- Each question should have a clear, descriptive slug that indicates what it measures
 
 SERVICE REQUIREMENTS:
-- Generate a comprehensive service structure with at least 10 total services
-- Use THESE EXACT PHASES: "Initiating", "Planning", "Implementation", "Monitoring and Controlling", "Closing"
-- Include AT LEAST 1 service for EACH phase
-- The Implementation phase MUST have AT LEAST 3 distinct services
+- Generate at least 10 services across all phases (Initiating, Planning, Implementation, Monitoring and Controlling, Closing)
 - Each service must have exactly 3 subservices
 - Each service and subservice must have a UNIQUE name specific to ${parsedData.technology || input}
 - NO generic service names - use specific technology terms from research
 - Each service description must be unique and specific to the service
 - Vary the language and structure across different services
 - Include specific tools, methodologies, and components in service names
-- All services must be appropriate for a formal Statement of Work
-- Start with a base of 1 hour per task, then adjust based on complexity
-
-CALCULATION REQUIREMENTS:
-- Create at least 5 unique calculations that affect service hours
-- Each calculation must have a DESCRIPTIVE and UNIQUE slug (not generic like "calc1")
-- Calculation slugs should describe what they calculate (e.g., "data_volume_multiplier", "compliance_complexity_factor")
-- Each calculation must map to at least one question
-- Formulas should be realistic and actually impact the level of effort
-- Include calculations for data volume, complexity, compliance requirements, timeline constraints, and custom requirements
-
-SCOPING LANGUAGE REQUIREMENTS:
-- For each service, include these detailed fields:
-  * serviceDescription: Comprehensive explanation of the service (200-300 characters)
-  * keyAssumptions: List of assumptions made for the service (150-200 characters)
-  * clientResponsibilities: What the client must provide or do (150-200 characters)
-  * outOfScope: What is explicitly excluded from the service (150-200 characters)
-
-- For each subservice, include the same scoping language fields:
-  * serviceDescription: Detailed explanation specific to the subservice
-  * keyAssumptions: Assumptions specific to this subservice component
-  * clientResponsibilities: Client requirements for this specific subservice
-  * outOfScope: Exclusions specific to this subservice component
+- Explicitly map services to specific discovery questions
+- Include clear formulas showing how question answers affect service hours
 
 IMPORTANT: Return ONLY valid JSON. Start with { and end with }. Do not include any markdown code blocks or explanations.
 Your response MUST be a valid JSON object with the following structure:
@@ -2253,24 +2407,58 @@ UNIQUENESS REQUIREMENTS:
 5. Incorporate specific technical terms from the research in different ways
 6. Vary the focus (business value, technical details, operational benefits) across services
 
+QUANTITATIVE MAPPING:
+1. Ensure services are properly mapped to quantitative questions like:
+   - "How many users will be migrated?"
+   - "How many locations/sites need to be configured?"
+   - "How many devices/servers/firewalls will be implemented?"
+   - "What is the total data volume to be migrated?"
+2. Service hours should scale based on these quantitative factors
+3. Each calculation should clearly impact specific services based on quantitative inputs
+4. Make sure service descriptions reference these quantitative factors
+
 SCOPING LANGUAGE REQUIREMENTS:
 1. For each service, include detailed scoping language fields:
-   - serviceDescription: Comprehensive explanation of the service (200-300 characters)
-   - keyAssumptions: List of assumptions made for the service (150-200 characters)
-   - clientResponsibilities: What the client must provide or do (150-200 characters)
-   - outOfScope: What is explicitly excluded from the service (150-200 characters)
+   - serviceDescription: Comprehensive explanation of the service (200-300 characters) ALWAYS starting with "We will..." (not "This service...")
+   - keyAssumptions: List of assumptions made for the service (150-200 characters) using passive voice without "Client will..." phrasing
+   - clientResponsibilities: What the client must provide or do (150-200 characters) using action verbs
+   - outOfScope: What is explicitly excluded from the service (150-200 characters) varying terminology
 
 2. For each subservice, include the same scoping language fields:
-   - serviceDescription: Detailed explanation specific to the subservice
-   - keyAssumptions: Assumptions specific to this subservice component
-   - clientResponsibilities: Client requirements for this specific subservice
-   - outOfScope: Exclusions specific to this subservice component
+   - serviceDescription: Detailed explanation specific to the subservice ALWAYS starting with "We will..." (not "This subservice...")
+   - keyAssumptions: Assumptions specific to this subservice component using passive voice
+   - clientResponsibilities: Client requirements for this specific subservice using varied action verbs
+   - outOfScope: Exclusions specific to this subservice component with varied terminology
 
 3. Ensure scoping language is contractually sound:
    - Clear boundaries between client and provider responsibilities
    - Specific assumptions that limit scope
    - Precise language about what is excluded
    - Measurable deliverables and outcomes
+
+FORMATTING REQUIREMENTS:
+1. Place each sentence on a new line using the newline character \\n
+2. For example:
+   "We will implement the core system components according to the approved design specifications.\\nOur team will configure all required modules and integrate with existing systems.\\nThis service includes comprehensive testing and validation of all implemented components."
+
+3. Each scope language field should follow this format with 3-4 sentences, each on its own line
+
+LANGUAGE VARIETY:
+1. For service descriptions, use varied action verbs beyond just "provide" and "deliver":
+   - "We will implement...", "We will execute...", "We will conduct...", "We will establish..."
+   - "We will develop...", "We will design...", "We will configure...", "We will deploy..."
+   
+2. For key assumptions, vary passive voice constructions:
+   - "Access will be provided...", "Documentation will be made available..."
+   - "Resources will be allocated...", "Systems will be accessible..."
+   
+3. For client responsibilities, use different action verbs:
+   - "Grant access...", "Provide feedback...", "Review deliverables..."
+   - "Assign resources...", "Ensure availability...", "Validate results..."
+   
+4. For out of scope items, use varied exclusion terminology:
+   - "Not included in this service...", "Excluded from this engagement..."
+   - "Beyond the scope of this service...", "Not covered in this work..."
 
 Make each service and subservice more specific to ${parsedData.technology || input} by:
 1. Adding technology-specific terminology from the research data
@@ -2543,148 +2731,177 @@ Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
 // Helper functions for generating detailed scope language
 
 function createDetailedService(technology: string, phase: string, serviceName: string): any {
-  return {
+  // Create a service object with all required fields
+  const service: Service = {
     phase: phase,
     service: serviceName,
     name: serviceName,
     description: `${serviceName} for ${technology}`,
-    hours: phase === "Implementation" ? 40 : 24,
+    hours: 40,
     serviceDescription: generateServiceDescription(technology, serviceName, phase),
     keyAssumptions: generateKeyAssumptions(technology, serviceName, phase),
     clientResponsibilities: generateClientResponsibilities(technology, serviceName, phase),
     outOfScope: generateOutOfScope(technology, serviceName, phase),
-    subservices: [
-      {
-        name: `${serviceName} - Assessment`,
-        description: `Assessment activities for ${serviceName}`,
-        hours: phase === "Implementation" ? 16 : 8,
-        serviceDescription: generateSubserviceDescription(technology, `${serviceName} - Assessment`, serviceName),
-        keyAssumptions: generateSubserviceKeyAssumptions(technology, `${serviceName} - Assessment`, serviceName),
-        clientResponsibilities: generateSubserviceClientResponsibilities(technology, `${serviceName} - Assessment`, serviceName),
-        outOfScope: generateSubserviceOutOfScope(technology, `${serviceName} - Assessment`, serviceName)
-      },
-      {
-        name: `${serviceName} - Implementation`,
-        description: `Implementation activities for ${serviceName}`,
-        hours: phase === "Implementation" ? 16 : 10,
-        serviceDescription: generateSubserviceDescription(technology, `${serviceName} - Implementation`, serviceName),
-        keyAssumptions: generateSubserviceKeyAssumptions(technology, `${serviceName} - Implementation`, serviceName),
-        clientResponsibilities: generateSubserviceClientResponsibilities(technology, `${serviceName} - Implementation`, serviceName),
-        outOfScope: generateSubserviceOutOfScope(technology, `${serviceName} - Implementation`, serviceName)
-      },
-      {
-        name: `${serviceName} - Validation`,
-        description: `Validation activities for ${serviceName}`,
-        hours: phase === "Implementation" ? 8 : 6,
-        serviceDescription: generateSubserviceDescription(technology, `${serviceName} - Validation`, serviceName),
-        keyAssumptions: generateSubserviceKeyAssumptions(technology, `${serviceName} - Validation`, serviceName),
-        clientResponsibilities: generateSubserviceClientResponsibilities(technology, `${serviceName} - Validation`, serviceName),
-        outOfScope: generateSubserviceOutOfScope(technology, `${serviceName} - Validation`, serviceName)
-      }
-    ]
+    subservices: []
   };
+  
+  // Generate subservices based on the service type
+  const subserviceTypes = [];
+  
+  if (phase === "Initiating") {
+    subserviceTypes.push("Assessment", "Requirements Gathering", "Project Planning");
+  } else if (phase === "Planning") {
+    subserviceTypes.push("Design", "Architecture", "Documentation");
+  } else if (phase === "Implementation") {
+    subserviceTypes.push("Configuration", "Deployment", "Testing");
+  } else if (phase === "Monitoring and Controlling") {
+    subserviceTypes.push("Performance Monitoring", "Quality Assurance", "Issue Resolution");
+  } else if (phase === "Closing") {
+    subserviceTypes.push("Knowledge Transfer", "Documentation Finalization", "Project Closure");
+  } else {
+    subserviceTypes.push("Planning", "Execution", "Validation");
+  }
+  
+  // Create 3 subservices
+  for (let i = 0; i < 3; i++) {
+    const subserviceType = subserviceTypes[i] || `Component ${i+1}`;
+    const subName = `${serviceName} ${subserviceType}`;
+    
+    const subservice: Subservice = {
+      name: subName,
+      description: `${subserviceType} activities for ${serviceName}`,
+      hours: Math.floor(service.hours / 3),
+      serviceDescription: generateSubserviceDescription(technology, subName, serviceName),
+      keyAssumptions: generateSubserviceKeyAssumptions(technology, subName, serviceName),
+      clientResponsibilities: generateSubserviceClientResponsibilities(technology, subName, serviceName),
+      outOfScope: generateSubserviceOutOfScope(technology, subName, serviceName),
+      // These will be populated later when mapping to questions and calculations
+      mappedQuestions: [],
+      calculationSlug: ""
+    };
+    
+    service.subservices.push(subservice);
+  }
+  
+  return service;
 }
 
 function generateServiceDescription(technology: string, serviceName: string, phase: string): string {
   const phaseDescriptions: {[key: string]: string} = {
-    "Initiating": `This service establishes the foundation for a successful ${technology} implementation by defining project parameters, stakeholder needs, and initial requirements. Our team will conduct thorough discovery sessions, document business and technical requirements, and establish project governance to ensure alignment with organizational objectives.`,
-    "Planning": `This service provides comprehensive planning for your ${technology} implementation, including detailed architecture design, resource allocation, timeline development, and risk assessment. Our experts will create a tailored implementation roadmap that addresses your specific business needs and technical environment.`,
-    "Implementation": `This service delivers expert implementation of ${technology} components according to the approved design specifications. Our certified consultants will configure, integrate, and optimize your ${technology} solution to meet your specific business requirements while following industry best practices and vendor recommendations.`,
-    "Monitoring and Controlling": `This service ensures your ${technology} implementation maintains optimal performance and security through proactive monitoring, quality control, and change management processes. Our specialists will establish monitoring frameworks, conduct regular reviews, and implement necessary adjustments to maintain system integrity.`,
-    "Closing": `This service provides formal closure activities for your ${technology} implementation, including comprehensive knowledge transfer, documentation finalization, and transition to operational support. Our team will ensure all project deliverables are completed, accepted, and properly transitioned to your team.`
+    "Initiating": `We will establish the foundation for a successful ${technology} implementation by defining project parameters, stakeholder needs, and initial requirements.\nOur team will conduct thorough discovery sessions, document business and technical requirements, and establish project governance.\nThis service ensures alignment with organizational objectives and creates a solid foundation for the project.`,
+    
+    "Planning": `We will deliver comprehensive planning for your ${technology} implementation, including detailed architecture design, resource allocation, and risk assessment.\nOur experts will create a tailored implementation roadmap that addresses your specific business needs and technical environment.\nThis planning phase establishes clear milestones, dependencies, and success criteria for the project.`,
+    
+    "Implementation": `We will execute expert implementation of ${technology} components according to the approved design specifications.\nOur certified consultants will configure, integrate, and optimize your ${technology} solution to meet your specific business requirements.\nAll implementation activities follow industry best practices and vendor recommendations to ensure optimal performance.`,
+    
+    "Monitoring and Controlling": `We will ensure your ${technology} implementation maintains optimal performance and security through proactive monitoring and quality control.\nOur specialists will establish monitoring frameworks, conduct regular reviews, and implement necessary adjustments.\nThis service maintains system integrity and addresses potential issues before they impact operations.`,
+    
+    "Closing": `We will provide formal closure activities for your ${technology} implementation, including comprehensive knowledge transfer and documentation finalization.\nOur team will ensure all project deliverables are completed, accepted, and properly transitioned to your team.\nThis service includes final system validation and transition to operational support.`
   };
   
-  return phaseDescriptions[phase] || `This service provides comprehensive ${serviceName} for your ${technology} implementation, delivered by our expert consultants following industry best practices and methodologies. Our team will work closely with your stakeholders to ensure the solution meets your specific business requirements and technical specifications.`;
+  return phaseDescriptions[phase] || `We will provide comprehensive ${serviceName} for your ${technology} implementation, delivered by our expert consultants.\nOur team will work closely with your stakeholders to ensure the solution meets your specific business requirements.\nAll activities follow industry best practices and methodologies to ensure a successful outcome.`;
 }
 
 function generateKeyAssumptions(technology: string, serviceName: string, phase: string): string {
   const phaseAssumptions: {[key: string]: string} = {
-    "Initiating": `Client will provide access to key stakeholders and subject matter experts for requirements gathering. Existing documentation related to current environment and business processes will be made available. Client will designate a project sponsor with decision-making authority.`,
-    "Planning": `Client environment documentation is accurate and up-to-date. Client will provide timely feedback on design documents and implementation plans. Necessary hardware and software prerequisites will be in place before implementation begins.`,
-    "Implementation": `Client will provide administrative access to required systems and environments. Implementation will be performed during agreed-upon maintenance windows. Client will ensure necessary hardware and software prerequisites are in place before implementation begins.`,
-    "Monitoring and Controlling": `Client will provide access to monitoring systems and performance data. Changes to the environment will follow the established change management process. Client will designate personnel responsible for ongoing monitoring activities.`,
-    "Closing": `All project deliverables have been completed and accepted. Client will allocate appropriate resources for knowledge transfer sessions. Client will designate personnel responsible for ongoing support and maintenance.`
+    "Initiating": `Access to key stakeholders and subject matter experts will be provided for requirements gathering.\nExisting documentation related to current environment and business processes will be made available.\nA project sponsor with decision-making authority will be designated by the client.`,
+    
+    "Planning": `Environment documentation is accurate and up-to-date for planning purposes.\nTimely feedback on design documents and implementation plans will be provided.\nHardware and software prerequisites will be identified and documented before implementation begins.`,
+    
+    "Implementation": `Administrative access to required systems and environments will be provided during implementation.\nImplementation activities can be performed during agreed-upon maintenance windows.\nHardware and software prerequisites are in place before implementation begins.`,
+    
+    "Monitoring and Controlling": `Access to monitoring systems and performance data will be granted as needed.\nAll changes to the environment will follow the established change management process.\nPersonnel responsible for ongoing monitoring activities will be identified and available.`,
+    
+    "Closing": `All project deliverables have been completed and accepted before closure activities begin.\nAppropriate resources will be allocated for knowledge transfer sessions.\nPersonnel responsible for ongoing support and maintenance will be available for transition activities.`
   };
   
-  return phaseAssumptions[phase] || `Client will provide timely access to necessary systems, information, and personnel. Client environment meets the minimum technical requirements for ${technology} implementation. Work will be performed during standard business hours unless otherwise specified. Client has necessary licenses and entitlements for ${technology} components.`;
+  return phaseAssumptions[phase] || `Timely access to necessary systems, information, and personnel will be provided throughout the project.\nThe environment meets the minimum technical requirements for ${technology} implementation.\nWork will be performed during standard business hours unless otherwise specified.\nAll necessary licenses and entitlements for ${technology} components are available prior to implementation.`;
 }
 
 function generateClientResponsibilities(technology: string, serviceName: string, phase: string): string {
   const phaseResponsibilities: {[key: string]: string} = {
-    "Initiating": `Provide access to key stakeholders and subject matter experts for requirements gathering sessions. Share existing documentation related to current environment and business processes. Designate a project sponsor with decision-making authority. Review and approve project charter and scope documents.`,
-    "Planning": `Review and provide timely feedback on design documents and implementation plans. Ensure necessary hardware and software prerequisites are in place before implementation begins. Designate technical resources to work with our implementation team. Approve the final implementation plan and schedule.`,
-    "Implementation": `Provide administrative access to required systems and environments. Ensure necessary hardware and software prerequisites are in place before implementation begins. Participate in testing and validation activities. Review and approve implementation deliverables.`,
-    "Monitoring and Controlling": `Provide access to monitoring systems and performance data. Follow the established change management process for any changes to the environment. Participate in regular status meetings and reviews. Report any issues or concerns promptly.`,
-    "Closing": `Allocate appropriate resources for knowledge transfer sessions. Review and approve final documentation. Participate in project closure activities and sign-off. Designate personnel responsible for ongoing support and maintenance.`
+    "Initiating": `Grant access to key stakeholders and subject matter experts for requirements gathering sessions.\nProvide existing documentation related to current environment and business processes.\nAssign a project sponsor with decision-making authority.\nReview and approve project charter and scope documents.`,
+    
+    "Planning": `Evaluate and provide timely feedback on design documents and implementation plans.\nConfirm necessary hardware and software prerequisites are in place.\nAssign technical resources to collaborate with our implementation team.\nApprove the final implementation plan and schedule.`,
+    
+    "Implementation": `Grant administrative access to required systems and environments for implementation.\nVerify necessary hardware and software prerequisites are in place.\nParticipate in testing and validation activities.\nReview and approve implementation deliverables.`,
+    
+    "Monitoring and Controlling": `Supply access to monitoring systems and performance data as needed.\nAdhere to the established change management process for system modifications.\nAttend regular status meetings and reviews.\nCommunicate any issues or concerns promptly.`,
+    
+    "Closing": `Dedicate appropriate resources for knowledge transfer sessions.\nReview and approve final documentation deliverables.\nParticipate in project closure activities and sign-off.\nAssign personnel responsible for ongoing support and maintenance.`
   };
   
-  return phaseResponsibilities[phase] || `Provide timely access to necessary systems, information, and personnel. Ensure appropriate stakeholders are available for meetings and decision-making. Review and approve deliverables within the agreed timeframe. Provide timely notification of any issues or concerns. Designate a primary point of contact for project coordination.`;
+  return phaseResponsibilities[phase] || `Grant timely access to necessary systems, information, and personnel throughout the project.\nEnsure appropriate stakeholders are available for meetings and decision-making.\nReview and approve deliverables within the agreed timeframe.\nProvide timely notification of any issues or concerns.\nDesignate a primary point of contact for project coordination.`;
 }
 
 function generateOutOfScope(technology: string, serviceName: string, phase: string): string {
   const phaseOutOfScope: {[key: string]: string} = {
-    "Initiating": `Development of custom solutions outside standard ${technology} capabilities. Business process reengineering. Detailed technical design and implementation planning. Hardware procurement or installation. Training end users on ${technology} functionality.`,
-    "Planning": `Implementation of the designed solution. Procurement of hardware or software licenses. Custom development beyond standard ${technology} capabilities. End-user training materials development. Ongoing support after implementation.`,
-    "Implementation": `Hardware procurement or installation unless explicitly included. Development of custom applications outside standard ${technology} capabilities. End-user training beyond knowledge transfer to administrators. Ongoing support beyond the implementation period.`,
-    "Monitoring and Controlling": `24/7 monitoring services unless explicitly included. Remediation of issues not related to the implemented ${technology} solution. Custom development of monitoring tools. End-user support and training.`,
-    "Closing": `Ongoing support beyond the project closure period. Development of custom training materials. Hardware decommissioning or disposal. Migration of additional systems not included in the original scope.`
+    "Initiating": `Development of custom solutions beyond standard ${technology} capabilities is not included.\nBusiness process reengineering activities are excluded from this service.\nDetailed technical design and implementation planning are addressed in subsequent phases.\nHardware procurement or installation services are not part of this service.\nEnd-user training on ${technology} functionality is excluded.`,
+    
+    "Planning": `Execution of the designed solution is not included in this planning service.\nAcquisition of hardware or software licenses is excluded.\nCustom development beyond standard ${technology} features is not covered.\nCreation of end-user training materials is not included.\nOngoing operational support after implementation is excluded.`,
+    
+    "Implementation": `Procurement or installation of hardware is excluded unless explicitly included.\nDevelopment of custom applications outside standard ${technology} functionality is not covered.\nEnd-user training beyond knowledge transfer to administrators is excluded.\nOngoing support beyond the implementation period is not included.\nIntegration with systems not specified in requirements is excluded.`,
+    
+    "Monitoring and Controlling": `24/7 monitoring services are excluded unless explicitly included in the agreement.\nResolution of issues not related to the implemented ${technology} solution is out of scope.\nDevelopment of custom monitoring tools is not included.\nEnd-user support and training activities are excluded.\nPerformance tuning beyond initial implementation is not covered.`,
+    
+    "Closing": `Support services beyond the project closure period are excluded.\nCreation of custom training materials is not included.\nHardware decommissioning or disposal activities are out of scope.\nMigration of additional systems not included in the original scope is excluded.\nExtended warranty or maintenance services are not included.`
   };
   
-  return phaseOutOfScope[phase] || `Hardware procurement or installation unless explicitly included. Development of custom applications outside standard ${technology} capabilities. End-user training beyond knowledge transfer to administrators. Ongoing support beyond the implementation period. Integration with systems not explicitly mentioned in requirements.`;
+  return phaseOutOfScope[phase] || `Hardware procurement or installation is excluded unless explicitly included in the agreement.\nDevelopment of custom applications beyond standard ${technology} capabilities is not covered.\nEnd-user training beyond knowledge transfer to system administrators is excluded.\nSupport services beyond the implementation period are not included.\nIntegration with systems not explicitly mentioned in requirements is out of scope.`;
 }
 
 function generateSubserviceDescription(technology: string, subserviceName: string, serviceName: string): string {
   if (subserviceName.includes("Assessment")) {
-    return `This subservice focuses on conducting a thorough assessment of your current environment and requirements for ${serviceName}. Our consultants will analyze your existing infrastructure, document specific requirements, identify potential challenges, and develop detailed specifications to guide the implementation process. The assessment will establish a solid foundation for successful ${technology} deployment.`;
+    return `We will conduct a thorough assessment of your current environment and requirements for ${serviceName}.\nOur consultants will analyze your existing infrastructure, document specific requirements, and identify potential challenges.\nWe will develop detailed specifications to guide the implementation process and establish a solid foundation for successful ${technology} deployment.`;
   } else if (subserviceName.includes("Implementation")) {
-    return `This subservice delivers the core implementation activities for ${serviceName}. Our certified consultants will configure ${technology} components according to the approved design, perform necessary integrations with your existing systems, and implement security controls and operational processes. All work follows industry best practices and vendor recommendations to ensure optimal performance and reliability.`;
+    return `We will execute the core implementation activities for ${serviceName} based on the approved design.\nOur certified consultants will configure ${technology} components, perform necessary integrations with your existing systems, and implement security controls.\nWe will follow industry best practices and vendor recommendations to ensure optimal performance and reliability.`;
   } else if (subserviceName.includes("Validation")) {
-    return `This subservice ensures that the ${serviceName} implementation meets all requirements and performs as expected. Our team will conduct comprehensive testing, validate functionality against acceptance criteria, troubleshoot any issues, and document the final configuration. The validation process includes knowledge transfer sessions with your technical team to ensure a smooth transition to operations.`;
+    return `We will verify that the ${serviceName} implementation meets all requirements and performs as expected.\nOur team will conduct comprehensive testing, validate functionality against acceptance criteria, and troubleshoot any issues.\nWe will document the final configuration and conduct knowledge transfer sessions with your technical team to ensure a smooth transition.`;
   } else if (subserviceName.includes("Planning")) {
-    return `This subservice focuses on developing a comprehensive plan for ${serviceName}. Our experts will create detailed implementation plans, resource schedules, risk mitigation strategies, and success criteria. The planning process incorporates industry best practices and lessons learned from similar ${technology} implementations to ensure a smooth and successful deployment.`;
+    return `We will develop a comprehensive plan for ${serviceName} tailored to your environment.\nOur experts will create detailed implementation plans, resource schedules, and risk mitigation strategies.\nWe will incorporate industry best practices and lessons learned from similar ${technology} implementations to ensure a smooth deployment process.`;
   } else {
-    return `This subservice provides specialized expertise for ${subserviceName} as part of the overall ${serviceName} service. Our consultants will apply industry best practices and proven methodologies to ensure this component of your ${technology} implementation meets your specific business and technical requirements. Deliverables include detailed documentation and knowledge transfer to your team.`;
+    return `We will provide specialized expertise for ${subserviceName} as part of the overall ${serviceName} service.\nOur consultants will apply industry best practices and proven methodologies to meet your specific business requirements.\nWe will deliver detailed documentation and knowledge transfer to your team to ensure long-term success.`;
   }
 }
 
 function generateSubserviceKeyAssumptions(technology: string, subserviceName: string, serviceName: string): string {
   if (subserviceName.includes("Assessment")) {
-    return `Client will provide access to current environment documentation and configurations. Key stakeholders and subject matter experts will be available for interviews and information gathering. Client will provide timely responses to information requests. Current environment is stable and accessible for assessment activities.`;
+    return `Access to current environment documentation and configurations will be provided for analysis.\nKey stakeholders and subject matter experts will be available for interviews and information gathering.\nTimely responses to information requests will be provided during the assessment.\nThe current environment is stable and accessible for assessment activities.`;
   } else if (subserviceName.includes("Implementation")) {
-    return `Assessment and planning phases have been completed and approved. Client will provide administrative access to systems required for implementation. Client environment meets the minimum technical requirements for ${technology}. Implementation will be performed during agreed-upon maintenance windows. Required licenses and entitlements are available.`;
+    return `Assessment and planning phases have been completed and approved prior to implementation.\nAdministrative access to systems required for implementation will be granted as needed.\nThe environment meets the minimum technical requirements for ${technology} deployment.\nImplementation can be performed during agreed-upon maintenance windows.\nRequired licenses and entitlements are available for use.`;
   } else if (subserviceName.includes("Validation")) {
-    return `Implementation activities have been completed successfully. Client will provide access to test environments and data. Client will participate in acceptance testing activities. Client will provide timely feedback on validation results. Validation will be performed during standard business hours unless otherwise specified.`;
+    return `Implementation activities have been completed successfully before validation begins.\nAccess to test environments and data will be provided for validation purposes.\nClient participation in acceptance testing activities is expected throughout this phase.\nTimely feedback on validation results will be provided by stakeholders.\nValidation can be performed during standard business hours unless otherwise specified.`;
   } else if (subserviceName.includes("Planning")) {
-    return `Assessment phase has been completed and requirements are documented. Client will provide timely feedback on planning deliverables. Client will designate appropriate technical and business resources to participate in planning activities. Current environment documentation is accurate and up-to-date.`;
+    return `Assessment phase has been completed and requirements are documented before planning begins.\nTimely feedback on planning deliverables will be provided by stakeholders.\nAppropriate technical and business resources will be designated for planning activities.\nCurrent environment documentation is accurate and up-to-date for planning purposes.`;
   } else {
-    return `Client will provide necessary access to systems and information required for ${subserviceName}. Client will ensure appropriate stakeholders are available for consultation and decision-making. Client environment meets the minimum technical requirements for this component of ${technology}. Work will be performed during standard business hours unless otherwise specified.`;
+    return `Access to systems and information required for ${subserviceName} will be provided as needed.\nAppropriate stakeholders will be available for consultation and decision-making.\nThe environment meets the minimum technical requirements for this component of ${technology}.\nWork can be performed during standard business hours unless otherwise specified.`;
   }
 }
 
 function generateSubserviceClientResponsibilities(technology: string, subserviceName: string, serviceName: string): string {
   if (subserviceName.includes("Assessment")) {
-    return `Provide access to current environment documentation and configurations. Make key stakeholders and subject matter experts available for interviews and information gathering. Provide timely responses to information requests. Grant access to systems required for assessment activities. Review and approve assessment findings and recommendations.`;
+    return `Supply access to current environment documentation and configurations for assessment.\nEnsure key stakeholders and subject matter experts are available for interviews.\nDeliver timely responses to information requests throughout the assessment phase.\nProvide access to systems required for assessment activities.\nReview and approve assessment findings and recommendations.`;
   } else if (subserviceName.includes("Implementation")) {
-    return `Provide administrative access to systems required for implementation. Ensure environment meets the minimum technical requirements for ${technology}. Make technical resources available to assist with implementation activities. Review and approve implementation results. Report any issues or concerns promptly during the implementation process.`;
+    return `Grant administrative access to systems required for implementation activities.\nConfirm environment meets the minimum technical requirements for ${technology}.\nMake technical resources available to assist with implementation when needed.\nEvaluate and approve implementation results in a timely manner.\nReport any issues or concerns promptly during the implementation process.`;
   } else if (subserviceName.includes("Validation")) {
-    return `Participate in acceptance testing activities. Provide access to test environments and data. Provide timely feedback on validation results. Designate appropriate resources for knowledge transfer sessions. Review and approve validation documentation and deliverables.`;
+    return `Participate in acceptance testing activities throughout the validation phase.\nProvide access to test environments and data needed for comprehensive validation.\nDeliver timely feedback on validation results and findings.\nAllocate appropriate resources for knowledge transfer sessions.\nReview and approve validation documentation and deliverables.`;
   } else if (subserviceName.includes("Planning")) {
-    return `Provide timely feedback on planning deliverables. Designate appropriate technical and business resources to participate in planning activities. Ensure current environment documentation is accurate and up-to-date. Review and approve the final implementation plan and schedule.`;
+    return `Provide timely feedback on planning deliverables throughout this phase.\nAssign appropriate technical and business resources to participate in planning.\nEnsure current environment documentation is accurate and up-to-date.\nReview and approve the final implementation plan and schedule.`;
   } else {
-    return `Provide necessary access to systems and information required for ${subserviceName}. Ensure appropriate stakeholders are available for consultation and decision-making. Review and approve deliverables within the agreed timeframe. Provide timely notification of any issues or concerns related to this component.`;
+    return `Provide access to systems and information required for ${subserviceName}.\nEnsure appropriate stakeholders are available for consultation when needed.\nReview and approve deliverables within the agreed timeframe.\nCommunicate any issues or concerns related to this component promptly.`;
   }
 }
 
 function generateSubserviceOutOfScope(technology: string, subserviceName: string, serviceName: string): string {
   if (subserviceName.includes("Assessment")) {
-    return `Assessment of systems or applications not directly related to ${technology}. Business process reengineering. Implementation of recommendations from the assessment. Hardware procurement or installation. Performance testing or load testing of existing systems.`;
+    return `Evaluation of systems or applications not directly related to ${technology} is excluded.\nBusiness process reengineering activities are not part of this assessment.\nImplementation of recommendations from the assessment is addressed in subsequent phases.\nHardware procurement or installation services are not included.\nPerformance testing or load testing of existing systems is out of scope.`;
   } else if (subserviceName.includes("Implementation")) {
-    return `Implementation of features or components not explicitly included in the approved design. Custom development beyond standard ${technology} capabilities. End-user training beyond knowledge transfer to administrators. Hardware procurement or installation unless explicitly included.`;
+    return `Deployment of features or components not explicitly included in the approved design is excluded.\nCustom development beyond standard ${technology} capabilities is not covered.\nEnd-user training beyond knowledge transfer to administrators is not included.\nHardware procurement or installation is excluded unless explicitly stated.\nIntegration with systems not specified in requirements is out of scope.`;
   } else if (subserviceName.includes("Validation")) {
-    return `Performance testing or load testing beyond basic functionality validation. Security penetration testing unless explicitly included. Development of custom validation tools or scripts. End-user training. Ongoing support beyond the validation period.`;
+    return `Performance testing or load testing beyond basic functionality validation is not included.\nSecurity penetration testing is excluded unless explicitly stated in requirements.\nCreation of custom validation tools or scripts is not covered.\nEnd-user training activities are outside the scope of validation.\nSupport services beyond the validation period are not included.`;
   } else if (subserviceName.includes("Planning")) {
-    return `Implementation of the planned solution. Procurement of hardware or software. Development of custom applications. End-user training materials development. Detailed technical design beyond high-level architecture.`;
+    return `Execution of the planned solution is addressed in subsequent phases.\nAcquisition of hardware or software components is not included.\nDevelopment of custom applications is excluded from planning activities.\nCreation of end-user training materials is not covered.\nDetailed technical design beyond high-level architecture is addressed separately.`;
   } else {
-    return `Activities not directly related to ${subserviceName}. Custom development beyond standard configuration. Integration with systems not explicitly mentioned in requirements. End-user training beyond knowledge transfer to administrators. Ongoing support beyond the implementation period.`;
+    return `Activities not directly related to ${subserviceName} are excluded from this service.\nCustom development beyond standard configuration is not covered.\nIntegration with systems not explicitly mentioned in requirements is out of scope.\nEnd-user training beyond knowledge transfer to administrators is not included.\nSupport services beyond the implementation period are excluded.`;
   }
 }

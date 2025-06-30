@@ -14,8 +14,7 @@ interface GeneratedContent {
     question: string
     options: Array<{
       key: string
-      value: string
-      numericalValue: number
+      value: number | string
       default?: boolean
     }>
   }>
@@ -70,12 +69,17 @@ export function ContentOutput({ content }: ContentOutputProps) {
     questionsCount: content?.questions?.length,
     servicesCount: content?.services?.length,
     servicesIsArray: Array.isArray(content?.services),
-    services: content?.services,
-    firstQuestion: content?.questions?.[0],
-    firstOption: content?.questions?.[0]?.options?.[0],
     contentValid: !!content && !!content.services && Array.isArray(content.services) && content.services.length >= 1
   })
 
+  // Add detailed logging for questions and options
+  if (content?.questions?.length > 0) {
+    console.log("Questions structure:", JSON.stringify(content.questions.slice(0, 2), null, 2));
+    if (content.questions[0]?.options?.length > 0) {
+      console.log("Options structure for first question:", JSON.stringify(content.questions[0].options.slice(0, 2), null, 2));
+    }
+  }
+  
   // Defensive check for content
   if (!content) {
     console.error("ContentOutput: content is null or undefined");
@@ -98,16 +102,47 @@ export function ContentOutput({ content }: ContentOutputProps) {
   }
   
   // Check if services have the required structure
-  const validServices = content.services.every(service => 
-    service && 
-    typeof service === 'object' && 
-    ((typeof service.phase === 'string') || (typeof service.name === 'string') || (typeof service.service === 'string')) && 
-    (typeof service.description === 'string' || typeof service.description === 'undefined') && 
-    (typeof service.hours === 'number' || typeof service.hours === 'undefined')
-  );
+  let invalidServices: Array<{
+    index: number;
+    service: any;
+    reasons: {
+      isObject: boolean;
+      hasPhase: boolean;
+      hasName: boolean;
+      hasService: boolean;
+      hasValidDescription: boolean;
+      hasValidHours: boolean;
+    };
+  }> = [];
+  
+  const validServices = content.services.every((service, index) => {
+    const isValid = service && 
+      typeof service === 'object' && 
+      ((typeof service.phase === 'string') || (typeof service.name === 'string') || (typeof service.service === 'string')) && 
+      (typeof service.description === 'string' || typeof service.description === 'undefined') && 
+      (typeof service.hours === 'number' || typeof service.hours === 'undefined');
+    
+    if (!isValid) {
+      invalidServices.push({
+        index,
+        service,
+        reasons: {
+          isObject: typeof service === 'object',
+          hasPhase: typeof service.phase === 'string',
+          hasName: typeof service.name === 'string',
+          hasService: typeof service.service === 'string',
+          hasValidDescription: typeof service.description === 'string' || typeof service.description === 'undefined',
+          hasValidHours: typeof service.hours === 'number' || typeof service.hours === 'undefined'
+        }
+      });
+    }
+    
+    return isValid;
+  });
   
   if (!validServices) {
     console.error("ContentOutput: services have invalid structure", content.services);
+    console.error("Invalid services details:", invalidServices);
     return renderErrorCard("Content Generation Failed", "The generated content has invalid service structure. Please try again or adjust your input/model settings.");
   }
 
@@ -218,6 +253,91 @@ export function ContentOutput({ content }: ContentOutputProps) {
     );
   }
 
+  // Helper function to get option display text with improved handling
+  const getOptionDisplayText = (option: any): string => {
+    // If option is a simple string, use it
+    if (typeof option === 'string') {
+      return option;
+    }
+    
+    if (!option || typeof option !== 'object') {
+      return "Option";
+    }
+
+    // Check for key field - this is the preferred display text
+    if (typeof option.key === 'string' && option.key.trim() !== '') {
+      return option.key;
+    }
+    
+    // Check for value field when it's a string (not when it's a number)
+    if (typeof option.value === 'string' && option.value.trim() !== '') {
+      return option.value;
+    }
+    
+    // Check for label field
+    if (typeof option.label === 'string' && option.label.trim() !== '') {
+      return option.label;
+    }
+    
+    // Check for text field
+    if (typeof option.text === 'string' && option.text.trim() !== '') {
+      return option.text;
+    }
+    
+    // Check for display field
+    if (typeof option.display === 'string' && option.display.trim() !== '') {
+      return option.display;
+    }
+    
+    // If we have a numeric value, convert it to string
+    if (typeof option.value === 'number') {
+      return String(option.value);
+    }
+    
+    // Fallback - if none of the above work, stringify the option for debugging
+    try {
+      const optionStr = JSON.stringify(option);
+      if (optionStr.length < 30) {
+        return optionStr;
+      }
+    } catch (e) {}
+    
+    return "Option";
+  }
+
+  // Helper function to get option numerical value with improved handling
+  const getOptionNumericalValue = (option: any, index: number): number => {
+    // If option has a numericalValue, use it
+    if (typeof option.numericalValue === 'number') {
+      return option.numericalValue;
+    }
+    
+    // If option has a number value, use it
+    if (typeof option.value === 'number') {
+      return option.value;
+    }
+    
+    // Try to parse value field as a number if it might be one
+    if (typeof option.value === 'string') {
+      const parsedValue = parseFloat(option.value);
+      if (!isNaN(parsedValue)) {
+        return parsedValue;
+      }
+    }
+    
+    // Check for a 'numberValue' or 'number' field
+    if (typeof option.numberValue === 'number') {
+      return option.numberValue;
+    }
+    
+    if (typeof option.number === 'number') {
+      return option.number;
+    }
+    
+    // Default to index + 1 as fallback
+    return index + 1;
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -278,16 +398,11 @@ export function ContentOutput({ content }: ContentOutputProps) {
                           >
                             <div className="flex items-center justify-between mb-1">
                               <span className="font-medium">
-                                {typeof option.key === 'string' ? option.key : 
-                                 typeof option.key === 'object' ? JSON.stringify(option.key) : 
-                                 "Option"}
+                                {getOptionDisplayText(option)}
                               </span>
                               <div className="flex items-center gap-2">
                                 <Badge variant="secondary" className="text-xs">
-                                  Value: {typeof option.value === 'string' || typeof option.value === 'number' ? 
-                                         option.value : 
-                                         typeof option.value === 'object' ? JSON.stringify(option.value) : 
-                                         optIndex + 1}
+                                  Value: {getOptionNumericalValue(option, optIndex)}
                                 </Badge>
                                 {option.default && (
                                   <Badge variant="default" className="text-xs">

@@ -26,8 +26,7 @@ interface GeneratedContent {
     question: string
     options: Array<{
       key: string
-      value: string
-      numericalValue: number
+      value: number | string
       default?: boolean
     }>
   }>
@@ -42,15 +41,24 @@ interface GeneratedContent {
   }>
   services: Array<{
     phase: string
-    service: string
+    service?: string
+    name?: string
     description: string
     hours: number
+    serviceDescription?: string
+    keyAssumptions?: string
+    clientResponsibilities?: string
+    outOfScope?: string
     subservices: Array<{
       name: string
       description: string
       hours: number
       mappedQuestions?: string[]
       calculationSlug?: string
+      serviceDescription?: string
+      keyAssumptions?: string
+      clientResponsibilities?: string
+      outOfScope?: string
     }>
   }>
   totalHours: number
