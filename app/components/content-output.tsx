@@ -30,7 +30,8 @@ interface GeneratedContent {
   }>
   services: Array<{
     phase: string
-    service: string
+    service?: string
+    name?: string
     description: string
     hours: number
     serviceDescription?: string
@@ -67,23 +68,47 @@ export function ContentOutput({ content }: ContentOutputProps) {
     technology: content?.technology,
     technologyType: typeof content?.technology,
     questionsCount: content?.questions?.length,
+    servicesCount: content?.services?.length,
+    servicesIsArray: Array.isArray(content?.services),
+    services: content?.services,
     firstQuestion: content?.questions?.[0],
-    firstOption: content?.questions?.[0]?.options?.[0]
+    firstOption: content?.questions?.[0]?.options?.[0],
+    contentValid: !!content && !!content.services && Array.isArray(content.services) && content.services.length >= 1
   })
 
   // Defensive check for content
-  if (!content || !content.services || !Array.isArray(content.services) || content.services.length < 10) {
-    return (
-      <Card>
-        <CardContent className="p-8">
-          <div className="text-center text-red-500">
-            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <div className="font-bold text-lg mb-2">Content Generation Failed</div>
-            <div className="text-sm">The generated content is invalid or incomplete. Please try again or adjust your input/model settings.</div>
-          </div>
-        </CardContent>
-      </Card>
-    )
+  if (!content) {
+    console.error("ContentOutput: content is null or undefined");
+    return renderErrorCard("Content Generation Failed", "The generated content is missing. Please try again or adjust your input/model settings.");
+  }
+  
+  if (!content.services) {
+    console.error("ContentOutput: content.services is missing");
+    return renderErrorCard("Content Generation Failed", "The generated content is missing services. Please try again or adjust your input/model settings.");
+  }
+  
+  if (!Array.isArray(content.services)) {
+    console.error("ContentOutput: content.services is not an array", typeof content.services);
+    return renderErrorCard("Content Generation Failed", "The generated content has an invalid service structure. Please try again or adjust your input/model settings.");
+  }
+  
+  if (content.services.length === 0) {
+    console.error("ContentOutput: content.services is empty array");
+    return renderErrorCard("Content Generation Failed", "The generated content has no services. Please try again or adjust your input/model settings.");
+  }
+  
+  // Check if services have the required structure
+  const validServices = content.services.every(service => 
+    service && 
+    typeof service === 'object' && 
+    (service.phase || service.name || service.service) && 
+    typeof service.description === 'string' && 
+    typeof service.hours === 'number'
+  );
+  
+  if (!validServices) {
+    console.error("ContentOutput: services have invalid structure", content.services);
+    return renderErrorCard("Content Generation Failed", "The generated content has invalid service structure. Please try again or adjust your input/model settings.");
   }
 
   const phaseColors = {
@@ -93,6 +118,21 @@ export function ContentOutput({ content }: ContentOutputProps) {
     Testing: "bg-purple-100 text-purple-800",
     "Go-Live": "bg-red-100 text-red-800",
     Support: "bg-gray-100 text-gray-800",
+  }
+
+  // Helper function to render error cards
+  function renderErrorCard(title: string, message: string) {
+    return (
+      <Card>
+        <CardContent className="p-8">
+          <div className="text-center text-red-500">
+            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <div className="font-bold text-lg mb-2">{title}</div>
+            <div className="text-sm">{message}</div>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   const exportToScopeStack = () => {
@@ -148,6 +188,23 @@ export function ContentOutput({ content }: ContentOutputProps) {
       default:
         return "bg-gray-100 text-gray-800"
     }
+  }
+
+  // Helper function to get service name
+  const getServiceName = (service: any) => {
+    return service.service || service.name || "Service";
+  }
+
+  // Helper function to get service phase
+  const getServicePhase = (service: any) => {
+    return service.phase || "General";
+  }
+
+  // Helper function to safely access subservices
+  const getSubservices = (service: any) => {
+    if (!service.subservices) return [];
+    if (!Array.isArray(service.subservices)) return [];
+    return service.subservices;
   }
 
   return (
@@ -252,7 +309,7 @@ export function ContentOutput({ content }: ContentOutputProps) {
             </div>
             {content.calculations && Array.isArray(content.calculations) && content.calculations.length > 0 ? (
               content.calculations.map((calculation, index) => (
-                <Card key={calculation.id} className="border-l-4 border-l-orange-500">
+                <Card key={calculation.id || index} className="border-l-4 border-l-orange-500">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div>
@@ -262,10 +319,10 @@ export function ContentOutput({ content }: ContentOutputProps) {
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="flex items-center gap-1 text-xs">
                           <Hash className="h-3 w-3" />
-                          {calculation.slug}
+                          {calculation.slug || "no-slug"}
                         </Badge>
-                        <Badge className={`text-xs ${getCalculationTypeColor(calculation.resultType)}`}>
-                          {calculation.resultType}
+                        <Badge className={`text-xs ${getCalculationTypeColor(calculation.resultType || "")}`}>
+                          {calculation.resultType || "unknown"}
                         </Badge>
                       </div>
                     </div>
@@ -317,12 +374,12 @@ export function ContentOutput({ content }: ContentOutputProps) {
                       <div className="flex items-center gap-3">
                         <Badge
                           className={
-                            phaseColors[service.phase as keyof typeof phaseColors] || "bg-gray-100 text-gray-800"
+                            phaseColors[getServicePhase(service) as keyof typeof phaseColors] || "bg-gray-100 text-gray-800"
                           }
                         >
-                          {service.phase}
+                          {getServicePhase(service)}
                         </Badge>
-                        <span className="font-medium">{service.service}</span>
+                        <span className="font-medium">{getServiceName(service)}</span>
                       </div>
                       <Badge variant="outline" className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -362,8 +419,8 @@ export function ContentOutput({ content }: ContentOutputProps) {
 
                     <div className="space-y-2">
                       <div className="font-medium text-sm">Subservices:</div>
-                      {service.subservices && Array.isArray(service.subservices) && service.subservices.length > 0 ? (
-                        service.subservices.map((sub, subIndex) => (
+                      {getSubservices(service).length > 0 ? (
+                        getSubservices(service).map((sub: any, subIndex: number) => (
                           <div key={subIndex} className="bg-gray-50 p-3 rounded border">
                             <div className="flex items-center justify-between mb-2">
                               <span className="font-medium text-sm">{sub.name}</span>
@@ -414,7 +471,7 @@ export function ContentOutput({ content }: ContentOutputProps) {
                                 <span className="text-xs text-gray-500">
                                   {sub.calculationSlug ? "Calculation uses:" : "Mapped to:"}
                                 </span>
-                                {sub.mappedQuestions.map((questionSlug, qIndex) => (
+                                {sub.mappedQuestions.map((questionSlug: string, qIndex: number) => (
                                   <Badge key={qIndex} variant="secondary" className="text-xs">
                                     {questionSlug || "unknown"}
                                   </Badge>

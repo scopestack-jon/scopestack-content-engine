@@ -1,97 +1,167 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ExternalLink, Shield, BookOpen, Users } from "lucide-react"
+import { ExternalLink, Shield, BookOpen, Users, FileText, Database, Code, AlertCircle } from "lucide-react"
 
 interface Source {
   url: string
   title: string
-  relevance: string
+  relevance?: string | any
+  category?: string
 }
 
 interface SourceAttributionProps {
-  sources: Source[]
+  sources: Source[] | string[]
 }
 
 export function SourceAttribution({ sources }: SourceAttributionProps) {
-  const safeSources = Array.isArray(sources) ? sources : []
-
-  const getSourceIcon = (url: string) => {
-    if (url.includes("cisco.com") || url.includes("microsoft.com") || url.includes("aws.amazon.com")) {
-      return <Shield className="h-4 w-4 text-blue-600" />
+  // Parse sources if they're in string format (url | title)
+  const parsedSources = Array.isArray(sources) 
+    ? sources.map(source => {
+        if (typeof source === 'string') {
+          // Try to extract URL and title from string format "url | title"
+          const parts = source.split(' | ');
+          return {
+            url: parts[0] || '',
+            title: parts[1] || source,
+            relevance: 'Relevant for implementation',
+            category: 'Technical Resource'
+          };
+        }
+        return source;
+      })
+    : [];
+    
+  // Ensure sources is an array and validate each source
+  const safeSources = parsedSources.map(source => {
+    // Create a new object to avoid modifying the original
+    const safeSource = { ...source };
+    
+    // Ensure URL is properly formatted
+    if (!safeSource.url || typeof safeSource.url !== 'string') {
+      safeSource.url = "";
     }
-    if (url.includes("docs.") || url.includes("documentation")) {
-      return <BookOpen className="h-4 w-4 text-green-600" />
+    
+    // Fix double quoted URLs
+    if (safeSource.url.startsWith('"') && safeSource.url.endsWith('"')) {
+      safeSource.url = safeSource.url.substring(1, safeSource.url.length - 1);
     }
-    return <Users className="h-4 w-4 text-purple-600" />
-  }
-
-  const getSourceType = (url: string) => {
-    if (url.includes("cisco.com") || url.includes("microsoft.com") || url.includes("aws.amazon.com")) {
-      return "Vendor Documentation"
+    
+    // Ensure URL starts with https:// only if it's not empty
+    if (safeSource.url && !safeSource.url.startsWith('http')) {
+      safeSource.url = "https://" + safeSource.url;
     }
-    if (url.includes("docs.") || url.includes("documentation")) {
-      return "Technical Documentation"
+    
+    // Ensure title exists
+    if (!safeSource.title) {
+      // Extract domain name for title if possible
+      if (safeSource.url) {
+        try {
+          const url = new URL(safeSource.url);
+          safeSource.title = url.hostname.replace('www.', '');
+        } catch (e) {
+          safeSource.title = "Resource";
+        }
+      } else {
+        safeSource.title = "Resource";
+      }
     }
-    if (url.includes("case-study") || url.includes("whitepaper")) {
-      return "Case Study"
+    
+    // Ensure relevance exists and is a string
+    if (!safeSource.relevance) {
+      safeSource.relevance = "Relevant for implementation";
+    } else if (typeof safeSource.relevance !== 'string') {
+      // If relevance is an object or another non-string type, convert to string or use default
+      try {
+        if (safeSource.relevance && typeof safeSource.relevance === 'object') {
+          // Try to extract a meaningful string from the object
+          const relevanceStr = safeSource.relevance.description || 
+                              safeSource.relevance.text || 
+                              safeSource.relevance.info ||
+                              JSON.stringify(safeSource.relevance);
+          safeSource.relevance = relevanceStr;
+        } else {
+          safeSource.relevance = String(safeSource.relevance);
+        }
+      } catch (e) {
+        safeSource.relevance = "Source for implementation";
+      }
     }
-    return "Industry Resource"
+    
+    // Ensure category exists
+    if (!safeSource.category) {
+      safeSource.category = "Technical Resource";
+    }
+    
+    return safeSource;
+  });
+  
+  // Get icon based on category
+  const getCategoryIcon = (category: string | undefined) => {
+    if (!category) return <ExternalLink className="h-4 w-4" />;
+    
+    const lowerCategory = category.toLowerCase();
+    if (lowerCategory.includes('vendor') || lowerCategory.includes('official')) return <Shield className="h-4 w-4" />;
+    if (lowerCategory.includes('research') || lowerCategory.includes('analyst')) return <BookOpen className="h-4 w-4" />;
+    if (lowerCategory.includes('community')) return <Users className="h-4 w-4" />;
+    if (lowerCategory.includes('documentation')) return <FileText className="h-4 w-4" />;
+    if (lowerCategory.includes('database')) return <Database className="h-4 w-4" />;
+    if (lowerCategory.includes('technical')) return <Code className="h-4 w-4" />;
+    return <ExternalLink className="h-4 w-4" />;
+  };
+  
+  // If no valid sources, show a message
+  if (!safeSources.length) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Sources</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center text-muted-foreground">
+            <AlertCircle className="mr-2 h-4 w-4" />
+            <p>No sources available</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ExternalLink className="h-5 w-5" />
-          Research Sources & Attribution
-        </CardTitle>
-        <p className="text-sm text-gray-600">
-          All content generated from these verified sources. No templates or canned data used.
-        </p>
+        <CardTitle className="text-lg">Sources</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {safeSources.length > 0 ? (
-          safeSources.map((source, index) => (
-            <div key={index} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    {getSourceIcon(source.url)}
-                    <Badge variant="outline" className="text-xs">
-                      {getSourceType(source.url)}
-                    </Badge>
-                  </div>
-                  <h4 className="font-medium text-sm mb-2">{source.title}</h4>
-                  <p className="text-xs text-gray-600 mb-2">{source.relevance}</p>
-                  <a
-                    href={source.url}
-                    target="_blank"
+      <CardContent>
+        <div className="space-y-4">
+          {safeSources.map((source, index) => (
+            <div key={index} className="border-b pb-3 last:border-0 last:pb-0">
+              <div className="flex items-center justify-between">
+                {source.url ? (
+                  <a 
+                    href={source.url} 
+                    target="_blank" 
                     rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                    className="font-medium hover:underline flex items-center"
                   >
-                    {source.url}
-                    <ExternalLink className="h-3 w-3" />
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    {source.title}
                   </a>
-                </div>
+                ) : (
+                  <div className="font-medium flex items-center">
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    {source.title}
+                  </div>
+                )}
+                <Badge variant="outline" className="flex items-center">
+                  {getCategoryIcon(source.category)}
+                  <span className="ml-1">{source.category}</span>
+                </Badge>
               </div>
+              {source.relevance && typeof source.relevance === 'string' && (
+                <p className="mt-1 text-sm text-muted-foreground">{source.relevance}</p>
+              )}
             </div>
-          ))
-        ) : (
-          <div className="text-center text-gray-500 py-4">
-            <div className="text-sm">No sources available</div>
-          </div>
-        )}
-
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Shield className="h-4 w-4 text-blue-600" />
-            <span className="font-medium text-sm">Research Transparency</span>
-          </div>
-          <p className="text-xs text-gray-700">
-            This content was generated through live web research conducted specifically for your technology solution.
-            Each question and service recommendation is derived from current industry practices, vendor documentation,
-            and professional services benchmarks found in the sources above.
-          </p>
+          ))}
         </div>
       </CardContent>
     </Card>
