@@ -287,7 +287,7 @@ export function ContentOutput({ content }: ContentOutputProps) {
                                   Value: {typeof option.value === 'string' || typeof option.value === 'number' ? 
                                          option.value : 
                                          typeof option.value === 'object' ? JSON.stringify(option.value) : 
-                                         "N/A"}
+                                         optIndex + 1}
                                 </Badge>
                                 {option.default && (
                                   <Badge variant="default" className="text-xs">
