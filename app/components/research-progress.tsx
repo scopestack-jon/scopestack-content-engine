@@ -4,12 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { CheckCircle, Clock, Loader2, ChevronDown, ChevronUp } from "lucide-react"
+import { CheckCircle, Clock, Loader2, ChevronDown, ChevronUp, AlertCircle } from "lucide-react"
 
 interface ResearchStep {
   id: string
   title: string
-  status: "pending" | "active" | "completed"
+  status: "pending" | "active" | "completed" | "error"
   model?: string
   sources?: string[]
 }
@@ -28,6 +28,8 @@ export function ResearchProgress({ steps, progress, isCollapsed = false, onToggl
         return <CheckCircle className="h-4 w-4 text-green-600" />
       case "active":
         return <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+      case "error":
+        return <AlertCircle className="h-4 w-4 text-red-600" />
       default:
         return <Clock className="h-4 w-4 text-gray-400" />
     }
@@ -39,6 +41,8 @@ export function ResearchProgress({ steps, progress, isCollapsed = false, onToggl
         return "border-green-200 bg-green-50"
       case "active":
         return "border-blue-200 bg-blue-50"
+      case "error":
+        return "border-red-200 bg-red-50"
       default:
         return "border-gray-200 bg-gray-50"
     }

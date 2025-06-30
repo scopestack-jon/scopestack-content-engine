@@ -32,6 +32,92 @@ CRITICAL FOR NESTED STRUCTURES:
 RESPOND WITH PURE JSON ONLY.
 `;
 
+// Function to clean AI responses
+function cleanAIResponse(response: string): string {
+  // Remove markdown code blocks if present
+  let cleaned = response.replace(/```json\s*([\s\S]*?)\s*```/g, '$1');
+  cleaned = cleaned.replace(/```\s*([\s\S]*?)\s*```/g, '$1');
+  
+  // Remove leading/trailing whitespace
+  cleaned = cleaned.trim();
+  
+  // If the response starts with a { and ends with }, extract just that JSON object
+  const jsonMatch = cleaned.match(/^\s*({[\s\S]*})\s*$/);
+  if (jsonMatch) {
+    cleaned = jsonMatch[1];
+  }
+  
+  // Fix common JSON syntax issues
+  cleaned = cleaned.replace(/,\s*}/g, '}'); // Remove trailing commas
+  cleaned = cleaned.replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
+  
+  return cleaned;
+}
+
+// Function to fix URL formatting issues in JSON
+function fixUrlsInJson(json: string): string {
+  // Fix URLs with escaped quotes
+  let fixed = json.replace(/"url"\s*:\s*"\\?"(http[^"]*?)\\?"/g, '"url": "$1"');
+  
+  // Fix URLs with double quotes
+  fixed = fixed.replace(/"url"\s*:\s*""(http[^"]*?)""/, '"url": "$1"');
+  
+  // Fix empty URLs
+  fixed = fixed.replace(/"url"\s*:\s*""/, '"url": "https://example.com"');
+  
+  return fixed;
+}
+
+// Function to sanitize source relevance fields
+function sanitizeSourceRelevance(content: any): any {
+  if (!content || typeof content !== 'object') {
+    return content;
+  }
+  
+  // Sanitize sources if they exist
+  if (Array.isArray(content.sources)) {
+    content.sources = content.sources.map((source: any) => {
+      if (!source || typeof source !== 'object') {
+        return {
+          url: "https://example.com",
+          title: "Default Source",
+          relevance: "General reference"
+        };
+      }
+      
+      // Ensure URL is properly formatted
+      if (!source.url || typeof source.url !== 'string' || !source.url.startsWith('http')) {
+        source.url = "https://example.com";
+      }
+      
+      // Ensure title exists
+      if (!source.title || typeof source.title !== 'string') {
+        source.title = "Unnamed Source";
+      }
+      
+      // Fix relevance field if it contains problematic characters
+      if (source.relevance && typeof source.relevance === 'string') {
+        // Check for common issues in relevance text
+        if (source.relevance.includes('"') || source.relevance.includes('\\') || 
+            source.relevance.includes('\n') || source.relevance.length > 200) {
+          // Truncate and sanitize
+          source.relevance = source.relevance
+            .replace(/"/g, "'")
+            .replace(/\\/g, "/")
+            .replace(/\n/g, " ")
+            .substring(0, 200);
+        }
+      } else {
+        source.relevance = `Information about ${content.technology || 'technology'}`;
+      }
+      
+      return source;
+    });
+  }
+  
+  return content;
+}
+
 const DEFAULT_PROMPTS = {
   parsing: `Analyze this technology solution request and extract key information:
 
@@ -488,6 +574,20 @@ async function extractContentFromFragments(cleaned: string, extractedQuestions: 
     };
   }
 }
+
+// Function to normalize nested structures into the expected format
+function normalizeNestedStructure(parsed: any): any {
+  try {
+    console.log("Normalizing nested structure...");
+    
+    const normalized: any = {
+      technology: "",
+      questions: [],
+      calculations: [],
+      services: [],
+      totalHours: 0,
+      sources: []
+    };
     
     // Extract technology name - try multiple possible locations
     if (parsed.technology) {
@@ -582,75 +682,52 @@ async function extractContentFromFragments(cleaned: string, extractedQuestions: 
           // Transform services to expected format
           const services = location.map((svc: any) => {
             const phase = svc.phase || "Implementation";
-            const service = svc.name || svc.service;
+            const serviceName = svc.name || svc.service;
             const hours = svc.estimated_hours || svc.hours || 40;
             
             // Handle subservices
             let subservices = [];
             if (Array.isArray(svc.subservices)) {
-              subservices = svc.subservices.map((sub: any, i: number) => {
+              subservices = svc.subservices.map((sub: any, subIndex: number) => {
                 // Handle both string and object subservices
                 if (typeof sub === 'string') {
+                  const subHours = Math.floor(hours / 3);
                   return {
                     name: sub,
                     description: `${sub} activities for ${serviceName}`,
-                    hours: subHours,
-                    mappedQuestions: extractedContent.questions.length > 0 ? 
-                      [extractedContent.questions[Math.min(subIndex, extractedContent.questions.length-1)].slug] : [],
-                    calculationSlug: extractedContent.calculations.length > 0 ? 
-                      extractedContent.calculations[Math.min(subIndex, extractedContent.calculations.length-1)].slug : undefined,
-                    serviceDescription: `This subservice focuses on delivering ${subName} as part of the overall ${serviceName} service. Our experts will implement industry best practices to ensure optimal performance and reliability. The work includes detailed documentation and validation of results.`,
-                    keyAssumptions: `Required access to systems will be provided in a timely manner. Existing documentation is available and up-to-date. The environment meets the minimum requirements for ${extractedContent.technology} implementation.`,
-                    clientResponsibilities: `Client will provide necessary information about current configurations and requirements. Client will make subject matter experts available for consultation. Client will review and approve deliverables within the agreed timeframe.`,
-                    outOfScope: `Custom development beyond standard configuration is not included. Migration of legacy data not specifically identified in requirements is excluded. Extended support beyond the implementation period is not included.`
+                    hours: subHours
                   };
                 } else {
                   const subName = sub.name || `Subservice ${subIndex+1}`;
                   const subDescription = sub.description || `${subName} activities`;
-                  const subHours = sub.hours || Math.floor(service.hours / 3);
+                  const subHours = sub.hours || Math.floor(hours / 3);
                   return {
                     name: subName,
                     description: subDescription,
-                    hours: subHours,
-                    mappedQuestions: Array.isArray(sub.mappedQuestions) ? sub.mappedQuestions : 
-                      (extractedContent.questions.length > 0 ? 
-                        [extractedContent.questions[Math.min(subIndex, extractedContent.questions.length-1)].slug] : []),
-                    calculationSlug: sub.calculationSlug || 
-                      (extractedContent.calculations.length > 0 ? 
-                        extractedContent.calculations[Math.min(subIndex, extractedContent.calculations.length-1)].slug : undefined),
-                    serviceDescription: sub.serviceDescription || 
-                      `This subservice delivers comprehensive ${subName} capabilities as part of the ${serviceName} service. Our team will implement industry-leading practices to ensure optimal outcomes and alignment with your business objectives. The work includes detailed planning, execution, and validation phases.`,
-                    keyAssumptions: sub.keyAssumptions || 
-                      `Client environment meets the minimum technical requirements for ${extractedContent.technology}. Appropriate stakeholders will be available for meetings and decision-making. Work will be performed remotely unless otherwise specified.`,
-                    clientResponsibilities: sub.clientResponsibilities || 
-                      `Client will provide timely responses to information requests. Client will ensure appropriate resources are available for testing and validation. Client will designate a technical point of contact with decision-making authority.`,
-                    outOfScope: sub.outOfScope || 
-                      `Performance optimization beyond initial implementation is not included. Integration with systems not explicitly mentioned in requirements is excluded. Extended support beyond the implementation period is not included in this subservice.`
+                    hours: subHours
                   };
                 }
               });
             }
             
             // Ensure we have at least 3 subservices
-            while (service.subservices.length < 3) {
-              const subIndex = service.subservices.length;
+            while (subservices.length < 3) {
+              const subIndex = subservices.length;
               const subName = `${serviceName} Component ${subIndex + 1}`;
-              service.subservices.push({
+              subservices.push({
                 name: subName,
                 description: `Supporting activities for ${serviceName}`,
-                hours: Math.floor(service.hours / 3),
-                mappedQuestions: extractedContent.questions.length > 0 ? 
-                  [extractedContent.questions[Math.min(subIndex, extractedContent.questions.length-1)].slug] : [],
-                calculationSlug: extractedContent.calculations.length > 0 ? 
-                  extractedContent.calculations[Math.min(subIndex, extractedContent.calculations.length-1)].slug : undefined,
-                serviceDescription: `This subservice provides essential ${subName} implementation for ${extractedContent.technology}. Our team will leverage industry best practices to ensure optimal configuration and performance. The service includes comprehensive documentation and knowledge transfer sessions.`,
-                keyAssumptions: `Client will provide necessary access to systems and information. The environment meets minimum technical requirements. Work will be performed during standard business hours unless otherwise specified.`,
-                clientResponsibilities: `Client will designate appropriate technical contacts. Client will ensure timely review and approval of deliverables. Client will provide access to necessary systems and documentation.`,
-                outOfScope: `Custom development beyond standard configuration is not included. Integration with systems not specified in requirements is excluded. Extended support beyond the implementation period is not included.`
+                hours: Math.floor(hours / 3)
               });
             }
             
-            return service;
+            return {
+              phase,
+              service: serviceName,
+              description: svc.description || `${serviceName} for implementation`,
+              hours,
+              subservices
+            };
           });
           
           if (services.length > 0) {
@@ -2162,328 +2239,5 @@ Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error("❌ Error in research endpoint:", errorMessage)
     return Response.json({ error: errorMessage }, { status: 500 })
-  }
-}
-
-// Function to normalize nested structures into the expected format
-function normalizeNestedStructure(parsed: any): any {
-  try {
-    console.log("Normalizing nested structure...");
-    
-    const normalized: any = {
-      technology: "",
-      questions: [],
-      calculations: [],
-      services: [],
-      totalHours: 0,
-      sources: []
-    };
-    
-    // Extract technology name - try multiple possible locations
-    if (parsed.technology) {
-      normalized.technology = parsed.technology;
-    } else if (parsed.project_scope?.title) {
-      normalized.technology = parsed.project_scope.title;
-    } else if (parsed.email_migration_research) {
-      normalized.technology = "Email Migration to Office 365";
-    } else if (parsed.migration_research) {
-      normalized.technology = "Email Migration to Office 365";
-    } else if (parsed.research_findings?.implementation_methodologies?.recommended_frameworks?.[0]) {
-      normalized.technology = parsed.research_findings.implementation_methodologies.recommended_frameworks[0];
-    } else if (parsed.implementation_methodologies?.recommended_frameworks?.[0]) {
-      normalized.technology = parsed.implementation_methodologies.recommended_frameworks[0];
-    } else if (parsed.project_title) {
-      normalized.technology = parsed.project_title;
-    }
-    
-    // Extract questions from various possible locations
-    if (Array.isArray(parsed.questions)) {
-      normalized.questions = parsed.questions;
-    } else if (parsed.assessment_questions) {
-      // Convert assessment_questions to the expected format
-      normalized.questions = Object.entries(parsed.assessment_questions).map(([id, q]: [string, any], index) => ({
-        id: id,
-        slug: id.replace('question_', ''),
-        question: q.text || `Question ${index + 1}`,
-        options: Array.isArray(q.options) ? q.options.map((opt: string, i: number) => ({
-          key: opt,
-          value: i + 1,
-          default: i === 0
-        })) : []
-      }));
-    } else if (parsed.discovery_questions) {
-      // Convert discovery_questions to the expected format
-      normalized.questions = parsed.discovery_questions.map((q: any, index: number) => ({
-        id: `q${index + 1}`,
-        slug: `question-${index + 1}`,
-        question: q.question,
-        options: Array.isArray(q.options) ? q.options.map((opt: string, i: number) => ({
-          key: opt,
-          value: i + 1,
-          default: i === 0
-        })) : []
-      }));
-    } else if (parsed.email_migration_research?.assessment_questions) {
-      normalized.questions = Object.entries(parsed.email_migration_research.assessment_questions).map(([id, q]: [string, any], index) => ({
-        id: id,
-        slug: id.replace('question_', ''),
-        question: q.text || `Question ${index + 1}`,
-        options: Array.isArray(q.options) ? q.options.map((opt: string, i: number) => ({
-          key: opt,
-          value: i + 1,
-          default: i === 0
-        })) : []
-      }));
-    } else if (parsed.research_findings?.assessment_questions) {
-      normalized.questions = Object.entries(parsed.research_findings.assessment_questions).map(([id, q]: [string, any], index) => ({
-        id: id,
-        slug: id.replace('question_', ''),
-        question: q.text || `Question ${index + 1}`,
-        options: Array.isArray(q.options) ? q.options.map((opt: string, i: number) => ({
-          key: opt,
-          value: i + 1,
-          default: i === 0
-        })) : []
-      }));
-    }
-    
-    // Extract services from various possible locations
-    if (Array.isArray(parsed.services)) {
-      normalized.services = parsed.services;
-    } else {
-      // Try to find services in different locations
-      const serviceLocations = [
-        parsed.service_components,
-        parsed.service_components?.core_services,
-        parsed.email_migration_research?.professional_services?.core_services,
-        parsed.email_migration_research?.service_components,
-        parsed.research_findings?.service_components?.core_services,
-        parsed.research_findings?.service_components,
-        parsed.implementation_services,
-        parsed.service_breakdown,
-        parsed.professional_services?.service_components,
-        parsed.professional_services
-      ];
-      
-      let foundServices = false;
-      
-      for (const location of serviceLocations) {
-        if (Array.isArray(location)) {
-          // Transform services to expected format
-          const services = location.map((svc: any) => {
-            const phase = svc.phase || "Implementation";
-            const service = svc.name || svc.service;
-            const hours = svc.estimated_hours || svc.hours || 40;
-            
-            // Handle subservices
-            let subservices = [];
-            if (Array.isArray(svc.subservices)) {
-              subservices = svc.subservices.map((sub: any, i: number) => {
-                // Handle both string and object subservices
-                if (typeof sub === 'string') {
-                  return {
-                    name: sub,
-                    description: `${sub} activities for ${serviceName}`,
-                    hours: subHours,
-                    mappedQuestions: extractedContent.questions.length > 0 ? 
-                      [extractedContent.questions[Math.min(subIndex, extractedContent.questions.length-1)].slug] : [],
-                    calculationSlug: extractedContent.calculations.length > 0 ? 
-                      extractedContent.calculations[Math.min(subIndex, extractedContent.calculations.length-1)].slug : undefined,
-                    serviceDescription: `This subservice focuses on delivering ${subName} as part of the overall ${serviceName} service. Our experts will implement industry best practices to ensure optimal performance and reliability. The work includes detailed documentation and validation of results.`,
-                    keyAssumptions: `Required access to systems will be provided in a timely manner. Existing documentation is available and up-to-date. The environment meets the minimum requirements for ${extractedContent.technology} implementation.`,
-                    clientResponsibilities: `Client will provide necessary information about current configurations and requirements. Client will make subject matter experts available for consultation. Client will review and approve deliverables within the agreed timeframe.`,
-                    outOfScope: `Custom development beyond standard configuration is not included. Migration of legacy data not specifically identified in requirements is excluded. Extended support beyond the implementation period is not included.`
-                  };
-                } else {
-                  const subName = sub.name || `Subservice ${subIndex+1}`;
-                  const subDescription = sub.description || `${subName} activities`;
-                  const subHours = sub.hours || Math.floor(service.hours / 3);
-                  return {
-                    name: subName,
-                    description: subDescription,
-                    hours: subHours,
-                    mappedQuestions: Array.isArray(sub.mappedQuestions) ? sub.mappedQuestions : 
-                      (extractedContent.questions.length > 0 ? 
-                        [extractedContent.questions[Math.min(subIndex, extractedContent.questions.length-1)].slug] : []),
-                    calculationSlug: sub.calculationSlug || 
-                      (extractedContent.calculations.length > 0 ? 
-                        extractedContent.calculations[Math.min(subIndex, extractedContent.calculations.length-1)].slug : undefined),
-                    serviceDescription: sub.serviceDescription || 
-                      `This subservice delivers comprehensive ${subName} capabilities as part of the ${serviceName} service. Our team will implement industry-leading practices to ensure optimal outcomes and alignment with your business objectives. The work includes detailed planning, execution, and validation phases.`,
-                    keyAssumptions: sub.keyAssumptions || 
-                      `Client environment meets the minimum technical requirements for ${extractedContent.technology}. Appropriate stakeholders will be available for meetings and decision-making. Work will be performed remotely unless otherwise specified.`,
-                    clientResponsibilities: sub.clientResponsibilities || 
-                      `Client will provide timely responses to information requests. Client will ensure appropriate resources are available for testing and validation. Client will designate a technical point of contact with decision-making authority.`,
-                    outOfScope: sub.outOfScope || 
-                      `Performance optimization beyond initial implementation is not included. Integration with systems not explicitly mentioned in requirements is excluded. Extended support beyond the implementation period is not included in this subservice.`
-                  };
-                }
-              });
-            }
-            
-            // Ensure we have at least 3 subservices
-            while (service.subservices.length < 3) {
-              const subIndex = service.subservices.length;
-              const subName = `${serviceName} Component ${subIndex + 1}`;
-              service.subservices.push({
-                name: subName,
-                description: `Supporting activities for ${serviceName}`,
-                hours: Math.floor(service.hours / 3),
-                mappedQuestions: extractedContent.questions.length > 0 ? 
-                  [extractedContent.questions[Math.min(subIndex, extractedContent.questions.length-1)].slug] : [],
-                calculationSlug: extractedContent.calculations.length > 0 ? 
-                  extractedContent.calculations[Math.min(subIndex, extractedContent.calculations.length-1)].slug : undefined,
-                serviceDescription: `This subservice provides essential ${subName} implementation for ${extractedContent.technology}. Our team will leverage industry best practices to ensure optimal configuration and performance. The service includes comprehensive documentation and knowledge transfer sessions.`,
-                keyAssumptions: `Client will provide necessary access to systems and information. The environment meets minimum technical requirements. Work will be performed during standard business hours unless otherwise specified.`,
-                clientResponsibilities: `Client will designate appropriate technical contacts. Client will ensure timely review and approval of deliverables. Client will provide access to necessary systems and documentation.`,
-                outOfScope: `Custom development beyond standard configuration is not included. Integration with systems not specified in requirements is excluded. Extended support beyond the implementation period is not included.`
-              });
-            }
-            
-            return service;
-          });
-          
-          if (services.length > 0) {
-            normalized.services = services;
-            foundServices = true;
-            break;
-          }
-        }
-      }
-      
-      // If no services found yet, try to extract from implementation_phases
-      if (!foundServices && Array.isArray(parsed.implementation_phases)) {
-        const services = parsed.implementation_phases.map((phase: any, index: number) => {
-          const phaseName = phase.name || phase.phase || `Phase ${index+1}`;
-          const hours = phase.hours || phase.estimated_hours || 40;
-          
-          // Create subservices from activities if available
-          let subservices = [];
-          if (Array.isArray(phase.activities)) {
-            subservices = phase.activities.slice(0, 3).map((activity: string, i: number) => ({
-              name: activity,
-              description: `${activity} for ${phaseName}`,
-              hours: Math.floor(hours / 3)
-            }));
-          }
-          
-          // Ensure exactly 3 subservices
-          while (subservices.length < 3) {
-            subservices.push({
-              name: `Activity ${subservices.length + 1}`,
-              description: `Supporting activity for ${phaseName}`,
-              hours: Math.floor(hours / 3)
-            });
-          }
-          
-          return {
-            phase: "Implementation",
-            service: phaseName,
-            description: phase.description || `${phaseName} phase activities`,
-            hours,
-            subservices
-          };
-        });
-        
-        if (services.length > 0) {
-          normalized.services = services;
-        }
-      }
-    }
-    
-    // Extract sources from various possible locations
-    if (Array.isArray(parsed.sources)) {
-      normalized.sources = parsed.sources;
-    } else if (parsed.reference_sources) {
-      normalized.sources = parsed.reference_sources.map((src: any) => ({
-        url: src.url || "https://example.com",
-        title: src.title || "Reference Source",
-        relevance: src.relevance || "Implementation guidance"
-      }));
-    } else if (parsed.email_migration_research?.reference_sources) {
-      normalized.sources = parsed.email_migration_research.reference_sources.map((src: any) => ({
-        url: src.url || "https://example.com",
-        title: src.title || "Reference Source",
-        relevance: src.relevance || "Implementation guidance"
-      }));
-    } else if (parsed.research_findings?.reference_sources) {
-      normalized.sources = parsed.research_findings.reference_sources.map((src: any) => ({
-        url: src.url || "https://example.com",
-        title: src.title || "Reference Source",
-        relevance: src.relevance || "Implementation guidance"
-      }));
-    } else if (parsed.resources) {
-      normalized.sources = parsed.resources.map((src: any) => ({
-        url: src.url || "https://example.com",
-        title: src.title || src.name || "Resource",
-        relevance: src.relevance || "Implementation resource"
-      }));
-    }
-    
-    // Ensure we have at least one source
-    if (!normalized.sources || normalized.sources.length === 0) {
-      normalized.sources = [
-        {
-          url: "https://example.com",
-          title: "Default Resource",
-          relevance: "Implementation guidance"
-        }
-      ];
-    }
-    
-    // Calculate total hours
-    if (typeof parsed.totalHours === 'number') {
-      normalized.totalHours = parsed.totalHours;
-    } else if (typeof parsed.total_estimated_hours === 'number') {
-      normalized.totalHours = parsed.total_estimated_hours;
-    } else if (typeof parsed.total_hours === 'number') {
-      normalized.totalHours = parsed.total_hours;
-    } else if (Array.isArray(normalized.services)) {
-      normalized.totalHours = normalized.services.reduce((total: number, service: any) => total + (service.hours || 0), 0);
-    }
-    
-    console.log("Successfully normalized nested structure");
-    return normalized;
-  } catch (error) {
-    console.error("Error in normalizeNestedStructure:", error);
-    
-    // Return a minimal valid structure
-    return {
-      technology: "Technology Solution",
-      questions: [
-        {
-          id: "q1",
-          slug: "default-question",
-          question: "What is your implementation timeline?",
-          options: [
-            { key: "Standard (3-6 months)", value: 1, default: true },
-            { key: "Accelerated (1-3 months)", value: 2 },
-            { key: "Extended (6-12 months)", value: 3 }
-          ]
-        }
-      ],
-      calculations: [],
-      services: [
-        {
-          phase: "Planning",
-          service: "Implementation Planning",
-          description: "Comprehensive planning for implementation",
-          hours: 40,
-          subservices: [
-            { name: "Requirements Gathering", description: "Gather implementation requirements", hours: 16 },
-            { name: "Solution Design", description: "Design the implementation solution", hours: 16 },
-            { name: "Implementation Planning", description: "Create implementation plan", hours: 8 }
-          ]
-        }
-      ],
-      totalHours: 40,
-      sources: [
-        {
-          url: "https://example.com",
-          title: "Implementation Guide",
-          relevance: "Official implementation documentation"
-        }
-      ]
-    };
   }
 }

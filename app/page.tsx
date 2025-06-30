@@ -13,7 +13,7 @@ import Link from "next/link"
 interface ResearchStep {
   id: string
   title: string
-  status: "pending" | "active" | "completed"
+  status: "pending" | "active" | "completed" | "error"
   model?: string
   sources?: string[]
 }
@@ -205,179 +205,204 @@ export default function ScopeStackContentEngine() {
       let buffer = ""
 
       console.log("Starting to read SSE stream...")
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) {
-          console.log("SSE stream complete")
-          break
-        }
+      
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) {
+            console.log("SSE stream complete")
+            break
+          }
 
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split("\n")
-        buffer = lines.pop() || ""
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split("\n")
+          buffer = lines.pop() || ""
 
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              console.log("SSE event received:", line.slice(6, 100) + "...")
-              const data = JSON.parse(line.slice(6))
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                console.log("SSE event received:", line.slice(6, 100) + "...")
+                const data = JSON.parse(line.slice(6))
 
-              if (data.type === "step") {
-                console.log("Step update:", data.stepId, data.status, data.progress)
-                setResearchSteps((prev) =>
-                  prev.map((step) =>
-                    step.id === data.stepId
-                      ? { ...step, status: data.status, model: data.model, sources: data.sources }
-                      : step,
-                  ),
-                )
-                setProgress(data.progress)
-              } else if (data.type === "complete") {
-                console.log("Complete event received")
-                console.log("Content received:", {
-                  technology: data.content?.technology,
-                  servicesCount: data.content?.services?.length,
-                  questionsCount: data.content?.questions?.length,
-                  services: data.content?.services,
-                  isServicesArray: Array.isArray(data.content?.services),
-                  contentValid: !!data.content && !!data.content.services && Array.isArray(data.content.services)
-                })
-                
-                // Validate content before setting it
-                if (!data.content) {
-                  console.error("Content is missing in the response")
-                  alert("Content generation failed: Missing content in the response")
-                  setIsProcessing(false)
-                  return
-                }
-                
-                // Ensure we have a technology field
-                if (!data.content.technology) {
-                  data.content.technology = userInput || "Technology Solution"
-                }
-                
-                // Ensure services is an array
-                if (!data.content.services || !Array.isArray(data.content.services)) {
-                  console.error("Services is missing or not an array")
-                  data.content.services = []
-                }
-                
-                // If services array is empty, create a default service structure
-                if (data.content.services.length === 0) {
-                  console.log("Creating default services because none were found")
+                if (data.type === "step") {
+                  console.log("Step update:", data.stepId, data.status, data.progress)
+                  setResearchSteps((prev) =>
+                    prev.map((step) =>
+                      step.id === data.stepId
+                        ? { ...step, status: data.status, model: data.model, sources: data.sources }
+                        : step,
+                    ),
+                  )
+                  setProgress(data.progress)
+                } else if (data.type === "complete") {
+                  console.log("Complete event received")
+                  console.log("Content received:", {
+                    technology: data.content?.technology,
+                    servicesCount: data.content?.services?.length,
+                    questionsCount: data.content?.questions?.length,
+                    services: data.content?.services,
+                    isServicesArray: Array.isArray(data.content?.services),
+                    contentValid: !!data.content && !!data.content.services && Array.isArray(data.content.services)
+                  })
                   
-                  // Create a default service structure based on the technology
-                  const technology = data.content.technology || userInput || "Technology Solution"
+                  // Validate content before setting it
+                  if (!data.content) {
+                    console.error("Content is missing in the response")
+                    alert("Content generation failed: Missing content in the response")
+                    setIsProcessing(false)
+                    return
+                  }
                   
-                  data.content.services = [
-                    {
-                      phase: "Planning",
-                      name: `${technology} Assessment`,
-                      description: `Comprehensive assessment of requirements for ${technology}`,
-                      hours: 40,
-                      subservices: [
-                        {
-                          name: "Requirements Gathering",
-                          description: `Detailed collection of requirements for ${technology}`,
-                          hours: 16,
-                          serviceDescription: `This service focuses on gathering detailed requirements for your ${technology} implementation. Our team will conduct stakeholder interviews, document technical specifications, and identify key success factors for your project.`,
-                          keyAssumptions: `Client stakeholders will be available for requirements gathering sessions. Existing documentation will be provided where available.`,
-                          clientResponsibilities: `Provide access to key stakeholders and subject matter experts. Share existing documentation and business processes.`,
-                          outOfScope: `Development of custom solutions outside standard ${technology} capabilities. Business process reengineering.`
-                        },
-                        {
-                          name: "Current State Analysis",
-                          description: `Analysis of current environment for ${technology} implementation`,
-                          hours: 16,
-                          serviceDescription: `This service provides a comprehensive analysis of your current environment to prepare for ${technology} implementation. Our experts will evaluate existing systems, identify potential challenges, and document the baseline configuration.`,
-                          keyAssumptions: `Access to current systems and documentation will be provided. Technical staff will be available for interviews and questions.`,
-                          clientResponsibilities: `Provide access to systems and environments. Make technical staff available for consultation. Provide existing documentation.`,
-                          outOfScope: `Remediation of issues found during analysis. Implementation of recommendations.`
-                        },
-                        {
-                          name: "Planning Documentation",
-                          description: `Creation of planning documents for ${technology} implementation`,
-                          hours: 8,
-                          serviceDescription: `This service delivers comprehensive planning documentation for your ${technology} implementation. Our team will create detailed project plans, technical specifications, and implementation roadmaps tailored to your requirements.`,
-                          keyAssumptions: `Requirements gathering and current state analysis have been completed. Client approval process is clearly defined.`,
-                          clientResponsibilities: `Review and approve documentation in a timely manner. Provide feedback on drafts and technical specifications.`,
-                          outOfScope: `Development of custom templates or non-standard documentation formats. Translation to languages other than English.`
-                        }
-                      ]
-                    },
-                    {
-                      phase: "Implementation",
-                      name: `${technology} Implementation`,
-                      description: `Core implementation of ${technology} solution`,
-                      hours: 80,
-                      subservices: [
-                        {
-                          name: "Configuration",
-                          description: `Configuration of ${technology} components`,
-                          hours: 40,
-                          serviceDescription: `This service provides expert configuration of all ${technology} components according to best practices and your specific requirements. Our team will implement the solution with attention to security, performance, and usability.`,
-                          keyAssumptions: `Planning phase has been completed and approved. Required infrastructure is available and accessible.`,
-                          clientResponsibilities: `Provide timely access to systems and environments. Ensure prerequisites are met before configuration begins.`,
-                          outOfScope: `Configuration of systems not directly related to ${technology}. Custom development beyond standard configuration options.`
-                        },
-                        {
-                          name: "Integration",
-                          description: `Integration of ${technology} with existing systems`,
-                          hours: 24,
-                          serviceDescription: `This service ensures seamless integration between ${technology} and your existing systems. Our integration specialists will configure connections, data flows, and authentication mechanisms to create a cohesive environment.`,
-                          keyAssumptions: `Existing systems are properly documented and accessible. Integration points are clearly defined in the planning phase.`,
-                          clientResponsibilities: `Provide documentation and access to existing systems. Make technical staff available for integration questions and testing.`,
-                          outOfScope: `Upgrades or modifications to existing systems to enable integration. Development of custom integration components.`
-                        },
-                        {
-                          name: "Testing",
-                          description: `Testing of ${technology} implementation`,
-                          hours: 16,
-                          serviceDescription: `This service provides comprehensive testing of your ${technology} implementation to ensure it meets all requirements and performs optimally. Our team will conduct functional, performance, and integration testing.`,
-                          keyAssumptions: `Configuration and integration work has been completed. Test environments are available and properly configured.`,
-                          clientResponsibilities: `Participate in user acceptance testing. Provide timely feedback on test results. Sign off on test completion.`,
-                          outOfScope: `Automated test script development. Load testing beyond standard performance validation.`
-                        }
-                      ]
-                    }
-                  ]
+                  // Ensure we have a technology field
+                  if (!data.content.technology) {
+                    data.content.technology = userInput || "Technology Solution"
+                  }
                   
-                  // Update total hours
-                  data.content.totalHours = data.content.services.reduce((total: number, service: any) => 
-                    total + (service.hours || 0), 0)
+                  // Ensure services is an array
+                  if (!data.content.services || !Array.isArray(data.content.services)) {
+                    console.error("Services is missing or not an array")
+                    data.content.services = []
+                  }
+                  
+                  // If services array is empty, create a default service structure
+                  if (data.content.services.length === 0) {
+                    console.log("Creating default services because none were found")
+                    
+                    // Create a default service structure based on the technology
+                    const technology = data.content.technology || userInput || "Technology Solution"
+                    
+                    data.content.services = [
+                      {
+                        phase: "Planning",
+                        name: `${technology} Assessment`,
+                        description: `Comprehensive assessment of requirements for ${technology}`,
+                        hours: 40,
+                        subservices: [
+                          {
+                            name: "Requirements Gathering",
+                            description: `Detailed collection of requirements for ${technology}`,
+                            hours: 16,
+                            serviceDescription: `This service focuses on gathering detailed requirements for your ${technology} implementation. Our team will conduct stakeholder interviews, document technical specifications, and identify key success factors for your project.`,
+                            keyAssumptions: `Client stakeholders will be available for requirements gathering sessions. Existing documentation will be provided where available.`,
+                            clientResponsibilities: `Provide access to key stakeholders and subject matter experts. Share existing documentation and business processes.`,
+                            outOfScope: `Development of custom solutions outside standard ${technology} capabilities. Business process reengineering.`
+                          },
+                          {
+                            name: "Current State Analysis",
+                            description: `Analysis of current environment for ${technology} implementation`,
+                            hours: 16,
+                            serviceDescription: `This service provides a comprehensive analysis of your current environment to prepare for ${technology} implementation. Our experts will evaluate existing systems, identify potential challenges, and document the baseline configuration.`,
+                            keyAssumptions: `Access to current systems and documentation will be provided. Technical staff will be available for interviews and questions.`,
+                            clientResponsibilities: `Provide access to systems and environments. Make technical staff available for consultation. Provide existing documentation.`,
+                            outOfScope: `Remediation of issues found during analysis. Implementation of recommendations.`
+                          },
+                          {
+                            name: "Planning Documentation",
+                            description: `Creation of planning documents for ${technology} implementation`,
+                            hours: 8,
+                            serviceDescription: `This service delivers comprehensive planning documentation for your ${technology} implementation. Our team will create detailed project plans, technical specifications, and implementation roadmaps tailored to your requirements.`,
+                            keyAssumptions: `Requirements gathering and current state analysis have been completed. Client approval process is clearly defined.`,
+                            clientResponsibilities: `Review and approve documentation in a timely manner. Provide feedback on drafts and technical specifications.`,
+                            outOfScope: `Development of custom templates or non-standard documentation formats. Translation to languages other than English.`
+                          }
+                        ]
+                      },
+                      {
+                        phase: "Implementation",
+                        name: `${technology} Implementation`,
+                        description: `Core implementation of ${technology} solution`,
+                        hours: 80,
+                        subservices: [
+                          {
+                            name: "Configuration",
+                            description: `Configuration of ${technology} components`,
+                            hours: 40,
+                            serviceDescription: `This service provides expert configuration of all ${technology} components according to best practices and your specific requirements. Our team will implement the solution with attention to security, performance, and usability.`,
+                            keyAssumptions: `Planning phase has been completed and approved. Required infrastructure is available and accessible.`,
+                            clientResponsibilities: `Provide timely access to systems and environments. Ensure prerequisites are met before configuration begins.`,
+                            outOfScope: `Configuration of systems not directly related to ${technology}. Custom development beyond standard configuration options.`
+                          },
+                          {
+                            name: "Integration",
+                            description: `Integration of ${technology} with existing systems`,
+                            hours: 24,
+                            serviceDescription: `This service ensures seamless integration between ${technology} and your existing systems. Our integration specialists will configure connections, data flows, and authentication mechanisms to create a cohesive environment.`,
+                            keyAssumptions: `Existing systems are properly documented and accessible. Integration points are clearly defined in the planning phase.`,
+                            clientResponsibilities: `Provide documentation and access to existing systems. Make technical staff available for integration questions and testing.`,
+                            outOfScope: `Upgrades or modifications to existing systems to enable integration. Development of custom integration components.`
+                          },
+                          {
+                            name: "Testing",
+                            description: `Testing of ${technology} implementation`,
+                            hours: 16,
+                            serviceDescription: `This service provides comprehensive testing of your ${technology} implementation to ensure it meets all requirements and performs optimally. Our team will conduct functional, performance, and integration testing.`,
+                            keyAssumptions: `Configuration and integration work has been completed. Test environments are available and properly configured.`,
+                            clientResponsibilities: `Participate in user acceptance testing. Provide timely feedback on test results. Sign off on test completion.`,
+                            outOfScope: `Automated test script development. Load testing beyond standard performance validation.`
+                          }
+                        ]
+                      }
+                    ]
+                    
+                    // Update total hours
+                    data.content.totalHours = data.content.services.reduce((total: number, service: any) => 
+                      total + (service.hours || 0), 0)
+                  }
+                  
+                  // Ensure questions is an array
+                  if (!data.content.questions || !Array.isArray(data.content.questions)) {
+                    data.content.questions = []
+                  }
+                  
+                  // If questions array is empty, leave it empty - no fallback content
+                  
+                  // Ensure calculations is an array
+                  if (!data.content.calculations || !Array.isArray(data.content.calculations)) {
+                    data.content.calculations = []
+                  }
+                  
+                  // If calculations array is empty, leave it empty - no fallback content
+                  
+                  // Ensure sources is an array
+                  if (!data.content.sources || !Array.isArray(data.content.sources)) {
+                    data.content.sources = []
+                  }
+                  
+                  // Set the validated content
+                  setGeneratedContent(data.content)
+                  setProgress(100)
                 }
-                
-                // Ensure questions is an array
-                if (!data.content.questions || !Array.isArray(data.content.questions)) {
-                  data.content.questions = []
-                }
-                
-                // If questions array is empty, leave it empty - no fallback content
-                
-                // Ensure calculations is an array
-                if (!data.content.calculations || !Array.isArray(data.content.calculations)) {
-                  data.content.calculations = []
-                }
-                
-                // If calculations array is empty, leave it empty - no fallback content
-                
-                // Ensure sources is an array
-                if (!data.content.sources || !Array.isArray(data.content.sources)) {
-                  data.content.sources = []
-                }
-                
-                // Set the validated content
-                setGeneratedContent(data.content)
-                setProgress(100)
+              } catch (parseError) {
+                console.error("Error parsing SSE data:", parseError, "Raw data:", line)
+                // Continue processing other lines even if one fails
               }
-            } catch (e) {
-              console.error("Error parsing SSE data:", e, "Raw data:", line)
             }
           }
         }
+      } catch (streamError: unknown) {
+        console.error("Error processing SSE stream:", streamError)
+        throw new Error(`Error processing research results: ${streamError instanceof Error ? streamError.message : 'Unknown stream error'}`)
+      } finally {
+        // Make sure to release the reader if there's an error
+        try {
+          reader.releaseLock()
+        } catch (releaseError) {
+          console.error("Error releasing reader lock:", releaseError)
+        }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Generation failed:", error)
+      // Show error to user
+      alert(`Content generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      
+      // Update UI to show error state
+      setResearchSteps((prev) =>
+        prev.map((step) =>
+          step.status === "active" 
+            ? { ...step, status: "error" } 
+            : step
+        )
+      )
     } finally {
       setIsProcessing(false)
     }

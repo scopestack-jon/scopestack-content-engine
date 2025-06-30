@@ -101,9 +101,9 @@ export function ContentOutput({ content }: ContentOutputProps) {
   const validServices = content.services.every(service => 
     service && 
     typeof service === 'object' && 
-    (service.phase || service.name || service.service) && 
-    typeof service.description === 'string' && 
-    typeof service.hours === 'number'
+    ((typeof service.phase === 'string') || (typeof service.name === 'string') || (typeof service.service === 'string')) && 
+    (typeof service.description === 'string' || typeof service.description === 'undefined') && 
+    (typeof service.hours === 'number' || typeof service.hours === 'undefined')
   );
   
   if (!validServices) {
@@ -192,19 +192,30 @@ export function ContentOutput({ content }: ContentOutputProps) {
 
   // Helper function to get service name
   const getServiceName = (service: any) => {
-    return service.service || service.name || "Service";
+    if (typeof service.service === 'string') return service.service;
+    if (typeof service.name === 'string') return service.name;
+    return "Service";
   }
 
   // Helper function to get service phase
   const getServicePhase = (service: any) => {
-    return service.phase || "General";
+    if (typeof service.phase === 'string') return service.phase;
+    return "General";
   }
 
   // Helper function to safely access subservices
   const getSubservices = (service: any) => {
     if (!service.subservices) return [];
     if (!Array.isArray(service.subservices)) return [];
-    return service.subservices;
+    
+    // Filter out invalid subservices
+    return service.subservices.filter((sub: any) => 
+      sub && 
+      typeof sub === 'object' && 
+      (typeof sub.name === 'string' || typeof sub.name === 'undefined') && 
+      (typeof sub.description === 'string' || typeof sub.description === 'undefined') && 
+      (typeof sub.hours === 'number' || typeof sub.hours === 'undefined')
+    );
   }
 
   return (
@@ -383,11 +394,11 @@ export function ContentOutput({ content }: ContentOutputProps) {
                       </div>
                       <Badge variant="outline" className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {service.hours}h
+                        {typeof service.hours === 'number' ? `${service.hours}h` : 'Hours not specified'}
                       </Badge>
                     </div>
 
-                    <p className="text-gray-600 mb-4">{service.description}</p>
+                    <p className="text-gray-600 mb-4">{service.description || 'No description available'}</p>
 
                     {/* New language fields for the service */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -423,10 +434,10 @@ export function ContentOutput({ content }: ContentOutputProps) {
                         getSubservices(service).map((sub: any, subIndex: number) => (
                           <div key={subIndex} className="bg-gray-50 p-3 rounded border">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium text-sm">{sub.name}</span>
+                              <span className="font-medium text-sm">{sub.name || `Subservice ${subIndex+1}`}</span>
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="text-xs">
-                                  {sub.hours}h base
+                                  {typeof sub.hours === 'number' ? `${sub.hours}h base` : 'Hours not specified'}
                                 </Badge>
                                 {sub.calculationSlug && (
                                   <Badge variant="secondary" className="text-xs flex items-center gap-1">
@@ -436,7 +447,7 @@ export function ContentOutput({ content }: ContentOutputProps) {
                                 )}
                               </div>
                             </div>
-                            <p className="text-xs text-gray-600 mb-2">{sub.description}</p>
+                            <p className="text-xs text-gray-600 mb-2">{sub.description || 'No description available'}</p>
 
                             {/* New language fields for the subservice */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
