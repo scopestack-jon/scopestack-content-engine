@@ -289,16 +289,16 @@ async function parseAIResponse(response: string): Promise<any> {
   
   // Extract questions directly from the cleaned response before any JSON parsing
   const extractedQuestions: any[] = [];
-  const questionRegex = /{[^{}]*"question"\s*:\s*"([^"]+)"[^{}]*"options"\s*:\s*\[([\s\S]*?)\][^{}]*}/g;
+  const questionRegex = /"question"\s*:\s*"([^"]+)"[\s\S]*?"options"\s*:\s*\[([\s\S]*?)\]/g;
   const questionMatches = Array.from(cleaned.matchAll(questionRegex));
   
   if (questionMatches && questionMatches.length > 0) {
     console.log(`Found ${questionMatches.length} direct question matches in response`);
     for (let i = 0; i < questionMatches.length; i++) {
       try {
-        const match = questionMatches[i][0];
-        const question = questionMatches[i][1];
-        const optionsText = questionMatches[i][2];
+        const match = questionMatches[i];
+        const question = match[1];
+        const optionsText = match[2];
         
         // Extract options
         const options: any[] = [];
@@ -309,14 +309,14 @@ async function parseAIResponse(response: string): Promise<any> {
           for (let j = 0; j < optionMatches.length; j++) {
             options.push({
               key: optionMatches[j][1],
-              value: optionMatches[j][1],
+              value: j+1,
               numericalValue: j+1,
               default: j === 0
             });
           }
         }
         
-        if (options.length > 0) {
+        if (options.length > 0 && question) {
           extractedQuestions.push({
             id: `q${i+1}`,
             slug: `question-${i+1}`,
@@ -669,34 +669,9 @@ function normalizeNestedStructure(parsed: any): any {
       }));
     }
     
-    // Extract calculations from various possible locations
+    // Extract calculations
     if (Array.isArray(parsed.calculations)) {
-      normalized.calculations = parsed.calculations.map((calc: any, index: number) => {
-        // Ensure calculation slugs are descriptive and not just "calc1"
-        if (calc.slug && calc.slug.match(/^calc\d+$/)) {
-          // Generate a more descriptive slug based on the calculation name
-          const descriptiveName = calc.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-          calc.slug = `${descriptiveName}_factor`;
-        }
-        return calc;
-      });
-    } else if (parsed.formulas || parsed.calculation_formulas) {
-      const formulas = parsed.formulas || parsed.calculation_formulas;
-      if (Array.isArray(formulas)) {
-        normalized.calculations = formulas.map((formula: any, index: number) => {
-          const name = formula.name || `Calculation ${index + 1}`;
-          const descriptiveName = name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-          return {
-            id: `calc${index + 1}`,
-            slug: `${descriptiveName}_factor`,
-            name: name,
-            description: formula.description || `${name} for determining resource requirements`,
-            formula: formula.formula || "1",
-            mappedQuestions: formula.mappedQuestions || [],
-            resultType: formula.resultType || "multiplier"
-          };
-        });
-      }
+      normalized.calculations = parsed.calculations;
     }
     
     // Extract services from various possible locations
@@ -721,229 +696,9 @@ function normalizeNestedStructure(parsed: any): any {
       
       for (const location of serviceLocations) {
         if (Array.isArray(location)) {
-          // Transform services to expected format
-          const services = location.map((svc: any) => {
-            const phase = svc.phase || "Implementation";
-            const service = svc.name || svc.service;
-            const hours = svc.estimated_hours || svc.hours || 40;
-            
-            // Create a service object with all required fields
-            const serviceObj: Service = {
-              phase: phase,
-              service: service,
-              name: service,
-              description: svc.description || `${service} for ${normalized.technology}`,
-              hours: hours,
-              serviceDescription: svc.serviceDescription || `This service provides comprehensive ${service} for ${normalized.technology} implementations.`,
-              keyAssumptions: svc.keyAssumptions || `Client will provide timely access to required systems and stakeholders.`,
-              clientResponsibilities: svc.clientResponsibilities || `Client will designate a project manager to serve as the primary point of contact.`,
-              outOfScope: svc.outOfScope || `Hardware procurement is not included in this service.`,
-              subservices: []
-            };
-            
-            // Handle subservices
-            if (Array.isArray(svc.subservices)) {
-              serviceObj.subservices = svc.subservices.map((sub: any, i: number) => {
-                // Handle both string and object subservices
-                if (typeof sub === 'string') {
-                  return {
-                    name: sub,
-                    description: `${sub} activities for ${service}`,
-                    hours: Math.floor(hours / 3),
-                    serviceDescription: `This subservice focuses on delivering ${sub} as part of the overall ${service} service.`,
-                    keyAssumptions: `Required access to systems will be provided in a timely manner.`,
-                    clientResponsibilities: `Client will provide necessary information about current configurations and requirements.`,
-                    outOfScope: `Custom development beyond standard configuration is not included.`
-                  };
-                } else {
-                  return {
-                    name: sub.name || `Subservice ${i+1}`,
-                    description: sub.description || `${sub.name || 'Subservice'} activities`,
-                    hours: sub.hours || Math.floor(hours / 3),
-                    mappedQuestions: sub.mappedQuestions || [],
-                    calculationSlug: sub.calculationSlug,
-                    serviceDescription: sub.serviceDescription || `This subservice delivers comprehensive capabilities as part of the ${service} service.`,
-                    keyAssumptions: sub.keyAssumptions || `Client environment meets the minimum technical requirements.`,
-                    clientResponsibilities: sub.clientResponsibilities || `Client will provide timely responses to information requests.`,
-                    outOfScope: sub.outOfScope || `Performance optimization beyond initial implementation is not included.`
-                  };
-                }
-              });
-            }
-            
-            // Ensure we have at least 3 subservices
-            while (serviceObj.subservices.length < 3) {
-              const subIndex = serviceObj.subservices.length;
-              const subName = `${service} Component ${subIndex + 1}`;
-              serviceObj.subservices.push({
-                name: subName,
-                description: `Supporting activities for ${service}`,
-                hours: Math.floor(hours / 3),
-                serviceDescription: `This subservice provides essential ${subName} implementation for ${normalized.technology}.`,
-                keyAssumptions: `Client will provide necessary access to systems and information.`,
-                clientResponsibilities: `Client will designate appropriate technical contacts.`,
-                outOfScope: `Custom development beyond standard configuration is not included.`
-              } as any);
-            }
-            
-            return serviceObj;
-          });
-          
-          if (services.length > 0) {
-            normalized.services = services;
-            foundServices = true;
-            break;
-          }
-        }
-      }
-      
-      // If no services found yet, try to extract from implementation_phases
-      if (!foundServices && Array.isArray(parsed.implementation_phases)) {
-        const services = parsed.implementation_phases.map((phase: any, index: number) => {
-          const phaseName = phase.name || phase.phase || `Phase ${index+1}`;
-          const hours = phase.hours || phase.estimated_hours || 40;
-          
-          // Create a service object with all required fields
-          const service: Service = {
-            phase: "Implementation",
-            service: phaseName,
-            name: phaseName,
-            description: `${phase} activities for ${normalized.technology}`,
-            hours: 40,
-            serviceDescription: `This service provides comprehensive ${phase} activities for ${normalized.technology}.`,
-            keyAssumptions: `Client will provide timely access to required systems and stakeholders.`,
-            clientResponsibilities: `Client will designate a project manager to serve as the primary point of contact.`,
-            outOfScope: `Hardware procurement is not included in this service.`,
-            subservices: []
-          };
-          
-          // Create subservices from activities if available
-          if (Array.isArray(phase.activities)) {
-            service.subservices = phase.activities.slice(0, 3).map((activity: string, i: number) => ({
-              name: activity,
-              description: `${activity} for ${phaseName}`,
-              hours: Math.floor(hours / 3),
-              serviceDescription: `This subservice focuses on delivering ${activity} as part of the overall ${phaseName} service.`,
-              keyAssumptions: `Required access to systems will be provided in a timely manner.`,
-              clientResponsibilities: `Client will provide necessary information about current configurations and requirements.`,
-              outOfScope: `Custom development beyond standard configuration is not included.`
-            }));
-          }
-          
-          // Ensure exactly 3 subservices
-          while (service.subservices.length < 3) {
-            const subIndex = service.subservices.length;
-            const subName = `Activity ${subIndex + 1}`;
-            service.subservices.push({
-              name: subName,
-              description: `Supporting activity for ${phaseName}`,
-              hours: Math.floor(hours / 3),
-              serviceDescription: `This subservice provides essential ${subName} implementation for ${normalized.technology}.`,
-              keyAssumptions: `Client will provide necessary access to systems and information.`,
-              clientResponsibilities: `Client will designate appropriate technical contacts.`,
-              outOfScope: `Custom development beyond standard configuration is not included.`
-            });
-          }
-          
-          return service;
-        });
-        
-        if (services.length > 0) {
-          normalized.services = services;
-        }
-      }
-    }
-    
-    // Ensure we have at least 1 service per phase and 3 services for Implementation
-    if (normalized.services.length > 0) {
-      const phases = ["Planning", "Design", "Implementation", "Testing", "Go-Live", "Support"];
-      const servicesByPhase: {[key: string]: any[]} = {};
-      
-      // Group services by phase
-      normalized.services.forEach((service: any) => {
-        const phase = service.phase || "Implementation";
-        if (!servicesByPhase[phase]) {
-          servicesByPhase[phase] = [];
-        }
-        servicesByPhase[phase].push(service);
-      });
-      
-      // Ensure each phase has at least 1 service
-      phases.forEach((phase) => {
-        if (!servicesByPhase[phase] || servicesByPhase[phase].length === 0) {
-          // Create a default service for this phase
-          const serviceName = `${normalized.technology} ${phase}`;
-          const service: Service = {
-            phase: phase,
-            service: serviceName,
-            name: serviceName,
-            description: `${phase} activities for ${normalized.technology}`,
-            hours: 40,
-            serviceDescription: `This service provides comprehensive ${phase} activities for ${normalized.technology}.`,
-            keyAssumptions: `Client will provide timely access to required systems and stakeholders.`,
-            clientResponsibilities: `Client will designate a project manager to serve as the primary point of contact.`,
-            outOfScope: `Hardware procurement is not included in this service.`,
-            subservices: []
-          };
-          
-          // Create 3 subservices
-          for (let i = 0; i < 3; i++) {
-            const subName = `${phase} Activity ${i + 1}`;
-            const subservice: Subservice = {
-              name: subName,
-              description: `${subName} for ${normalized.technology}`,
-              hours: Math.floor(service.hours / 3),
-              serviceDescription: `This subservice provides essential ${subName} implementation for ${normalized.technology}.`,
-              keyAssumptions: `Client will provide necessary access to systems and information.`,
-              clientResponsibilities: `Client will designate appropriate technical contacts.`,
-              outOfScope: `Custom development beyond standard configuration is not included.`
-            };
-            service.subservices.push(subservice);
-          }
-          
-          normalized.services.push(service);
-          if (!servicesByPhase[phase]) {
-            servicesByPhase[phase] = [];
-          }
-          servicesByPhase[phase].push(service);
-        }
-      });
-      
-      // Ensure Implementation phase has at least 3 services
-      if (servicesByPhase["Implementation"] && servicesByPhase["Implementation"].length < 3) {
-        const implementationCount = servicesByPhase["Implementation"].length;
-        for (let i = implementationCount; i < 3; i++) {
-          const serviceName = `${normalized.technology} Implementation Component ${i + 1}`;
-          const service: Service = {
-            phase: "Implementation",
-            service: serviceName,
-            name: serviceName,
-            description: `Implementation activities for ${normalized.technology} component ${i + 1}`,
-            hours: 40,
-            serviceDescription: `This service provides comprehensive implementation activities for ${normalized.technology} component ${i + 1}.`,
-            keyAssumptions: `Client will provide timely access to required systems and stakeholders.`,
-            clientResponsibilities: `Client will designate a project manager to serve as the primary point of contact.`,
-            outOfScope: `Hardware procurement is not included in this service.`,
-            subservices: []
-          };
-          
-          // Create 3 subservices
-          for (let j = 0; j < 3; j++) {
-            const subName = `Implementation Activity ${j + 1}`;
-            const subservice: Subservice = {
-              name: subName,
-              description: `${subName} for ${serviceName}`,
-              hours: Math.floor(service.hours / 3),
-              serviceDescription: `This subservice provides essential ${subName} implementation for ${normalized.technology}.`,
-              keyAssumptions: `Client will provide necessary access to systems and information.`,
-              clientResponsibilities: `Client will designate appropriate technical contacts.`,
-              outOfScope: `Custom development beyond standard configuration is not included.`
-            };
-            service.subservices.push(subservice);
-          }
-          
-          normalized.services.push(service);
-          servicesByPhase["Implementation"].push(service);
+          normalized.services = location;
+          foundServices = true;
+          break;
         }
       }
     }
@@ -952,29 +707,13 @@ function normalizeNestedStructure(parsed: any): any {
     if (Array.isArray(parsed.sources)) {
       normalized.sources = parsed.sources;
     } else if (parsed.reference_sources) {
-      normalized.sources = parsed.reference_sources.map((src: any) => ({
-        url: src.url || "https://example.com",
-        title: src.title || "Reference Source",
-        relevance: src.relevance || "Implementation guidance"
-      }));
+      normalized.sources = parsed.reference_sources;
     } else if (parsed.email_migration_research?.reference_sources) {
-      normalized.sources = parsed.email_migration_research.reference_sources.map((src: any) => ({
-        url: src.url || "https://example.com",
-        title: src.title || "Reference Source",
-        relevance: src.relevance || "Implementation guidance"
-      }));
+      normalized.sources = parsed.email_migration_research.reference_sources;
     } else if (parsed.research_findings?.reference_sources) {
-      normalized.sources = parsed.research_findings.reference_sources.map((src: any) => ({
-        url: src.url || "https://example.com",
-        title: src.title || "Reference Source",
-        relevance: src.relevance || "Implementation guidance"
-      }));
+      normalized.sources = parsed.research_findings.reference_sources;
     } else if (parsed.resources) {
-      normalized.sources = parsed.resources.map((src: any) => ({
-        url: src.url || "https://example.com",
-        title: src.title || src.name || "Resource",
-        relevance: src.relevance || "Implementation resource"
-      }));
+      normalized.sources = parsed.resources;
     }
     
     // Ensure we have at least one source
@@ -1010,7 +749,7 @@ function normalizeNestedStructure(parsed: any): any {
       questions: [
         {
           id: "q1",
-          slug: "implementation_timeline",
+          slug: "default-question",
           question: "What is your implementation timeline?",
           options: [
             { key: "Standard (3-6 months)", value: 1, default: true },
@@ -1019,56 +758,17 @@ function normalizeNestedStructure(parsed: any): any {
           ]
         }
       ],
-      calculations: [
-        {
-          id: "calc1",
-          slug: "timeline_factor",
-          name: "Timeline Factor",
-          description: "Adjusts hours based on implementation timeline",
-          formula: "implementation_timeline",
-          mappedQuestions: ["implementation_timeline"],
-          resultType: "multiplier"
-        }
-      ],
+      calculations: [],
       services: [
         {
           phase: "Planning",
           service: "Implementation Planning",
-          name: "Implementation Planning",
           description: "Comprehensive planning for implementation",
           hours: 40,
-          serviceDescription: "This service provides comprehensive planning for the implementation, including requirements gathering, solution design, and implementation planning.",
-          keyAssumptions: "Client stakeholders will be available for requirements gathering sessions. Existing documentation will be provided where available.",
-          clientResponsibilities: "Provide access to key stakeholders and subject matter experts. Share existing documentation and business processes.",
-          outOfScope: "Development of custom solutions outside standard capabilities. Business process reengineering.",
           subservices: [
-            { 
-              name: "Requirements Gathering", 
-              description: "Gather implementation requirements", 
-              hours: 16,
-              serviceDescription: "This subservice focuses on gathering detailed requirements for your implementation.",
-              keyAssumptions: "Client stakeholders will be available for requirements gathering sessions.",
-              clientResponsibilities: "Provide access to key stakeholders and subject matter experts.",
-              outOfScope: "Development of custom solutions outside standard capabilities."
-            },
-            { 
-              name: "Solution Design", 
-              description: "Design the implementation solution", 
-              hours: 16,
-              serviceDescription: "This subservice focuses on designing the implementation solution based on requirements.",
-              keyAssumptions: "Requirements gathering has been completed.",
-              clientResponsibilities: "Review and approve design documents.",
-              outOfScope: "Implementation of the design."
-            },
-            { 
-              name: "Implementation Planning", 
-              description: "Create implementation plan", 
-              hours: 8,
-              serviceDescription: "This subservice focuses on creating a detailed implementation plan.",
-              keyAssumptions: "Solution design has been completed and approved.",
-              clientResponsibilities: "Review and approve implementation plan.",
-              outOfScope: "Execution of the implementation plan."
-            }
+            { name: "Requirements Gathering", description: "Gather implementation requirements", hours: 16 },
+            { name: "Solution Design", description: "Design the implementation solution", hours: 16 },
+            { name: "Implementation Planning", description: "Create implementation plan", hours: 8 }
           ]
         }
       ],
@@ -1204,32 +904,33 @@ function validateContentStructure(content: any): boolean {
     // Keep existing questions if any
     const existingQuestions = Array.isArray(content.questions) ? content.questions : [];
     
-    // Generate additional questions to reach minimum of 10
+    // Generate technology-specific questions based on the content
     const defaultQuestions = [
       {
-        id: "q1",
-        slug: "implementation-scope",
-        question: `What is the scope of ${content.technology} implementation?`,
+        id: "q_environment_complexity",
+        slug: "environment-complexity",
+        question: `What is the complexity of the ${content.technology} environment?`,
         options: [
-          { key: "Basic implementation", value: 1, default: true },
-          { key: "Standard implementation", value: 2 },
-          { key: "Comprehensive implementation", value: 3 }
+          { key: "Simple (minimal customization)", value: 1, default: true },
+          { key: "Moderate (some customization)", value: 2 },
+          { key: "Complex (significant customization)", value: 3 }
         ]
       },
       {
-        id: "q2",
-        slug: "organization-size",
-        question: "What is the size of your organization?",
+        id: "q_user_count",
+        slug: "user-count",
+        question: `How many users will be using the ${content.technology} solution?`,
         options: [
-          { key: "Small (1-100 employees)", value: 1 },
-          { key: "Medium (101-1000 employees)", value: 2, default: true },
-          { key: "Large (1000+ employees)", value: 3 }
+          { key: "Small (1-100 users)", value: 1, default: true },
+          { key: "Medium (101-500 users)", value: 2 },
+          { key: "Large (501-1000 users)", value: 3 },
+          { key: "Enterprise (1000+ users)", value: 4 }
         ]
       },
       {
-        id: "q3",
-        slug: "timeline-requirements",
-        question: "What is your implementation timeline?",
+        id: "q_timeline",
+        slug: "implementation-timeline",
+        question: `What is your implementation timeline for ${content.technology}?`,
         options: [
           { key: "Standard (3-6 months)", value: 1, default: true },
           { key: "Accelerated (1-3 months)", value: 2 },
@@ -1237,84 +938,54 @@ function validateContentStructure(content: any): boolean {
         ]
       },
       {
-        id: "q4",
+        id: "q_integration",
+        slug: "integration-requirements",
+        question: `What level of integration is required for ${content.technology}?`,
+        options: [
+          { key: "Basic (minimal integration)", value: 1, default: true },
+          { key: "Standard (typical integrations)", value: 2 },
+          { key: "Complex (multiple custom integrations)", value: 3 }
+        ]
+      },
+      {
+        id: "q_data_migration",
+        slug: "data-migration-volume",
+        question: `What is the volume of data to be migrated to ${content.technology}?`,
+        options: [
+          { key: "Small (under 100GB)", value: 1, default: true },
+          { key: "Medium (100GB-1TB)", value: 2 },
+          { key: "Large (1TB-10TB)", value: 3 },
+          { key: "Very Large (10TB+)", value: 4 }
+        ]
+      },
+      {
+        id: "q_compliance",
         slug: "compliance-requirements",
         question: `What compliance requirements apply to your ${content.technology} implementation?`,
         options: [
-          { key: "Standard security best practices", value: 1, default: true },
-          { key: "Industry-specific regulations", value: 2 },
-          { key: "Multiple regulatory frameworks", value: 3 }
+          { key: "Standard (no specific requirements)", value: 1, default: true },
+          { key: "Industry-specific (e.g., HIPAA, PCI)", value: 2 },
+          { key: "Multiple frameworks (e.g., HIPAA, GDPR, SOX)", value: 3 }
         ]
       },
       {
-        id: "q5",
-        slug: "integration-complexity",
-        question: `How complex are the integrations required for your ${content.technology} implementation?`,
+        id: "q_training",
+        slug: "training-requirements",
+        question: `What level of training is required for ${content.technology}?`,
         options: [
-          { key: "Simple - few integrations", value: 1, default: true },
-          { key: "Moderate - several systems", value: 2 },
-          { key: "Complex - many interdependent systems", value: 3 }
-        ]
-      },
-      {
-        id: "q6",
-        slug: "data-volume",
-        question: `What is the volume of data involved in your ${content.technology} implementation?`,
-        options: [
-          { key: "Small (<100GB)", value: 1, default: true },
-          { key: "Medium (100GB-1TB)", value: 2 },
-          { key: "Large (>1TB)", value: 3 }
-        ]
-      },
-      {
-        id: "q7",
-        slug: "customization-requirements",
-        question: `What level of customization is required for your ${content.technology} implementation?`,
-        options: [
-          { key: "Minimal - standard configuration", value: 1, default: true },
-          { key: "Moderate - some customization", value: 2 },
-          { key: "Extensive - highly customized", value: 3 }
-        ]
-      },
-      {
-        id: "q8",
-        slug: "user-training-needs",
-        question: `What level of user training is required for your ${content.technology} implementation?`,
-        options: [
-          { key: "Basic - standard training", value: 1, default: true },
-          { key: "Intermediate - role-based training", value: 2 },
-          { key: "Advanced - comprehensive training program", value: 3 }
-        ]
-      },
-      {
-        id: "q9",
-        slug: "environment-complexity",
-        question: `How complex is your existing environment for ${content.technology} implementation?`,
-        options: [
-          { key: "Simple - homogeneous environment", value: 1, default: true },
-          { key: "Moderate - some diversity", value: 2 },
-          { key: "Complex - highly heterogeneous", value: 3 }
-        ]
-      },
-      {
-        id: "q10",
-        slug: "migration-requirements",
-        question: `What are your data migration requirements for ${content.technology} implementation?`,
-        options: [
-          { key: "Minimal - little or no migration", value: 1, default: true },
-          { key: "Moderate - some data migration", value: 2 },
-          { key: "Extensive - large-scale migration", value: 3 }
+          { key: "Basic (self-service materials)", value: 1, default: true },
+          { key: "Standard (group training sessions)", value: 2 },
+          { key: "Comprehensive (personalized training)", value: 3 }
         ]
       }
     ];
     
-    // Combine existing and default questions, ensuring we have at least 10
-    content.questions = [
-      ...existingQuestions,
-      ...defaultQuestions.slice(0, Math.max(0, 10 - existingQuestions.length))
-    ];
+    // Combine existing with defaults, ensuring we have at least 10 questions
+    const additionalNeeded = Math.max(0, 10 - existingQuestions.length);
+    const additionalQuestions = defaultQuestions.slice(0, additionalNeeded);
     
-    console.log(`✅ Generated ${10 - existingQuestions.length} additional questions to meet minimum requirements`);
+    content.questions = [...existingQuestions, ...additionalQuestions];
+    console.log(`✅ Generated ${additionalQuestions.length} additional questions to meet minimum requirements`);
   }
 
   // Validate or create calculations
@@ -1324,62 +995,76 @@ function validateContentStructure(content: any): boolean {
     // Keep existing calculations if any
     const existingCalculations = Array.isArray(content.calculations) ? content.calculations : [];
     
-    // Generate additional calculations to reach minimum of 5
+    // Generate technology-specific calculations
     const defaultCalculations = [
       {
-        id: "calc1",
-        slug: "implementation_scope_factor",
-        name: "Implementation Scope Factor",
-        description: "Adjusts hours based on implementation scope",
-        formula: "implementation_scope",
-        mappedQuestions: ["implementation-scope"],
+        id: "complexity_factor",
+        slug: "complexity_factor",
+        name: `${content.technology} Complexity Factor`,
+        description: `Adjusts hours based on ${content.technology} environment complexity`,
+        formula: "environment_complexity",
+        mappedQuestions: ["environment-complexity"],
         resultType: "multiplier"
       },
       {
-        id: "calc2",
-        slug: "organization_size_factor",
-        name: "Organization Size Factor",
-        description: "Adjusts hours based on organization size",
-        formula: "organization_size",
-        mappedQuestions: ["organization-size"],
+        id: "user_count_factor",
+        slug: "user_count_factor",
+        name: "User Count Factor",
+        description: `Adjusts hours based on number of ${content.technology} users`,
+        formula: "user_count",
+        mappedQuestions: ["user-count"],
         resultType: "multiplier"
       },
       {
-        id: "calc3",
-        slug: "timeline_factor",
-        name: "Timeline Factor",
-        description: "Adjusts hours based on implementation timeline",
-        formula: "timeline_requirements",
-        mappedQuestions: ["timeline-requirements"],
+        id: "integration_factor",
+        slug: "integration_factor",
+        name: "Integration Complexity Factor",
+        description: `Adjusts hours based on ${content.technology} integration requirements`,
+        formula: "integration_requirements",
+        mappedQuestions: ["integration-requirements"],
         resultType: "multiplier"
       },
       {
-        id: "calc4",
+        id: "data_migration_factor",
+        slug: "data_migration_factor",
+        name: "Data Migration Volume Factor",
+        description: `Adjusts hours based on ${content.technology} data migration volume`,
+        formula: "data_migration_volume",
+        mappedQuestions: ["data-migration-volume"],
+        resultType: "multiplier"
+      },
+      {
+        id: "compliance_factor",
         slug: "compliance_factor",
-        name: "Compliance Factor",
-        description: "Adjusts hours based on compliance requirements",
+        name: "Compliance Requirements Factor",
+        description: `Adjusts hours based on ${content.technology} compliance requirements`,
         formula: "compliance_requirements",
         mappedQuestions: ["compliance-requirements"],
-        resultType: "multiplier"
-      },
-      {
-        id: "calc5",
-        slug: "integration_complexity_factor",
-        name: "Integration Complexity Factor",
-        description: "Adjusts hours based on integration complexity",
-        formula: "integration_complexity",
-        mappedQuestions: ["integration-complexity"],
         resultType: "multiplier"
       }
     ];
     
-    // Combine existing and default calculations, ensuring we have at least 5
-    content.calculations = [
-      ...existingCalculations,
-      ...defaultCalculations.slice(0, Math.max(0, 5 - existingCalculations.length))
-    ];
+    // Ensure existing calculations have descriptive slugs
+    existingCalculations.forEach((calc: any) => {
+      // Check if the slug is generic like "calc1" or missing
+      if (!calc.slug || calc.slug.match(/^calc\d+$/)) {
+        // Generate a descriptive slug based on the calculation name
+        const baseName = (calc.name || "calculation").toLowerCase().replace(/[^a-z0-9]+/g, '_');
+        calc.slug = `${baseName}_factor`;
+      }
+      
+      // Ensure each calculation has a descriptive name
+      if (!calc.name || calc.name.match(/^Calculation \d+$/)) {
+        calc.name = `${content.technology} ${calc.id || "Factor"}`;
+      }
+    });
     
-    console.log(`✅ Generated ${5 - existingCalculations.length} additional calculations to meet minimum requirements`);
+    // Combine existing with defaults, ensuring we have at least 5 calculations
+    const additionalNeeded = Math.max(0, 5 - existingCalculations.length);
+    const additionalCalculations = defaultCalculations.slice(0, additionalNeeded);
+    
+    content.calculations = [...existingCalculations, ...additionalCalculations];
+    console.log(`✅ Generated ${additionalCalculations.length} additional calculations to meet minimum requirements`);
   }
 
   // Validate or create services
@@ -1390,7 +1075,7 @@ function validateContentStructure(content: any): boolean {
     const existingServices = Array.isArray(content.services) ? content.services : [];
     
     // Define the required phases
-    const phases = ["Planning", "Design", "Implementation", "Testing", "Go-Live", "Support"];
+    const phases = ["Initiating", "Planning", "Implementation", "Monitoring and Controlling", "Closing"];
     
     // Group existing services by phase
     const servicesByPhase: {[key: string]: any[]} = {};
@@ -1414,44 +1099,86 @@ function validateContentStructure(content: any): boolean {
       
       if (currentCount < requiredCount) {
         for (let i = currentCount; i < requiredCount; i++) {
-          const serviceName = `${content.technology} ${phase} ${i > 0 ? i + 1 : ''}`;
+          // Create unique service names based on technology and phase
+          let serviceName = "";
+          
+          // Generate unique service names based on phase
+          if (phase === "Initiating") {
+            const initiatingServices = [
+              `${content.technology} Requirements Analysis`,
+              `${content.technology} Feasibility Assessment`,
+              `${content.technology} Stakeholder Engagement`
+            ];
+            serviceName = initiatingServices[i % initiatingServices.length];
+          } else if (phase === "Planning") {
+            const planningServices = [
+              `${content.technology} Architecture Design`,
+              `${content.technology} Resource Planning`,
+              `${content.technology} Risk Assessment`
+            ];
+            serviceName = planningServices[i % planningServices.length];
+          } else if (phase === "Implementation") {
+            const implementationServices = [
+              `${content.technology} Core Deployment`,
+              `${content.technology} Integration Services`,
+              `${content.technology} Configuration Management`,
+              `${content.technology} Data Migration`,
+              `${content.technology} Security Implementation`
+            ];
+            serviceName = implementationServices[i % implementationServices.length];
+          } else if (phase === "Monitoring and Controlling") {
+            const monitoringServices = [
+              `${content.technology} Performance Optimization`,
+              `${content.technology} Quality Assurance`,
+              `${content.technology} Change Management`
+            ];
+            serviceName = monitoringServices[i % monitoringServices.length];
+          } else if (phase === "Closing") {
+            const closingServices = [
+              `${content.technology} Knowledge Transfer`,
+              `${content.technology} Documentation Finalization`,
+              `${content.technology} Project Closure`
+            ];
+            serviceName = closingServices[i % closingServices.length];
+          }
+          
           defaultServices.push({
             phase: phase,
             service: serviceName,
             name: serviceName,
             description: `${phase} activities for ${content.technology}`,
-            hours: 40,
-            serviceDescription: `This service provides comprehensive ${phase} activities for ${content.technology} implementations.`,
+            hours: 40, // Base hours, will be adjusted by calculations
+            serviceDescription: `This service provides comprehensive ${phase.toLowerCase()} activities for ${content.technology} implementations.`,
             keyAssumptions: `Client will provide timely access to required systems and stakeholders.`,
             clientResponsibilities: `Client will designate a project manager to serve as the primary point of contact.`,
             outOfScope: `Hardware procurement is not included in this service.`,
             subservices: [
               {
-                name: `${phase} Requirements Gathering`,
-                description: `Gather requirements for ${phase}`,
-                hours: 16,
-                serviceDescription: `This subservice focuses on gathering detailed requirements for ${phase}.`,
-                keyAssumptions: `Client stakeholders will be available for requirements gathering sessions.`,
+                name: `${serviceName} - Planning`,
+                description: `Planning activities for ${serviceName}`,
+                hours: 16, // Base hours, will be adjusted by calculations
+                serviceDescription: `This subservice focuses on planning activities for ${serviceName}.`,
+                keyAssumptions: `Client stakeholders will be available for planning sessions.`,
                 clientResponsibilities: `Provide access to key stakeholders and subject matter experts.`,
                 outOfScope: `Development of custom solutions outside standard capabilities.`
               },
               {
-                name: `${phase} Design`,
-                description: `Design the ${phase} solution`,
-                hours: 16,
-                serviceDescription: `This subservice focuses on designing the ${phase} solution based on requirements.`,
-                keyAssumptions: `Requirements gathering has been completed.`,
-                clientResponsibilities: `Review and approve design documents.`,
-                outOfScope: `Implementation of the design.`
+                name: `${serviceName} - Execution`,
+                description: `Execution activities for ${serviceName}`,
+                hours: 16, // Base hours, will be adjusted by calculations
+                serviceDescription: `This subservice focuses on executing the ${serviceName}.`,
+                keyAssumptions: `Planning has been completed.`,
+                clientResponsibilities: `Review and approve deliverables.`,
+                outOfScope: `Activities outside the scope of this subservice.`
               },
               {
-                name: `${phase} Planning`,
-                description: `Create ${phase} plan`,
-                hours: 8,
-                serviceDescription: `This subservice focuses on creating a detailed ${phase} plan.`,
-                keyAssumptions: `Solution design has been completed and approved.`,
-                clientResponsibilities: `Review and approve ${phase} plan.`,
-                outOfScope: `Execution of the ${phase} plan.`
+                name: `${serviceName} - Validation`,
+                description: `Validation activities for ${serviceName}`,
+                hours: 8, // Base hours, will be adjusted by calculations
+                serviceDescription: `This subservice focuses on validating the ${serviceName}.`,
+                keyAssumptions: `Execution has been completed.`,
+                clientResponsibilities: `Participate in validation activities.`,
+                outOfScope: `Activities outside the scope of this subservice.`
               }
             ]
           });
@@ -1463,46 +1190,88 @@ function validateContentStructure(content: any): boolean {
     if (existingServices.length + defaultServices.length < 10) {
       const additionalNeeded = 10 - (existingServices.length + defaultServices.length);
       
+      // Define additional specialized services for each phase
+      const specializedServices = {
+        "Initiating": [
+          `${content.technology} Business Case Development`,
+          `${content.technology} Initial Scope Definition`,
+          `${content.technology} Project Charter Creation`
+        ],
+        "Planning": [
+          `${content.technology} Schedule Development`,
+          `${content.technology} Budget Planning`,
+          `${content.technology} Communication Planning`
+        ],
+        "Implementation": [
+          `${content.technology} Environment Preparation`,
+          `${content.technology} User Provisioning`,
+          `${content.technology} Testing Framework Implementation`,
+          `${content.technology} Compliance Controls Implementation`,
+          `${content.technology} Backup and Recovery Setup`
+        ],
+        "Monitoring and Controlling": [
+          `${content.technology} Performance Monitoring Setup`,
+          `${content.technology} Issue Management`,
+          `${content.technology} Compliance Verification`
+        ],
+        "Closing": [
+          `${content.technology} User Acceptance Testing`,
+          `${content.technology} Transition to Operations`,
+          `${content.technology} Lessons Learned Documentation`
+        ]
+      };
+      
+      // Counter to track which specialized service to use per phase
+      const serviceCounters: {[key: string]: number} = {};
+      phases.forEach(phase => serviceCounters[phase] = 0);
+      
       for (let i = 0; i < additionalNeeded; i++) {
         // Distribute additional services across phases
         const phase = phases[i % phases.length];
-        const serviceName = `${content.technology} ${phase} Additional ${Math.floor(i / phases.length) + 1}`;
+        
+        // Get the next specialized service for this phase
+        const phaseServices = specializedServices[phase as keyof typeof specializedServices];
+        const serviceIndex = serviceCounters[phase] % phaseServices.length;
+        const serviceName = phaseServices[serviceIndex];
+        
+        // Increment the counter for this phase
+        serviceCounters[phase]++;
         
         defaultServices.push({
           phase: phase,
           service: serviceName,
           name: serviceName,
-          description: `Additional ${phase} activities for ${content.technology}`,
-          hours: 40,
-          serviceDescription: `This service provides additional ${phase} activities for ${content.technology} implementations.`,
+          description: `Specialized ${phase.toLowerCase()} service for ${content.technology}`,
+          hours: 40, // Base hours, will be adjusted by calculations
+          serviceDescription: `This service provides specialized ${phase.toLowerCase()} capabilities for ${content.technology} implementations.`,
           keyAssumptions: `Client will provide timely access to required systems and stakeholders.`,
           clientResponsibilities: `Client will designate a project manager to serve as the primary point of contact.`,
           outOfScope: `Hardware procurement is not included in this service.`,
           subservices: [
             {
-              name: `${serviceName} Component 1`,
-              description: `First component of ${serviceName}`,
-              hours: 16,
-              serviceDescription: `This subservice focuses on the first component of ${serviceName}.`,
+              name: `${serviceName} - Assessment`,
+              description: `Assessment activities for ${serviceName}`,
+              hours: 16, // Base hours, will be adjusted by calculations
+              serviceDescription: `This subservice focuses on assessment activities for ${serviceName}.`,
               keyAssumptions: `Client stakeholders will be available for consultation.`,
               clientResponsibilities: `Provide access to key stakeholders and subject matter experts.`,
               outOfScope: `Activities outside the scope of this component.`
             },
             {
-              name: `${serviceName} Component 2`,
-              description: `Second component of ${serviceName}`,
-              hours: 16,
-              serviceDescription: `This subservice focuses on the second component of ${serviceName}.`,
-              keyAssumptions: `First component has been completed.`,
+              name: `${serviceName} - Implementation`,
+              description: `Implementation activities for ${serviceName}`,
+              hours: 16, // Base hours, will be adjusted by calculations
+              serviceDescription: `This subservice focuses on implementation activities for ${serviceName}.`,
+              keyAssumptions: `Assessment has been completed.`,
               clientResponsibilities: `Review and approve deliverables.`,
               outOfScope: `Activities outside the scope of this component.`
             },
             {
-              name: `${serviceName} Component 3`,
-              description: `Third component of ${serviceName}`,
-              hours: 8,
-              serviceDescription: `This subservice focuses on the third component of ${serviceName}.`,
-              keyAssumptions: `Second component has been completed.`,
+              name: `${serviceName} - Finalization`,
+              description: `Finalization activities for ${serviceName}`,
+              hours: 8, // Base hours, will be adjusted by calculations
+              serviceDescription: `This subservice focuses on finalizing the ${serviceName}.`,
+              keyAssumptions: `Implementation has been completed.`,
               clientResponsibilities: `Review and approve deliverables.`,
               outOfScope: `Activities outside the scope of this component.`
             }
@@ -2402,19 +2171,21 @@ CRITICAL INSTRUCTIONS:
 7. All content must be suitable for a formal Statement of Work document - use professional language and terminology
 
 DISCOVERY QUESTIONS REQUIREMENTS:
-- Generate AT LEAST 15 highly specific discovery questions for ${parsedData.technology || input}
-- Each question MUST directly impact level of effort or scope
-- Each question must include technology-specific terminology from the research
+- Generate AT LEAST 10 highly specific discovery questions for ${parsedData.technology || input}
+- Each question MUST include specific technology terminology and components from ${parsedData.technology || input}
 - Questions must cover technical, business, and operational aspects
 - Each question must have 3-4 options that are specific to the technology
 - Options must include realistic values/choices relevant to ${parsedData.technology || input}
 - NO generic questions - each question must be uniquely tailored to ${parsedData.technology || input}
 - Questions should reference specific components, versions, configurations of ${parsedData.technology || input}
-- Include questions about compliance, security, data volume, timeline constraints, and integration requirements
+- Each question must have a clear impact on scoping and service delivery
+- Include questions about scale, complexity, integration points, and specific technical requirements
+- Options should have meaningful differences that affect implementation effort
 
 SERVICE REQUIREMENTS:
 - Generate a comprehensive service structure with at least 10 total services
-- Include AT LEAST 1 service for EACH implementation phase (Planning, Design, Implementation, Testing, Go-Live, Support)
+- Use THESE EXACT PHASES: "Initiating", "Planning", "Implementation", "Monitoring and Controlling", "Closing"
+- Include AT LEAST 1 service for EACH phase
 - The Implementation phase MUST have AT LEAST 3 distinct services
 - Each service must have exactly 3 subservices
 - Each service and subservice must have a UNIQUE name specific to ${parsedData.technology || input}
@@ -2423,6 +2194,7 @@ SERVICE REQUIREMENTS:
 - Vary the language and structure across different services
 - Include specific tools, methodologies, and components in service names
 - All services must be appropriate for a formal Statement of Work
+- Start with a base of 1 hour per task, then adjust based on complexity
 
 CALCULATION REQUIREMENTS:
 - Create at least 5 unique calculations that affect service hours
