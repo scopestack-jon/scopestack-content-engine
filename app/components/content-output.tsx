@@ -93,10 +93,10 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
     const phaseOrder: Record<string, number> = {
       "Initiating": 1,
       "Planning": 2,
-      "Design": 2,
-      "Implementation": 3,
-      "Monitoring & Control": 4,
-      "Close Out": 5,
+      "Design": 3,
+      "Implementation": 4,
+      "Monitoring & Control": 5,
+      "Close Out": 6,
     };
     
     return [...services].sort((a, b) => {
@@ -177,12 +177,12 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   }
 
   const phaseColors = {
-    Planning: "bg-blue-100 text-blue-800",
-    Design: "bg-green-100 text-green-800",
-    Implementation: "bg-orange-100 text-orange-800",
-    Testing: "bg-purple-100 text-purple-800",
-    "Go-Live": "bg-red-100 text-red-800",
-    Support: "bg-gray-100 text-gray-800",
+    "Initiating": "bg-purple-100 text-purple-800",
+    "Planning": "bg-blue-100 text-blue-800",
+    "Design": "bg-green-100 text-green-800",
+    "Implementation": "bg-orange-100 text-orange-800",
+    "Monitoring & Control": "bg-yellow-100 text-yellow-800",
+    "Close Out": "bg-red-100 text-red-800",
   }
 
   // Helper function to render error cards
