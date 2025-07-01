@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: model || "openai/gpt-4o",
+        model: model || "x-ai/grok-3-mini-beta",
         messages: [
           { role: "user", content: prompt }
         ],

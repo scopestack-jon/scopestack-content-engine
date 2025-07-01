@@ -151,6 +151,7 @@ export default function SettingsPage() {
     { id: "microsoft/wizardlm-2-8x22b", name: "WizardLM-2-8x22B", provider: "Microsoft" },
     { id: "qwen/qwen-2-72b-instruct", name: "Qwen-2-72B", provider: "Alibaba" },
     { id: "deepseek/deepseek-coder", name: "DeepSeek-Coder", provider: "DeepSeek" },
+    { id: "x-ai/grok-3-mini-beta", name: "Grok-3-Mini", provider: "X AI" },
   ])
 
   useEffect(() => {
