@@ -90,6 +90,36 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   const sortServicesByPhase = (services: any[]) => {
     if (!Array.isArray(services)) return [];
     
+    // Define standard phase names and their variations
+    const phaseNameMap: Record<string, string> = {
+      // Standard names
+      "initiating": "Initiating",
+      "planning": "Planning",
+      "design": "Design",
+      "implementation": "Implementation",
+      "monitoring & control": "Monitoring & Control",
+      "monitoring and control": "Monitoring & Control",
+      "close out": "Close Out",
+      "closing": "Close Out",
+      
+      // Common variations
+      "assessment": "Initiating",
+      "discovery": "Initiating",
+      "requirements": "Initiating",
+      "analysis": "Planning",
+      "preparation": "Planning",
+      "architecture": "Design",
+      "development": "Implementation",
+      "deployment": "Implementation",
+      "migration": "Implementation",
+      "testing": "Implementation",
+      "validation": "Monitoring & Control",
+      "maintenance": "Monitoring & Control",
+      "transition": "Close Out",
+      "handover": "Close Out",
+      "documentation": "Close Out"
+    };
+    
     const phaseOrder: Record<string, number> = {
       "Initiating": 1,
       "Planning": 2,
@@ -100,11 +130,17 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
     };
     
     return [...services].sort((a, b) => {
-      const phaseA = a.phase || "Implementation";
-      const phaseB = b.phase || "Implementation";
+      // Get phase names and normalize them
+      let phaseA = a.phase || "Implementation";
+      let phaseB = b.phase || "Implementation";
       
-      const orderA = phaseOrder[phaseA] || 3; // Default to Implementation (3) if not found
-      const orderB = phaseOrder[phaseB] || 3;
+      // Convert to standard phase names if variations exist
+      const normalizedPhaseA = phaseNameMap[phaseA.toLowerCase()] || phaseA;
+      const normalizedPhaseB = phaseNameMap[phaseB.toLowerCase()] || phaseB;
+      
+      // Get the order or default to Implementation (4)
+      const orderA = phaseOrder[normalizedPhaseA] || phaseOrder["Implementation"];
+      const orderB = phaseOrder[normalizedPhaseB] || phaseOrder["Implementation"];
       
       return orderA - orderB;
     });
@@ -552,13 +588,87 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
     }
   };
 
+  // Helper function to get standardized phase name
+  const getStandardizedPhaseName = (phase: string): string => {
+    if (!phase) return "Implementation";
+    
+    const phaseNameMap: Record<string, string> = {
+      // Standard names
+      "initiating": "Initiating",
+      "planning": "Planning",
+      "design": "Design",
+      "implementation": "Implementation",
+      "monitoring & control": "Monitoring & Control",
+      "monitoring and control": "Monitoring & Control",
+      "close out": "Close Out",
+      "closing": "Close Out",
+      
+      // Common variations
+      "assessment": "Initiating",
+      "discovery": "Initiating",
+      "requirements": "Initiating",
+      "analysis": "Planning",
+      "preparation": "Planning",
+      "architecture": "Design",
+      "development": "Implementation",
+      "deployment": "Implementation",
+      "migration": "Implementation",
+      "testing": "Implementation",
+      "validation": "Monitoring & Control",
+      "maintenance": "Monitoring & Control",
+      "transition": "Close Out",
+      "handover": "Close Out",
+      "documentation": "Close Out"
+    };
+    
+    return phaseNameMap[phase.toLowerCase()] || phase;
+  };
+
+  // Helper function to safely get technology name
+  const getTechnologyName = (technology: any): string => {
+    if (typeof technology === 'string') {
+      return technology;
+    }
+    
+    if (technology && typeof technology === 'object') {
+      // Try to extract a meaningful name from technology object
+      if (technology.platform) {
+        return technology.platform;
+      } else if (technology.primary) {
+        return technology.primary;
+      } else if (technology.name) {
+        return technology.name;
+      } else if (technology.type) {
+        return technology.type;
+      } else if (technology.product) {
+        return technology.product;
+      }
+      
+      // If we have source and destination, create a migration string
+      if (technology.source && technology.destination) {
+        return `${technology.destination} Migration from ${technology.source}`;
+      }
+      
+      // Try to stringify the object in a clean way
+      try {
+        const techStr = JSON.stringify(technology);
+        return techStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
+      } catch (e) {
+        // Last resort
+        return "Technology Solution";
+      }
+    }
+    
+    return "Technology Solution";
+  };
+
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Generated Content: {typeof content.technology === 'string' ? content.technology : "Unknown Technology"}
+            Generated Content: {getTechnologyName(content.technology)}
           </CardTitle>
           <div className="flex items-center gap-4">
             <Badge variant="outline" className="flex items-center gap-1">
@@ -714,7 +824,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                       <div className="flex items-center gap-3">
                         <Badge
                           className={
-                            phaseColors[getServicePhase(service) as keyof typeof phaseColors] || "bg-gray-100 text-gray-800"
+                            phaseColors[getStandardizedPhaseName(getServicePhase(service)) as keyof typeof phaseColors] || "bg-gray-100 text-gray-800"
                           }
                         >
                           {getServicePhase(service)}

@@ -2067,6 +2067,196 @@ function deepStringifyObjects(obj: any): any {
     return obj;
   }
   
+  // Special handling for the technology field which often contains nested objects
+  if (obj && typeof obj === 'object' && obj.technology && typeof obj.technology === 'object') {
+    // If technology is an object with nested properties, convert it to a string representation
+    if (obj.technology.platform || obj.technology.primary) {
+      let techString = '';
+      if (obj.technology.platform) {
+        techString = obj.technology.platform;
+      } else if (obj.technology.primary) {
+        techString = obj.technology.primary;
+      }
+      
+      // Add source/destination if available
+      if (obj.technology.source && obj.technology.destination) {
+        techString += ` Migration from ${obj.technology.source} to ${obj.technology.destination}`;
+      } else if (obj.technology.migration_from || obj.technology.migrating_from) {
+        techString += ` Migration from ${obj.technology.migration_from || obj.technology.migrating_from}`;
+      }
+      
+      // Replace the technology object with the string
+      obj.technology = techString;
+    }
+  }
+  
+  // Special handling for calculations array
+  if (obj && typeof obj === 'object' && Array.isArray(obj.calculations)) {
+    obj.calculations = obj.calculations.map((calc: any) => {
+      if (calc && typeof calc === 'object') {
+        // Fix calculation name if it's an object
+        if (calc.name && typeof calc.name === 'object') {
+          if (calc.name.value) {
+            calc.name = calc.name.value;
+          } else if (calc.name.text) {
+            calc.name = calc.name.text;
+          } else if (calc.name.title) {
+            calc.name = calc.name.title;
+          } else {
+            calc.name = "Calculation " + (calc.id || calc.slug || "");
+          }
+        }
+        
+        // Fix calculation formula if it's an object
+        if (calc.formula && typeof calc.formula === 'object') {
+          if (calc.formula.value) {
+            calc.formula = calc.formula.value;
+          } else if (calc.formula.text) {
+            calc.formula = calc.formula.text;
+          } else if (calc.formula.expression) {
+            calc.formula = calc.formula.expression;
+          } else {
+            calc.formula = calc.slug || calc.id || "formula";
+          }
+        }
+        
+        // Fix calculation description if it's an object
+        if (calc.description && typeof calc.description === 'object') {
+          if (calc.description.value) {
+            calc.description = calc.description.value;
+          } else if (calc.description.text) {
+            calc.description = calc.description.text;
+          } else {
+            calc.description = `Calculation for ${calc.name || calc.slug || calc.id || "determining resource requirements"}`;
+          }
+        }
+      }
+      return calc;
+    });
+  }
+  
+  // Special handling for services array
+  if (obj && typeof obj === 'object' && Array.isArray(obj.services)) {
+    obj.services = obj.services.map((service: any) => {
+      if (service && typeof service === 'object') {
+        // Fix service name if it's an object
+        if (service.name && typeof service.name === 'object') {
+          if (service.name.value) {
+            service.name = service.name.value;
+          } else if (service.name.text) {
+            service.name = service.name.text;
+          } else if (service.name.title) {
+            service.name = service.name.title;
+          } else {
+            service.name = "Service";
+          }
+        }
+        
+        // Fix service field if it's an object
+        if (service.service && typeof service.service === 'object') {
+          if (service.service.value) {
+            service.service = service.service.value;
+          } else if (service.service.text) {
+            service.service = service.service.text;
+          } else if (service.service.title) {
+            service.service = service.service.title;
+          } else if (service.service.name) {
+            service.service = service.service.name;
+          } else {
+            service.service = "Service";
+          }
+        }
+        
+        // Fix phase field if it's an object
+        if (service.phase && typeof service.phase === 'object') {
+          if (service.phase.value) {
+            service.phase = service.phase.value;
+          } else if (service.phase.text) {
+            service.phase = service.phase.text;
+          } else if (service.phase.name) {
+            service.phase = service.phase.name;
+          } else {
+            service.phase = "Implementation";
+          }
+        }
+        
+        // Process subservices if they exist
+        if (Array.isArray(service.subservices)) {
+          service.subservices = service.subservices.map((sub: any) => {
+            if (sub && typeof sub === 'object') {
+              // Fix subservice name if it's an object
+              if (sub.name && typeof sub.name === 'object') {
+                if (sub.name.value) {
+                  sub.name = sub.name.value;
+                } else if (sub.name.text) {
+                  sub.name = sub.name.text;
+                } else if (sub.name.title) {
+                  sub.name = sub.name.title;
+                } else {
+                  sub.name = "Subservice";
+                }
+              }
+            }
+            return sub;
+          });
+        }
+      }
+      return service;
+    });
+  }
+  
+  // Special handling for questions array
+  if (obj && typeof obj === 'object' && Array.isArray(obj.questions)) {
+    obj.questions = obj.questions.map((question: any) => {
+      if (question && typeof question === 'object') {
+        // Fix question text if it's an object
+        if (question.question && typeof question.question === 'object') {
+          if (question.question.value) {
+            question.question = question.question.value;
+          } else if (question.question.text) {
+            question.question = question.question.text;
+          } else {
+            question.question = "Question " + (question.id || question.slug || "");
+          }
+        }
+        
+        // Process options if they exist
+        if (Array.isArray(question.options)) {
+          question.options = question.options.map((option: any, index: number) => {
+            if (option && typeof option === 'object') {
+              // If the option is just a plain object with no key property, create one
+              if (!option.key) {
+                option = {
+                  key: `Option ${index + 1}`,
+                  value: index + 1,
+                  default: index === 0
+                };
+              } else if (typeof option.key === 'object') {
+                // If key is an object, extract a string value
+                if (option.key.value) {
+                  option.key = option.key.value;
+                } else if (option.key.text) {
+                  option.key = option.key.text;
+                } else {
+                  option.key = `Option ${index + 1}`;
+                }
+              }
+            } else if (typeof option === 'string') {
+              // If option is just a string, convert to proper format
+              option = {
+                key: option,
+                value: index + 1,
+                default: index === 0
+              };
+            }
+            return option;
+          });
+        }
+      }
+      return question;
+    });
+  }
+  
   if (typeof obj === 'object') {
     if (Array.isArray(obj)) {
       return obj.map(item => deepStringifyObjects(item));
@@ -2082,15 +2272,33 @@ function deepStringifyObjects(obj: any): any {
             if (!Array.isArray(value) && Object.keys(value).length > 0) {
               try {
                 // Try to convert complex objects to strings if they might cause issues
-                if (key === 'name' || key === 'phase' || key === 'service' || key === 'description' || key === 'formula') {
-                  result[key] = typeof value.toString === 'function' ? 
-                    value.toString() !== '[object Object]' ? value.toString() : JSON.stringify(value) : 
-                    JSON.stringify(value);
+                if (key === 'name' || key === 'phase' || key === 'service' || key === 'description' || 
+                    key === 'formula' || key === 'technology') {
+                  // For objects that should be strings, create a meaningful representation
+                  if (value.name) {
+                    result[key] = value.name;
+                  } else if (value.title) {
+                    result[key] = value.title;
+                  } else if (value.id) {
+                    result[key] = value.id;
+                  } else if (value.value) {
+                    result[key] = value.value;
+                  } else {
+                    // If no good string representation, use JSON stringify but clean it up
+                    const jsonStr = JSON.stringify(value);
+                    result[key] = jsonStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
+                  }
                 } else {
                   result[key] = deepStringifyObjects(value);
                 }
               } catch (e) {
-                result[key] = JSON.stringify(value);
+                // If all else fails, convert to string
+                if (typeof value.toString === 'function' && value.toString() !== '[object Object]') {
+                  result[key] = value.toString();
+                } else {
+                  const jsonStr = JSON.stringify(value);
+                  result[key] = jsonStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
+                }
               }
             } else {
               result[key] = deepStringifyObjects(value);
