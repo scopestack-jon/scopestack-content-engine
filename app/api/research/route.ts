@@ -2061,6 +2061,52 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
   }
 }
 
+// Add this function near the top of the file with other helper functions
+function deepStringifyObjects(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  
+  if (typeof obj === 'object') {
+    if (Array.isArray(obj)) {
+      return obj.map(item => deepStringifyObjects(item));
+    } else {
+      const result: {[key: string]: any} = {};
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          const value = obj[key];
+          if (value === null || value === undefined) {
+            result[key] = value;
+          } else if (typeof value === 'object') {
+            // Check if it's a simple object that might be incorrectly stringified later
+            if (!Array.isArray(value) && Object.keys(value).length > 0) {
+              try {
+                // Try to convert complex objects to strings if they might cause issues
+                if (key === 'name' || key === 'phase' || key === 'service' || key === 'description' || key === 'formula') {
+                  result[key] = typeof value.toString === 'function' ? 
+                    value.toString() !== '[object Object]' ? value.toString() : JSON.stringify(value) : 
+                    JSON.stringify(value);
+                } else {
+                  result[key] = deepStringifyObjects(value);
+                }
+              } catch (e) {
+                result[key] = JSON.stringify(value);
+              }
+            } else {
+              result[key] = deepStringifyObjects(value);
+            }
+          } else {
+            result[key] = value;
+          }
+        }
+      }
+      return result;
+    }
+  }
+  
+  return obj;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
@@ -2738,6 +2784,9 @@ Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
             
             // Validate and fix content structure to ensure it meets minimum requirements
             validateContentStructure(contentObj);
+            
+            // Apply deep stringification to fix object representation issues
+            contentObj = deepStringifyObjects(contentObj);
             
             console.log("✅ Content structure finalized")
           } catch (error: unknown) {

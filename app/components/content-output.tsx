@@ -259,13 +259,48 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   const getServiceName = (service: any) => {
     if (typeof service.service === 'string') return service.service;
     if (typeof service.name === 'string') return service.name;
+    // Handle case where service might be an object that was stringified incorrectly
+    if (service.service && typeof service.service === 'object') {
+      return service.service.name || "Service";
+    }
     return "Service";
   }
 
   // Helper function to get service phase
   const getServicePhase = (service: any) => {
     if (typeof service.phase === 'string') return service.phase;
+    // Handle case where phase might be an object that was stringified incorrectly
+    if (service.phase && typeof service.phase === 'object') {
+      return service.phase.name || "General";
+    }
     return "General";
+  }
+  
+  // Helper function to safely get calculation name
+  const getCalculationName = (calculation: any) => {
+    if (typeof calculation.name === 'string') return calculation.name;
+    if (calculation.name && typeof calculation.name === 'object') {
+      return calculation.name.toString() || "Calculation";
+    }
+    return "Calculation";
+  }
+
+  // Helper function to safely get calculation description
+  const getCalculationDescription = (calculation: any) => {
+    if (typeof calculation.description === 'string') return calculation.description;
+    if (calculation.description && typeof calculation.description === 'object') {
+      return calculation.description.toString() || "Calculation description";
+    }
+    return "Calculation description";
+  }
+
+  // Helper function to safely get calculation formula
+  const getCalculationFormula = (calculation: any) => {
+    if (typeof calculation.formula === 'string') return calculation.formula;
+    if (calculation.formula && typeof calculation.formula === 'object') {
+      return calculation.formula.toString() || "formula";
+    }
+    return "formula";
   }
 
   // Helper function to safely access subservices
@@ -406,7 +441,7 @@ Return a JSON object with ONLY these four sections:
   "outOfScope": "What is explicitly excluded from this subservice"
 }
 
-IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON object.`;
+IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON object. Do NOT include markdown code blocks (no \`\`\`json or \`\`\`). Start with { and end with }.`;
 
       // Get custom prompt from localStorage if available
       let promptTemplate = defaultPrompt;
@@ -422,6 +457,8 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
         .replace(/{serviceName}/g, service.service || service.name || '')
         .replace(/{subserviceName}/g, subservice.name || '');
       
+      console.log(`Regenerating scope language for ${subservice.name}`);
+      
       // Call the API to generate scope language
       const response = await fetch("/api/test-openrouter", {
         method: "POST",
@@ -433,7 +470,8 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
       });
       
       if (!response.ok) {
-        throw new Error("Failed to regenerate scope language");
+        const errorText = await response.text();
+        throw new Error(`Failed to regenerate scope language: ${errorText}`);
       }
       
       const result = await response.json();
@@ -442,7 +480,35 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
         try {
           // Clean the response text
           const cleaned = result.text.replace(/```json|```/g, "").trim();
-          const newScopeLanguage = JSON.parse(cleaned);
+          console.log("Received scope language response:", cleaned.substring(0, 100) + "...");
+          
+          let newScopeLanguage;
+          try {
+            // Try to parse the JSON
+            newScopeLanguage = JSON.parse(cleaned);
+          } catch (parseError) {
+            console.error("JSON parse error:", parseError);
+            
+            // Try to extract a JSON object using regex
+            const jsonMatch = cleaned.match(/{[\s\S]*}/);
+            if (jsonMatch) {
+              try {
+                newScopeLanguage = JSON.parse(jsonMatch[0]);
+              } catch (e) {
+                throw new Error("Could not parse JSON from response");
+              }
+            } else {
+              throw new Error("No valid JSON found in response");
+            }
+          }
+          
+          // Validate the required fields exist
+          if (!newScopeLanguage.serviceDescription || 
+              !newScopeLanguage.keyAssumptions || 
+              !newScopeLanguage.clientResponsibilities || 
+              !newScopeLanguage.outOfScope) {
+            throw new Error("Response is missing required fields");
+          }
           
           // Update the content with the new scope language
           const updatedServices = [...content.services];
@@ -467,7 +533,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
           console.error("Failed to parse scope language:", parseError);
           toast({
             title: "Error",
-            description: "Failed to parse the regenerated scope language",
+            description: `Failed to parse the regenerated scope language: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
             variant: "destructive",
           });
         }
@@ -478,7 +544,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
       console.error("Error regenerating scope language:", error);
       toast({
         title: "Error",
-        description: "Failed to regenerate scope language",
+        description: `Failed to regenerate scope language: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {
@@ -587,8 +653,8 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <div className="font-medium mb-1">{calculation.name}</div>
-                        <div className="text-sm text-gray-600">{calculation.description}</div>
+                        <div className="font-medium mb-1">{getCalculationName(calculation)}</div>
+                        <div className="text-sm text-gray-600">{getCalculationDescription(calculation)}</div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="flex items-center gap-1 text-xs">
@@ -603,7 +669,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
 
                     <div className="bg-gray-50 p-3 rounded border mb-3">
                       <div className="text-sm font-medium mb-1">Formula:</div>
-                      <code className="text-sm bg-white px-2 py-1 rounded border">{calculation.formula}</code>
+                      <code className="text-sm bg-white px-2 py-1 rounded border">{getCalculationFormula(calculation)}</code>
                     </div>
 
                     <div className="flex items-center gap-1 flex-wrap">

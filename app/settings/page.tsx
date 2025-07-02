@@ -36,7 +36,15 @@ Extract and return in JSON format:
 - compliance: compliance requirements
 - complexity: complexity factors
 
-Be specific and detailed.`,
+Be specific and detailed.
+
+IMPORTANT RESPONSE FORMAT:
+- Return ONLY valid JSON
+- NO markdown code blocks (no \`\`\`json or \`\`\`)
+- NO explanations before or after the JSON
+- Start response with { and end with }
+- Complete the entire JSON structure
+- Validate JSON syntax before returning`,
 
   research: `Based on this technology solution: "{input}"
 
@@ -63,7 +71,15 @@ Format sources as: SOURCE: [URL] | [Title] | [Relevance]
 
 Provide specific, actionable research findings that would inform professional services scoping.
 Focus on current 2024-2025 industry standards and practices.
-Include enough detail to generate at least 10 distinct services with 3 subservices each.`,
+Include enough detail to generate at least 10 distinct services with 3 subservices each.
+
+IMPORTANT RESPONSE FORMAT:
+- Return ONLY valid JSON
+- NO markdown code blocks (no \`\`\`json or \`\`\`)
+- NO explanations before or after the JSON
+- Start response with { and end with }
+- Complete the entire JSON structure
+- Validate JSON syntax before returning`,
 
   analysis: `Analyze these research findings and create structured insights:
 
@@ -85,7 +101,15 @@ IMPORTANT: Ensure your analysis provides enough detail to support generating:
 - Each service must have exactly 3 subservices
 - Realistic hour estimates for each component
 
-Base your analysis on current professional services benchmarks and proven methodologies.`,
+Base your analysis on current professional services benchmarks and proven methodologies.
+
+IMPORTANT RESPONSE FORMAT:
+- Return ONLY valid JSON
+- NO markdown code blocks (no \`\`\`json or \`\`\`)
+- NO explanations before or after the JSON
+- Start response with { and end with }
+- Complete the entire JSON structure
+- Validate JSON syntax before returning`,
 
   scopeLanguage: `Generate professional scope language for the following IT service:
 
@@ -114,7 +138,13 @@ Return a JSON object with ONLY these four sections:
   "outOfScope": "What is explicitly excluded from this subservice"
 }
 
-IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON object.`
+IMPORTANT RESPONSE FORMAT:
+- Return ONLY valid JSON
+- NO markdown code blocks (no \`\`\`json or \`\`\`)
+- NO explanations before or after the JSON
+- Start response with { and end with }
+- Complete the entire JSON structure
+- Validate JSON syntax before returning`
 }
 
 export default function SettingsPage() {
