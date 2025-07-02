@@ -187,10 +187,10 @@ export default function ScopeStackContentEngine() {
         body: JSON.stringify({
           input: userInput,
           models: {
-            research: localStorage.getItem("research_model") || "anthropic/claude-3.5-sonnet",
+            research: localStorage.getItem("research_model") || "perplexity/llama-3.1-sonar-large-128k-online",
             analysis: localStorage.getItem("analysis_model") || "openai/gpt-4-turbo",
-            content: localStorage.getItem("content_model") || "anthropic/claude-3.5-sonnet",
-            format: localStorage.getItem("format_model") || "openai/gpt-4o",
+            content: localStorage.getItem("content_model") || "x-ai/grok-3-mini-beta",
+            format: localStorage.getItem("format_model") || "anthropic/claude-3.5-sonnet",
           },
           prompts: {
             parsing: localStorage.getItem("parsing_prompt"),

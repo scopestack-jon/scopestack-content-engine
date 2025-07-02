@@ -428,7 +428,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt,
-          model: "groq/llama3-70b-8192"
+          model: "x-ai/grok-3-mini-beta"
         }),
       });
       
