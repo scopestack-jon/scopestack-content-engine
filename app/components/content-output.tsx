@@ -293,14 +293,64 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
 
   // Helper function to get service name
   const getServiceName = (service: any) => {
-    if (typeof service.service === 'string') return service.service;
-    if (typeof service.name === 'string') return service.name;
-    // Handle case where service might be an object that was stringified incorrectly
-    if (service.service && typeof service.service === 'object') {
-      return service.service.name || "Service";
+    // First check if service.service is a string
+    if (typeof service.service === 'string') {
+      return service.service.replace(/\[object Object\]/g, getTechnologyName(content.technology));
     }
-    return "Service";
-  }
+    
+    // Then check if service.name is a string
+    if (typeof service.name === 'string') {
+      return service.name.replace(/\[object Object\]/g, getTechnologyName(content.technology));
+    }
+    
+    // Handle case where service.service might be an object
+    if (service.service && typeof service.service === 'object') {
+      if (service.service.name) {
+        return service.service.name.replace(/\[object Object\]/g, getTechnologyName(content.technology));
+      }
+      if (service.service.value) {
+        return service.service.value.replace(/\[object Object\]/g, getTechnologyName(content.technology));
+      }
+      if (service.service.text) {
+        return service.service.text.replace(/\[object Object\]/g, getTechnologyName(content.technology));
+      }
+      // Try to stringify the object
+      try {
+        const serviceStr = JSON.stringify(service.service);
+        if (serviceStr !== '{}') {
+          return serviceStr.replace(/[{}"]/g, '').replace(/,/g, ', ').replace(/\[object Object\]/g, getTechnologyName(content.technology));
+        }
+      } catch (e) {
+        // Last resort
+        return `Service for ${getTechnologyName(content.technology)}`;
+      }
+    }
+    
+    // Handle case where service.name might be an object
+    if (service.name && typeof service.name === 'object') {
+      if (service.name.name) {
+        return service.name.name.replace(/\[object Object\]/g, getTechnologyName(content.technology));
+      }
+      if (service.name.value) {
+        return service.name.value.replace(/\[object Object\]/g, getTechnologyName(content.technology));
+      }
+      if (service.name.text) {
+        return service.name.text.replace(/\[object Object\]/g, getTechnologyName(content.technology));
+      }
+      // Try to stringify the object
+      try {
+        const nameStr = JSON.stringify(service.name);
+        if (nameStr !== '{}') {
+          return nameStr.replace(/[{}"]/g, '').replace(/,/g, ', ').replace(/\[object Object\]/g, getTechnologyName(content.technology));
+        }
+      } catch (e) {
+        // Last resort
+        return `Service for ${getTechnologyName(content.technology)}`;
+      }
+    }
+    
+    return `Service for ${getTechnologyName(content.technology)}`;
+  };
 
   // Helper function to get service phase
   const getServicePhase = (service: any) => {
@@ -314,30 +364,88 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   
   // Helper function to safely get calculation name
   const getCalculationName = (calculation: any) => {
-    if (typeof calculation.name === 'string') return calculation.name;
-    if (calculation.name && typeof calculation.name === 'object') {
-      return calculation.name.toString() || "Calculation";
+    if (typeof calculation.name === 'string') {
+      return calculation.name;
     }
-    return "Calculation";
-  }
+    
+    if (calculation.name && typeof calculation.name === 'object') {
+      if (calculation.name.text) {
+        return calculation.name.text;
+      } else if (calculation.name.value) {
+        return calculation.name.value;
+      } else {
+        try {
+          const nameStr = JSON.stringify(calculation.name);
+          if (nameStr !== '{}') {
+            return nameStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
+          }
+        } catch (e) {
+          // Last resort
+          return `Calculation ${calculation.id || calculation.slug || ''}`;
+        }
+      }
+    }
+    
+    return `Calculation ${calculation.id || calculation.slug || ''}`;
+  };
 
   // Helper function to safely get calculation description
   const getCalculationDescription = (calculation: any) => {
-    if (typeof calculation.description === 'string') return calculation.description;
-    if (calculation.description && typeof calculation.description === 'object') {
-      return calculation.description.toString() || "Calculation description";
+    if (typeof calculation.description === 'string') {
+      return calculation.description.replace(/\[object Object\]/g, getTechnologyName(content.technology));
     }
-    return "Calculation description";
-  }
+    
+    if (calculation.description && typeof calculation.description === 'object') {
+      if (calculation.description.text) {
+        return calculation.description.text;
+      } else if (calculation.description.value) {
+        return calculation.description.value;
+      } else {
+        try {
+          const descStr = JSON.stringify(calculation.description);
+          if (descStr !== '{}') {
+            return descStr.replace(/[{}"]/g, '').replace(/,/g, ', ').replace(/\[object Object\]/g, getTechnologyName(content.technology));
+          }
+        } catch (e) {
+          // Last resort
+          return `Calculation for ${getTechnologyName(content.technology)}`;
+        }
+      }
+    }
+    
+    return `Calculation for ${getTechnologyName(content.technology)}`;
+  };
 
   // Helper function to safely get calculation formula
   const getCalculationFormula = (calculation: any) => {
-    if (typeof calculation.formula === 'string') return calculation.formula;
-    if (calculation.formula && typeof calculation.formula === 'object') {
-      return calculation.formula.toString() || "formula";
+    if (typeof calculation.formula === 'string') {
+      return calculation.formula.replace(/\[object Object\]/g, getTechnologyName(content.technology));
     }
-    return "formula";
-  }
+    
+    if (calculation.formula && typeof calculation.formula === 'object') {
+      if (calculation.formula.text) {
+        return calculation.formula.text;
+      } else if (calculation.formula.value) {
+        return calculation.formula.value;
+      } else if (calculation.formula.expression) {
+        return calculation.formula.expression;
+      } else {
+        try {
+          const formulaStr = JSON.stringify(calculation.formula);
+          if (formulaStr !== '{}') {
+            return formulaStr.replace(/[{}"]/g, '').replace(/,/g, ', ').replace(/\[object Object\]/g, getTechnologyName(content.technology));
+          }
+        } catch (e) {
+          // Last resort
+          return calculation.mappedQuestions && calculation.mappedQuestions.length > 0 ? 
+            calculation.mappedQuestions[0] : 'question_value';
+        }
+      }
+    }
+    
+    return calculation.mappedQuestions && calculation.mappedQuestions.length > 0 ? 
+      calculation.mappedQuestions[0] : 'question_value';
+  };
 
   // Helper function to safely access subservices
   const getSubservices = (service: any) => {
@@ -642,6 +750,9 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
         return technology.type;
       } else if (technology.product) {
         return technology.product;
+      } else if (technology.components && Array.isArray(technology.components) && technology.components.length > 0) {
+        // If we have components array, use the first component
+        return technology.components[0];
       }
       
       // If we have source and destination, create a migration string
@@ -652,7 +763,9 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
       // Try to stringify the object in a clean way
       try {
         const techStr = JSON.stringify(technology);
-        return techStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
+        if (techStr !== '{}') {
+          return techStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
+        }
       } catch (e) {
         // Last resort
         return "Technology Solution";
@@ -660,6 +773,25 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
     }
     
     return "Technology Solution";
+  };
+
+  // Helper function to safely get service description
+  const getServiceDescription = (service: any): string => {
+    if (typeof service.description === 'string') {
+      return service.description.replace(/\[object Object\]/g, getTechnologyName(content.technology));
+    }
+    
+    if (service.description && typeof service.description === 'object') {
+      if (service.description.text) {
+        return service.description.text;
+      } else if (service.description.value) {
+        return service.description.value;
+      } else {
+        return `Service for ${getTechnologyName(content.technology)}`;
+      }
+    }
+    
+    return 'No description available';
   };
 
   return (
@@ -763,8 +895,12 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <div className="font-medium mb-1">{getCalculationName(calculation)}</div>
-                        <div className="text-sm text-gray-600">{getCalculationDescription(calculation)}</div>
+                        <div className="font-medium mb-1">
+                          {getCalculationName(calculation).replace(/\[object Object\]/g, getTechnologyName(content.technology))}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {getCalculationDescription(calculation)}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="flex items-center gap-1 text-xs">
@@ -829,7 +965,9 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                         >
                           {getServicePhase(service)}
                         </Badge>
-                        <span className="font-medium">{getServiceName(service)}</span>
+                        <span className="font-medium">
+                          {getServiceName(service)}
+                        </span>
                       </div>
                       <Badge variant="outline" className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -837,7 +975,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                       </Badge>
                     </div>
 
-                    <p className="text-gray-600 mb-4">{service.description || 'No description available'}</p>
+                    <p className="text-gray-600 mb-4">{getServiceDescription(service)}</p>
 
                     {/* New language fields for the service */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

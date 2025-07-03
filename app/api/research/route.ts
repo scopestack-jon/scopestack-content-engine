@@ -2067,249 +2067,214 @@ function deepStringifyObjects(obj: any): any {
     return obj;
   }
   
-  // Special handling for the technology field which often contains nested objects
-  if (obj && typeof obj === 'object' && obj.technology && typeof obj.technology === 'object') {
-    // If technology is an object with nested properties, convert it to a string representation
-    if (obj.technology.platform || obj.technology.primary) {
-      let techString = '';
-      if (obj.technology.platform) {
-        techString = obj.technology.platform;
-      } else if (obj.technology.primary) {
-        techString = obj.technology.primary;
+  // Handle the root technology object
+  if (obj && typeof obj === 'object') {
+    // Make a copy to avoid modifying the original
+    const result = Array.isArray(obj) ? [...obj] : {...obj};
+    
+    // Special handling for the technology field at the root level
+    if (result.technology && typeof result.technology === 'object') {
+      // Try to extract a meaningful name from technology object
+      if (result.technology.platform) {
+        result.technology = result.technology.platform;
+      } else if (result.technology.primary) {
+        result.technology = result.technology.primary;
+      } else if (result.technology.name) {
+        result.technology = result.technology.name;
+      } else if (result.technology.type) {
+        result.technology = result.technology.type;
+      } else if (result.technology.product) {
+        result.technology = result.technology.product;
+      } else if (result.technology.components && Array.isArray(result.technology.components) && result.technology.components.length > 0) {
+        result.technology = result.technology.components[0];
+      } else if (result.technology.source && result.technology.destination) {
+        result.technology = `${result.technology.destination} Migration from ${result.technology.source}`;
+      } else {
+        // Try to stringify the object in a clean way
+        try {
+          const techStr = JSON.stringify(result.technology);
+          result.technology = techStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
+        } catch (e) {
+          // Last resort
+          result.technology = "Technology Solution";
+        }
       }
-      
-      // Add source/destination if available
-      if (obj.technology.source && obj.technology.destination) {
-        techString += ` Migration from ${obj.technology.source} to ${obj.technology.destination}`;
-      } else if (obj.technology.migration_from || obj.technology.migrating_from) {
-        techString += ` Migration from ${obj.technology.migration_from || obj.technology.migrating_from}`;
-      }
-      
-      // Replace the technology object with the string
-      obj.technology = techString;
     }
-  }
-  
-  // Special handling for calculations array
-  if (obj && typeof obj === 'object' && Array.isArray(obj.calculations)) {
-    obj.calculations = obj.calculations.map((calc: any) => {
-      if (calc && typeof calc === 'object') {
-        // Fix calculation name if it's an object
-        if (calc.name && typeof calc.name === 'object') {
-          if (calc.name.value) {
-            calc.name = calc.name.value;
-          } else if (calc.name.text) {
-            calc.name = calc.name.text;
-          } else if (calc.name.title) {
-            calc.name = calc.name.title;
-          } else {
-            calc.name = "Calculation " + (calc.id || calc.slug || "");
-          }
-        }
-        
-        // Fix calculation formula if it's an object
-        if (calc.formula && typeof calc.formula === 'object') {
-          if (calc.formula.value) {
-            calc.formula = calc.formula.value;
-          } else if (calc.formula.text) {
-            calc.formula = calc.formula.text;
-          } else if (calc.formula.expression) {
-            calc.formula = calc.formula.expression;
-          } else {
-            calc.formula = calc.slug || calc.id || "formula";
-          }
-        }
-        
-        // Fix calculation description if it's an object
-        if (calc.description && typeof calc.description === 'object') {
-          if (calc.description.value) {
-            calc.description = calc.description.value;
-          } else if (calc.description.text) {
-            calc.description = calc.description.text;
-          } else {
-            calc.description = `Calculation for ${calc.name || calc.slug || calc.id || "determining resource requirements"}`;
-          }
-        }
-      }
-      return calc;
-    });
-  }
-  
-  // Special handling for services array
-  if (obj && typeof obj === 'object' && Array.isArray(obj.services)) {
-    obj.services = obj.services.map((service: any) => {
-      if (service && typeof service === 'object') {
-        // Fix service name if it's an object
-        if (service.name && typeof service.name === 'object') {
-          if (service.name.value) {
-            service.name = service.name.value;
-          } else if (service.name.text) {
-            service.name = service.name.text;
-          } else if (service.name.title) {
-            service.name = service.name.title;
-          } else {
-            service.name = "Service";
-          }
-        }
-        
-        // Fix service field if it's an object
-        if (service.service && typeof service.service === 'object') {
-          if (service.service.value) {
-            service.service = service.service.value;
-          } else if (service.service.text) {
-            service.service = service.service.text;
-          } else if (service.service.title) {
-            service.service = service.service.title;
-          } else if (service.service.name) {
-            service.service = service.service.name;
-          } else {
-            service.service = "Service";
-          }
-        }
-        
-        // Fix phase field if it's an object
-        if (service.phase && typeof service.phase === 'object') {
-          if (service.phase.value) {
-            service.phase = service.phase.value;
-          } else if (service.phase.text) {
-            service.phase = service.phase.text;
-          } else if (service.phase.name) {
-            service.phase = service.phase.name;
-          } else {
-            service.phase = "Implementation";
-          }
-        }
-        
-        // Process subservices if they exist
-        if (Array.isArray(service.subservices)) {
-          service.subservices = service.subservices.map((sub: any) => {
-            if (sub && typeof sub === 'object') {
-              // Fix subservice name if it's an object
-              if (sub.name && typeof sub.name === 'object') {
-                if (sub.name.value) {
-                  sub.name = sub.name.value;
-                } else if (sub.name.text) {
-                  sub.name = sub.name.text;
-                } else if (sub.name.title) {
-                  sub.name = sub.name.title;
-                } else {
-                  sub.name = "Subservice";
-                }
-              }
-            }
-            return sub;
-          });
-        }
-      }
-      return service;
-    });
-  }
-  
-  // Special handling for questions array
-  if (obj && typeof obj === 'object' && Array.isArray(obj.questions)) {
-    obj.questions = obj.questions.map((question: any) => {
-      if (question && typeof question === 'object') {
-        // Fix question text if it's an object
-        if (question.question && typeof question.question === 'object') {
-          if (question.question.value) {
-            question.question = question.question.value;
-          } else if (question.question.text) {
-            question.question = question.question.text;
-          } else {
-            question.question = "Question " + (question.id || question.slug || "");
-          }
-        }
-        
-        // Process options if they exist
-        if (Array.isArray(question.options)) {
-          question.options = question.options.map((option: any, index: number) => {
-            if (option && typeof option === 'object') {
-              // If the option is just a plain object with no key property, create one
-              if (!option.key) {
-                option = {
-                  key: `Option ${index + 1}`,
-                  value: index + 1,
-                  default: index === 0
-                };
-              } else if (typeof option.key === 'object') {
-                // If key is an object, extract a string value
-                if (option.key.value) {
-                  option.key = option.key.value;
-                } else if (option.key.text) {
-                  option.key = option.key.text;
-                } else {
-                  option.key = `Option ${index + 1}`;
-                }
-              }
-            } else if (typeof option === 'string') {
-              // If option is just a string, convert to proper format
-              option = {
-                key: option,
-                value: index + 1,
-                default: index === 0
-              };
-            }
-            return option;
-          });
-        }
-      }
-      return question;
-    });
-  }
-  
-  if (typeof obj === 'object') {
-    if (Array.isArray(obj)) {
-      return obj.map(item => deepStringifyObjects(item));
-    } else {
-      const result: {[key: string]: any} = {};
-      for (const key in obj) {
-        if (Object.prototype.hasOwnProperty.call(obj, key)) {
-          const value = obj[key];
-          if (value === null || value === undefined) {
-            result[key] = value;
-          } else if (typeof value === 'object') {
-            // Check if it's a simple object that might be incorrectly stringified later
-            if (!Array.isArray(value) && Object.keys(value).length > 0) {
+    
+    // Special handling for services array
+    if (result.services && Array.isArray(result.services)) {
+      result.services = result.services.map((service: any) => {
+        if (service && typeof service === 'object') {
+          // Create a copy of the service
+          const processedService = {...service};
+          
+          // Handle service name field
+          if (processedService.name && typeof processedService.name === 'object') {
+            if (processedService.name.name) {
+              processedService.name = processedService.name.name;
+            } else if (processedService.name.value) {
+              processedService.name = processedService.name.value;
+            } else if (processedService.name.text) {
+              processedService.name = processedService.name.text;
+            } else if (processedService.name.title) {
+              processedService.name = processedService.name.title;
+            } else {
               try {
-                // Try to convert complex objects to strings if they might cause issues
-                if (key === 'name' || key === 'phase' || key === 'service' || key === 'description' || 
-                    key === 'formula' || key === 'technology') {
-                  // For objects that should be strings, create a meaningful representation
-                  if (value.name) {
-                    result[key] = value.name;
-                  } else if (value.title) {
-                    result[key] = value.title;
-                  } else if (value.id) {
-                    result[key] = value.id;
-                  } else if (value.value) {
-                    result[key] = value.value;
-                  } else {
-                    // If no good string representation, use JSON stringify but clean it up
-                    const jsonStr = JSON.stringify(value);
-                    result[key] = jsonStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
-                  }
+                const nameStr = JSON.stringify(processedService.name);
+                if (nameStr !== '{}') {
+                  processedService.name = nameStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
                 } else {
-                  result[key] = deepStringifyObjects(value);
+                  processedService.name = processedService.service || "Service";
                 }
               } catch (e) {
-                // If all else fails, convert to string
-                if (typeof value.toString === 'function' && value.toString() !== '[object Object]') {
-                  result[key] = value.toString();
-                } else {
-                  const jsonStr = JSON.stringify(value);
-                  result[key] = jsonStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
-                }
+                processedService.name = processedService.service || "Service";
               }
+            }
+          }
+          
+          // Handle service field
+          if (processedService.service && typeof processedService.service === 'object') {
+            if (processedService.service.name) {
+              processedService.service = processedService.service.name;
+            } else if (processedService.service.value) {
+              processedService.service = processedService.service.value;
+            } else if (processedService.service.text) {
+              processedService.service = processedService.service.text;
+            } else if (processedService.service.title) {
+              processedService.service = processedService.service.title;
             } else {
-              result[key] = deepStringifyObjects(value);
+              try {
+                const serviceStr = JSON.stringify(processedService.service);
+                if (serviceStr !== '{}') {
+                  processedService.service = serviceStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
+                } else {
+                  processedService.service = processedService.name || "Service";
+                }
+              } catch (e) {
+                processedService.service = processedService.name || "Service";
+              }
+            }
+          }
+          
+          // Ensure both name and service fields exist and are strings
+          if (!processedService.name && processedService.service) {
+            processedService.name = processedService.service;
+          } else if (!processedService.service && processedService.name) {
+            processedService.service = processedService.name;
+          } else if (!processedService.name && !processedService.service) {
+            processedService.name = processedService.phase ? `${processedService.phase} Service` : "Service";
+            processedService.service = processedService.name;
+          }
+          
+          // Process subservices recursively
+          if (processedService.subservices && Array.isArray(processedService.subservices)) {
+            processedService.subservices = processedService.subservices.map((subservice: any) => {
+              if (subservice && typeof subservice === 'object') {
+                const processedSubservice = {...subservice};
+                
+                // Handle subservice name field
+                if (processedSubservice.name && typeof processedSubservice.name === 'object') {
+                  if (processedSubservice.name.name) {
+                    processedSubservice.name = processedSubservice.name.name;
+                  } else if (processedSubservice.name.value) {
+                    processedSubservice.name = processedSubservice.name.value;
+                  } else if (processedSubservice.name.text) {
+                    processedSubservice.name = processedSubservice.name.text;
+                  } else {
+                    try {
+                      const nameStr = JSON.stringify(processedSubservice.name);
+                      if (nameStr !== '{}') {
+                        processedSubservice.name = nameStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
+                      } else {
+                        processedSubservice.name = "Subservice";
+                      }
+                    } catch (e) {
+                      processedSubservice.name = "Subservice";
+                    }
+                  }
+                }
+                
+                // Process other fields recursively
+                for (const key in processedSubservice) {
+                  if (key !== 'name' && processedSubservice[key] && typeof processedSubservice[key] === 'object') {
+                    processedSubservice[key] = deepStringifyObjects(processedSubservice[key]);
+                  }
+                }
+                
+                return processedSubservice;
+              }
+              return subservice;
+            });
+          }
+          
+          // Process other fields recursively
+          for (const key in processedService) {
+            if (!['name', 'service', 'subservices'].includes(key) && processedService[key] && typeof processedService[key] === 'object') {
+              processedService[key] = deepStringifyObjects(processedService[key]);
+            }
+          }
+          
+          return processedService;
+        }
+        return service;
+      });
+    }
+    
+    // Process all other fields recursively
+    for (const key in result) {
+      if (Object.prototype.hasOwnProperty.call(result, key) && !['technology', 'services'].includes(key)) {
+        const value = result[key];
+        
+        // Process arrays
+        if (Array.isArray(value)) {
+          result[key] = value.map(item => deepStringifyObjects(item));
+        } 
+        // Process objects (but not Date or other special objects)
+        else if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+          // Special handling for specific fields that often cause [object Object] issues
+          if (['name', 'service', 'phase', 'description', 'formula'].includes(key) && 
+              (typeof value === 'object')) {
+            // Try to extract a string representation
+            if (value.name) {
+              result[key] = value.name;
+            } else if (value.value) {
+              result[key] = value.value;
+            } else if (value.text) {
+              result[key] = value.text;
+            } else if (value.title) {
+              result[key] = value.title;
+            } else if (value.expression) {
+              result[key] = value.expression;
+            } else {
+              // Try to convert the object to a string
+              try {
+                const str = JSON.stringify(value);
+                if (str !== '{}') {
+                  result[key] = str.replace(/[{}"]/g, '').replace(/,/g, ', ');
+                } else {
+                  result[key] = key === 'name' ? 'Item' : 
+                              key === 'service' ? 'Service' : 
+                              key === 'phase' ? 'Implementation' : 
+                              key === 'description' ? 'Description' : 
+                              key === 'formula' ? 'Calculation' : 'Value';
+                }
+              } catch (e) {
+                result[key] = key === 'name' ? 'Item' : 
+                             key === 'service' ? 'Service' : 
+                             key === 'phase' ? 'Implementation' : 
+                             key === 'description' ? 'Description' : 
+                             key === 'formula' ? 'Calculation' : 'Value';
+              }
             }
           } else {
-            result[key] = value;
+            // Recursively process nested objects
+            result[key] = deepStringifyObjects(value);
           }
         }
       }
-      return result;
     }
+    
+    return result;
   }
   
   return obj;
@@ -2980,7 +2945,36 @@ Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
             }
             
             // Ensure all required fields exist
-            contentObj.technology = contentObj.technology || parsedData.technology || input;
+            // Special handling for technology field
+            if (contentObj.technology && typeof contentObj.technology === 'object') {
+              // Try to extract a meaningful name from technology object
+              if (contentObj.technology.platform) {
+                contentObj.technology = contentObj.technology.platform;
+              } else if (contentObj.technology.primary) {
+                contentObj.technology = contentObj.technology.primary;
+              } else if (contentObj.technology.name) {
+                contentObj.technology = contentObj.technology.name;
+              } else if (contentObj.technology.type) {
+                contentObj.technology = contentObj.technology.type;
+              } else if (contentObj.technology.product) {
+                contentObj.technology = contentObj.technology.product;
+              } else if (contentObj.technology.source && contentObj.technology.destination) {
+                contentObj.technology = `${contentObj.technology.destination} Migration from ${contentObj.technology.source}`;
+              } else {
+                // Try to stringify the object in a clean way
+                try {
+                  const techStr = JSON.stringify(contentObj.technology);
+                  contentObj.technology = techStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
+                } catch (e) {
+                  // Last resort
+                  contentObj.technology = parsedData.technology || input || "Technology Solution";
+                }
+              }
+            } else if (!contentObj.technology) {
+              contentObj.technology = parsedData.technology || input || "Technology Solution";
+            }
+            
+            // Continue with the rest of the fields
             contentObj.questions = Array.isArray(contentObj.questions) ? contentObj.questions : [];
             contentObj.calculations = Array.isArray(contentObj.calculations) ? contentObj.calculations : [];
             contentObj.services = Array.isArray(contentObj.services) ? contentObj.services : [];
