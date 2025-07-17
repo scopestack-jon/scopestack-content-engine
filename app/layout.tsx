@@ -1,10 +1,13 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { ErrorBoundary } from '@/components/error-boundary'
+import { ErrorToastProvider } from '@/components/error-toast'
+import { Toaster } from '@/components/ui/sonner'
 
 export const metadata: Metadata = {
-  title: 'Content Engine',
-  description: 'Created with v0',
-  generator: 'v0.dev',
+  title: 'ScopeStack Content Engine',
+  description: 'Research-driven content generation for professional services scoping',
+  generator: 'ScopeStack',
 }
 
 export default function RootLayout({
@@ -14,7 +17,25 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <ErrorBoundary>
+          <ErrorToastProvider>
+            {children}
+            <Toaster 
+              position="top-right"
+              expand={true}
+              richColors={true}
+              closeButton={true}
+              toastOptions={{
+                duration: 5000,
+                style: {
+                  fontSize: '14px'
+                }
+              }}
+            />
+          </ErrorToastProvider>
+        </ErrorBoundary>
+      </body>
     </html>
   )
 }

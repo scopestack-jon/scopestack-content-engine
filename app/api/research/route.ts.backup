@@ -1,7 +1,6 @@
 console.log("OPENROUTER_API_KEY:", process.env.OPENROUTER_API_KEY);
 import { generateText } from "ai"
 import type { NextRequest } from "next/server"
-import { OptimizedAPIClient, OptimizedJSONParser } from "../../../lib/api-optimizations"
 
 // Add the JSON response instruction constant
 const JSON_RESPONSE_INSTRUCTION = `
@@ -205,45 +204,66 @@ IMPORTANT: Ensure your analysis provides enough detail to support generating:
 Base your analysis on current professional services benchmarks and proven methodologies.${JSON_RESPONSE_INSTRUCTION}`,
 }
 
-// Initialize optimized API client
-const optimizedClient = new OptimizedAPIClient()
+// Generic function to call OpenRouter API for any model
+async function callOpenRouter({ model, prompt }: { model: string; prompt: string }): Promise<string> {
+  const apiKey = process.env.OPENROUTER_API_KEY
+  if (!apiKey) throw new Error("No OpenRouter API key set")
 
-// Optimized function to call OpenRouter API with caching and rate limiting
-async function callOpenRouter({ model, prompt, cacheKey }: { 
-  model: string; 
-  prompt: string; 
-  cacheKey?: string 
-}): Promise<string> {
-  return await optimizedClient.callWithOptimizations({
-    model,
-    prompt,
-    cacheKey,
-    timeoutMs: 45000, // Reduced from 120s to 45s
-    retries: 2 // Reduced from 3 to 2
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "user", content: prompt }
+      ],
+      max_tokens: 2048,
+      temperature: 0.7,
+      stream: false
+    })
   })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`OpenRouter API error: ${response.status} ${errorText}`)
+  }
+
+  const data = await response.json()
+  // OpenRouter returns choices[0].message.content
+  return data.choices?.[0]?.message?.content || ""
 }
 
-// Optimized generateTextWithTimeout using new API client
+// Update generateTextWithTimeout to use callOpenRouter
 async function generateTextWithTimeout(
-  options: { model: string; prompt: string; cacheKey?: string },
-  timeoutMs: number = 45000, // Reduced from 120s to 45s
+  options: { model: string; prompt: string },
+  timeoutMs: number = 120000, // 2 minutes default timeout
   stepName: string = "AI call"
 ): Promise<{ text: string }> {
   const startTime = Date.now()
   console.log(`[${stepName}] Starting with model: ${options.model}, prompt length: ${options.prompt.length}`)
   
   try {
-    const text = await callOpenRouter({
-      model: options.model,
-      prompt: options.prompt,
-      cacheKey: options.cacheKey
+    const timeoutPromise = new Promise<{ text: string }>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`[${stepName}] Timed out after ${timeoutMs}ms`))
+      }, timeoutMs)
     })
+
+    const resultPromise = (async (): Promise<{ text: string }> => {
+      const text = await callOpenRouter(options)
+      return { text }
+    })()
+
+    const result = await Promise.race([resultPromise, timeoutPromise])
 
     const duration = Date.now() - startTime
     console.log(`[${stepName}] Completed successfully in ${duration}ms`)
-    console.log(`[${stepName}] Response length: ${text?.length || 0} characters`)
+    console.log(`[${stepName}] Response length: ${result.text?.length || 0} characters`)
 
-    return { text }
+    return result
   } catch (error: any) {
     const duration = Date.now() - startTime
     console.error(`[${stepName}] Failed after ${duration}ms:`, {
@@ -393,9 +413,9 @@ async function parseAIResponse(response: string): Promise<any> {
     }
   }
   
-  // Try optimized JSON parsing first
+  // Try standard JSON parsing first
   try {
-    const parsed = await OptimizedJSONParser.parseWithTimeout(cleaned, 10000);
+    const parsed = JSON.parse(cleaned);
     
     // If parsed successfully, check if we need to transform the structure
     // Look for common nested structures in the responses and normalize them
@@ -953,8 +973,7 @@ function normalizeNestedStructure(parsed: any): any {
 async function generateWithRetry(
   prompt: string, 
   model: string, 
-  maxAttempts: number = 2, // Reduced from 3 to 2
-  cacheKey?: string
+  maxAttempts: number = 3
 ): Promise<any> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -963,11 +982,7 @@ async function generateWithRetry(
       // Add a specific instruction to return valid JSON
       const enhancedPrompt = prompt + "\n\nIMPORTANT: Return only valid JSON. Do not include markdown code blocks. Start with { and end with }. Do NOT nest your response inside fields like 'email_migration_research' or 'research_findings'."
       
-      const response = await callOpenRouter({ 
-        model, 
-        prompt: enhancedPrompt,
-        cacheKey: cacheKey ? `${cacheKey}:${attempt}` : undefined
-      })
+      const response = await callOpenRouter({ model, prompt: enhancedPrompt })
       
       try {
         // First try parsing directly
@@ -1551,11 +1566,10 @@ CRITICAL INSTRUCTIONS:
 IMPORTANT: Return ONLY valid JSON with NO additional text or explanation. Start with { and end with }.`;
 
   try {
-    // Call the OpenRouter API to perform the research with caching
+    // Call the OpenRouter API to perform the research
     const researchResult = await callOpenRouter({
       model,
       prompt: researchPrompt,
-      cacheKey: `research:${topic.substring(0, 50)}`
     });
     
     // Clean the research result
@@ -1719,11 +1733,10 @@ function extractUrlsFromText(text: string, topic: string): any[] {
 // Function to generate a realistic URL from a title
 function generateRealisticUrlFromTitle(title: string, topic: string): string {
   // Extract keywords from title and topic
-  const keywordSet = new Set([
+  const keywords = [...new Set([
     ...title.toLowerCase().split(/\s+/).filter(word => word.length > 3),
     ...topic.toLowerCase().split(/\s+/).filter(word => word.length > 3)
-  ]);
-  const keywords = Array.from(keywordSet);
+  ])];
   
   // Identify potential vendor
   const vendorNames = ['cisco', 'microsoft', 'aws', 'amazon', 'google', 'oracle', 'ibm', 'vmware', 'sap'];
@@ -2306,7 +2319,6 @@ export async function POST(request: NextRequest) {
             const parsingResponse = await callOpenRouter({
               model: models?.parsing || "anthropic/claude-3.5-sonnet",
               prompt: parsingPrompt,
-              cacheKey: `parse:${input.substring(0, 50)}`
             })
             
             parsedData = await parseAIResponse(parsingResponse)
@@ -2380,8 +2392,7 @@ export async function POST(request: NextRequest) {
           }
           
           // Remove duplicates and limit to first 5-7 sources
-          const sourceSet = new Set(researchSources);
-          researchSources = Array.from(sourceSet).slice(0, 7);
+          researchSources = [...new Set(researchSources)].slice(0, 7);
           
           console.log(`Final sources for UI display (${researchSources.length}):`, researchSources);
           console.log("✅ Web research successful");
@@ -2453,8 +2464,23 @@ Extract and structure the following:
 
 Format your analysis as structured JSON focusing on service components.${JSON_RESPONSE_INSTRUCTION}`
           
-          // Stage 2: Extract scoping questions and calculations (run in parallel)
-          console.log("Analysis Stages 1 & 2: Running service and scoping analysis in parallel...")
+          let serviceAnalysisData
+          try {
+            const serviceAnalysisResponse = await callOpenRouter({
+              model: models?.analysis || "anthropic/claude-3.5-sonnet",
+              prompt: serviceAnalysisPrompt,
+            })
+            
+            serviceAnalysisData = await parseAIResponse(serviceAnalysisResponse)
+            console.log("✅ Service analysis successful!")
+          } catch (serviceAnalysisError) {
+            const errorMessage = serviceAnalysisError instanceof Error ? serviceAnalysisError.message : String(serviceAnalysisError)
+            console.error(`❌ Service analysis failed: ${errorMessage}`)
+            serviceAnalysisData = { service_components: [] }
+          }
+          
+          // Stage 2: Extract scoping questions and calculations
+          console.log("Analysis Stage 2: Extracting scoping questions and calculations...")
           const scopingAnalysisPrompt = `Analyze research findings to extract scoping questions and calculations for ${parsedData.technology || input}:
 
 Research Findings: ${JSON.stringify(researchData)}
@@ -2469,35 +2495,18 @@ Extract and structure the following:
 
 Format your analysis as structured JSON focusing on scoping components.${JSON_RESPONSE_INSTRUCTION}`
           
-          // Run service and scoping analysis in parallel
-          let serviceAnalysisData, scopingAnalysisData
+          let scopingAnalysisData
           try {
-            const [serviceResult, scopingResult] = await optimizedClient.executeInParallel([
-              async () => {
-                const response = await callOpenRouter({
-                  model: models?.analysis || "anthropic/claude-3.5-sonnet",
-                  prompt: serviceAnalysisPrompt,
-                  cacheKey: `service:${parsedData.technology || input}`
-                })
-                return await parseAIResponse(response)
-              },
-              async () => {
-                const response = await callOpenRouter({
-                  model: "openai/gpt-4-turbo",
-                  prompt: scopingAnalysisPrompt,
-                  cacheKey: `scoping:${parsedData.technology || input}`
-                })
-                return await parseAIResponse(response)
-              }
-            ], 2)
+            const scopingAnalysisResponse = await callOpenRouter({
+              model: "openai/gpt-4-turbo",
+              prompt: scopingAnalysisPrompt,
+            })
             
-            serviceAnalysisData = serviceResult
-            scopingAnalysisData = scopingResult
-            console.log("✅ Parallel analysis successful!")
-          } catch (analysisError) {
-            const errorMessage = analysisError instanceof Error ? analysisError.message : String(analysisError)
-            console.error(`❌ Parallel analysis failed: ${errorMessage}`)
-            serviceAnalysisData = { service_components: [] }
+            scopingAnalysisData = await parseAIResponse(scopingAnalysisResponse)
+            console.log("✅ Scoping analysis successful!")
+          } catch (scopingAnalysisError) {
+            const errorMessage = scopingAnalysisError instanceof Error ? scopingAnalysisError.message : String(scopingAnalysisError)
+            console.error(`❌ Scoping analysis failed: ${errorMessage}`)
             scopingAnalysisData = { scoping_components: [] }
           }
           
@@ -2601,7 +2610,6 @@ Format your response as structured JSON with these sections clearly defined.${JS
             const outlineResponse = await callOpenRouter({
               model: models?.content || "anthropic/claude-3.5-sonnet",
               prompt: outlinePrompt,
-              cacheKey: `outline:${parsedData.technology || input}`
             })
             
             outlineObj = await parseAIResponse(outlineResponse)

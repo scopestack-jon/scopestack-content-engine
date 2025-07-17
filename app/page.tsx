@@ -8,6 +8,10 @@ import { Loader2, Search, Brain, FileText, CheckCircle, Settings, Calculator, Ro
 import { ResearchProgress } from "./components/research-progress"
 import { ContentOutput } from "./components/content-output"
 import { SourceAttribution } from "./components/source-attribution"
+import { ErrorBoundary, ResearchErrorBoundary, ContentErrorBoundary } from "@/components/error-boundary"
+import { showErrorToast, showResearchErrorToast, showSuccessToast, useErrorHandler } from "@/components/error-toast"
+import { createAPIError, createResearchError, ErrorCode, ScopeStackError } from "@/lib/errors"
+import { withRetry } from "@/lib/retry"
 import Link from "next/link"
 
 interface ResearchStep {
@@ -76,6 +80,7 @@ export default function ScopeStackContentEngine() {
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null)
   const [progress, setProgress] = useState(0)
   const [isResearchCollapsed, setIsResearchCollapsed] = useState(false)
+  const { handleError } = useErrorHandler()
 
   useEffect(() => {
     // Load saved content and input from localStorage
@@ -92,7 +97,10 @@ export default function ScopeStackContentEngine() {
       try {
         setGeneratedContent(JSON.parse(savedContent))
       } catch (e) {
-        console.error("Failed to parse saved content:", e)
+        handleError(e, {
+          context: 'loading saved content',
+          showToast: false // Don't show toast on app load
+        })
       }
     }
 
@@ -201,13 +209,23 @@ export default function ScopeStackContentEngine() {
       })
 
       if (!response.ok) {
+        const errorText = await response.text()
         console.error("Research API response not OK:", response.status, response.statusText)
-        throw new Error(`Research failed with status ${response.status}`)
+        throw createAPIError(
+          `Research failed with status ${response.status}`,
+          response.status,
+          errorText
+        )
       }
 
       console.log("Research API response received, setting up SSE reader...")
       const reader = response.body?.getReader()
-      if (!reader) throw new Error("No response stream")
+      if (!reader) {
+        throw new ScopeStackError(
+          ErrorCode.API_INVALID_RESPONSE,
+          "No response stream available from research API"
+        )
+      }
 
       const decoder = new TextDecoder()
       let buffer = ""
@@ -255,8 +273,11 @@ export default function ScopeStackContentEngine() {
                   
                   // Validate content before setting it
                   if (!data.content) {
-                    console.error("Content is missing in the response")
-                    alert("Content generation failed: Missing content in the response")
+                    const error = new ScopeStackError(
+                      ErrorCode.CONTENT_MISSING_REQUIRED_FIELDS,
+                      "Generated content is missing from the response"
+                    )
+                    handleError(error, { context: 'content validation' })
                     setIsProcessing(false)
                     return
                   }
@@ -268,7 +289,7 @@ export default function ScopeStackContentEngine() {
                   
                   // Ensure services is an array
                   if (!data.content.services || !Array.isArray(data.content.services)) {
-                    console.error("Services is missing or not an array")
+                    console.warn("Services field is missing or invalid, using fallback")
                     data.content.services = []
                   }
                   
@@ -381,27 +402,39 @@ export default function ScopeStackContentEngine() {
                   setProgress(100)
                 }
               } catch (parseError) {
-                console.error("Error parsing SSE data:", parseError, "Raw data:", line)
+                handleError(parseError, {
+                  context: 'parsing SSE data',
+                  showToast: false // Don't spam toasts for individual SSE parsing errors
+                })
                 // Continue processing other lines even if one fails
               }
             }
           }
         }
       } catch (streamError: unknown) {
-        console.error("Error processing SSE stream:", streamError)
-        throw new Error(`Error processing research results: ${streamError instanceof Error ? streamError.message : 'Unknown stream error'}`)
+        const error = new ScopeStackError(
+          ErrorCode.API_NETWORK_ERROR,
+          `Error processing research results: ${streamError instanceof Error ? streamError.message : 'Unknown stream error'}`,
+          { originalError: streamError }
+        )
+        throw error
       } finally {
         // Make sure to release the reader if there's an error
         try {
           reader.releaseLock()
         } catch (releaseError) {
-          console.error("Error releasing reader lock:", releaseError)
+          handleError(releaseError, {
+            context: 'releasing reader lock',
+            showToast: false
+          })
         }
       }
     } catch (error: unknown) {
-      console.error("Generation failed:", error)
-      // Show error to user
-      alert(`Content generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      // Handle the error with our improved error handling
+      showResearchErrorToast(error, 'research', () => {
+        // Retry the entire generation process
+        handleGenerate()
+      })
       
       // Update UI to show error state
       setResearchSteps((prev) =>
@@ -523,22 +556,26 @@ export default function ScopeStackContentEngine() {
 
         {/* Research Progress */}
         {(isProcessing || researchSteps.length > 0) && (
-          <ResearchProgress
-            steps={researchSteps}
-            progress={progress}
-            isCollapsed={isResearchCollapsed && !isProcessing}
-            onToggleCollapse={() => setIsResearchCollapsed(!isResearchCollapsed)}
-          />
+          <ResearchErrorBoundary>
+            <ResearchProgress
+              steps={researchSteps}
+              progress={progress}
+              isCollapsed={isResearchCollapsed && !isProcessing}
+              onToggleCollapse={() => setIsResearchCollapsed(!isResearchCollapsed)}
+            />
+          </ResearchErrorBoundary>
         )}
 
         {/* Generated Content */}
         {(() => {
           console.log("Checking if should render ContentOutput. generatedContent:", generatedContent)
           return generatedContent && (
-            <div className="space-y-6">
-              <ContentOutput content={generatedContent} setContent={setGeneratedContent} />
-              <SourceAttribution sources={generatedContent.sources} />
-            </div>
+            <ContentErrorBoundary>
+              <div className="space-y-6">
+                <ContentOutput content={generatedContent} setContent={setGeneratedContent} />
+                <SourceAttribution sources={generatedContent.sources} />
+              </div>
+            </ContentErrorBoundary>
           )
         })()}
 
