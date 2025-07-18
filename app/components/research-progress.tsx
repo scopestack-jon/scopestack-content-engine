@@ -12,6 +12,10 @@ interface ResearchStep {
   status: "pending" | "active" | "completed" | "error"
   model?: string
   sources?: string[]
+  confidence?: number
+  insights?: string[]
+  sourceCount?: number
+  highCredibilityCount?: number
 }
 
 interface ResearchProgressProps {
@@ -101,15 +105,70 @@ export function ResearchProgress({ steps, progress, isCollapsed = false, onToggl
               </div>
               <Badge variant={step.status === "completed" ? "default" : "secondary"}>Step {index + 1}</Badge>
             </div>
+            {/* Enhanced research metrics for active research */}
+            {step.status === "completed" && step.id === "research" && (
+              <div className="mt-3 space-y-2">
+                {step.confidence && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Research Confidence:</span>
+                    <Badge variant={step.confidence >= 0.8 ? "default" : step.confidence >= 0.6 ? "secondary" : "outline"}>
+                      {Math.round(step.confidence * 100)}%
+                    </Badge>
+                  </div>
+                )}
+                
+                {step.sourceCount && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Sources Found:</span>
+                    <Badge variant="outline">{step.sourceCount} sources</Badge>
+                    {step.highCredibilityCount && step.highCredibilityCount > 0 && (
+                      <Badge variant="default">{step.highCredibilityCount} high-credibility</Badge>
+                    )}
+                  </div>
+                )}
+                
+                {step.insights && step.insights.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-xs text-gray-500 mb-1">Key Insights:</div>
+                    <div className="space-y-1">
+                      {step.insights.slice(0, 3).map((insight, idx) => (
+                        <div key={idx} className="text-xs bg-blue-50 p-2 rounded border">
+                          {insight}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
             {step.sources && step.sources.length > 0 && (
               <div className="mt-2">
-                <div className="text-xs text-gray-500 mb-1">Sources:</div>
+                <div className="text-xs text-gray-500 mb-1">Sources ({step.sources.length}):</div>
                 <div className="flex flex-wrap gap-1">
-                  {step.sources.map((source, sourceIndex) => (
-                    <Badge key={sourceIndex} variant="outline" className="text-xs">
-                      {source}
+                  {step.sources.slice(0, 8).map((source, sourceIndex) => {
+                    // Parse source format: "URL | Title | Quality"
+                    const parts = source.split(' | ');
+                    const url = parts[0];
+                    const title = parts[1] || 'Source';
+                    const quality = parts[2] || '';
+                    
+                    return (
+                      <Badge 
+                        key={sourceIndex} 
+                        variant={quality.includes('HIGH') || quality.includes('⭐') ? "default" : "outline"} 
+                        className="text-xs max-w-[200px] truncate"
+                        title={`${title} - ${url}`}
+                      >
+                        {title}
+                      </Badge>
+                    );
+                  })}
+                  {step.sources.length > 8 && (
+                    <Badge variant="secondary" className="text-xs">
+                      +{step.sources.length - 8} more
                     </Badge>
-                  ))}
+                  )}
                 </div>
               </div>
             )}
