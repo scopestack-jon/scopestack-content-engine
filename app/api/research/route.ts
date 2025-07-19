@@ -44,10 +44,18 @@ function cleanAIResponse(response: string): string {
   // Remove leading/trailing whitespace
   cleaned = cleaned.trim();
   
-  // If the response starts with a { and ends with }, extract just that JSON object
-  const jsonMatch = cleaned.match(/^\s*({[\s\S]*})\s*$/);
+  // More aggressive JSON extraction - find any JSON object in the response
+  const jsonMatch = cleaned.match(/({[\s\S]*})/);
   if (jsonMatch) {
     cleaned = jsonMatch[1];
+  }
+  
+  // If still no match, try to find JSON array
+  if (!cleaned.startsWith('{') && !cleaned.startsWith('[')) {
+    const arrayMatch = response.match(/(\[[\s\S]*\])/);
+    if (arrayMatch) {
+      cleaned = arrayMatch[1];
+    }
   }
   
   // Fix common JSON syntax issues
@@ -211,6 +219,45 @@ Base your analysis on current professional services benchmarks and proven method
 const optimizedClient = new OptimizedAPIClient()
 const researchEnhancer = new DynamicResearchEnhancer()
 const liveResearchEngine = new LiveResearchEngine()
+
+// Helper function to safely extract string values from potentially complex objects
+function safeStringify(value: any, fallback: string = "Technology Solution"): string {
+  if (!value) return fallback;
+  
+  if (typeof value === 'string') return value;
+  
+  if (typeof value === 'object') {
+    // Try common property names first
+    if (value.name) return safeStringify(value.name, fallback);
+    if (value.title) return safeStringify(value.title, fallback);
+    if (value.text) return safeStringify(value.text, fallback);
+    if (value.value) return safeStringify(value.value, fallback);
+    
+    // If it's an array, join the elements
+    if (Array.isArray(value)) {
+      return value.map(v => safeStringify(v, '')).filter(Boolean).join(', ') || fallback;
+    }
+    
+    // Try to extract meaningful content from object
+    try {
+      const jsonStr = JSON.stringify(value);
+      if (jsonStr && jsonStr !== '{}' && jsonStr !== 'null') {
+        // Remove JSON syntax and clean up
+        return jsonStr
+          .replace(/[{}"[\]]/g, '')
+          .replace(/,/g, ', ')
+          .replace(/:/g, ': ')
+          .slice(0, 100) // Limit length
+          .trim() || fallback;
+      }
+    } catch {
+      // JSON.stringify failed, fall through to default
+    }
+  }
+  
+  // Convert to string as last resort
+  return String(value).slice(0, 100) || fallback;
+}
 
 // Optimized function to call OpenRouter API with caching and rate limiting
 async function callOpenRouter({ model, prompt, cacheKey }: { 
@@ -1500,25 +1547,23 @@ function validateContentStructure(content: any): boolean {
 // Function removed - no longer generating static questions
 
 // Enhanced active research using Perplexity
-async function performPerplexityResearch(
-  topic: string, 
-  context: { industry?: string; technology?: string; scale?: string; compliance?: string[] }
-): Promise<any> {
-  console.log(`🔍 Performing Perplexity-based active research for: ${topic}`);
-  
-  const contextString = [
-    context.industry && `Industry: ${context.industry}`,
-    context.technology && `Technology: ${context.technology}`,
-    context.scale && `Scale: ${context.scale}`,
-    context.compliance?.length && `Compliance: ${context.compliance.join(', ')}`
-  ].filter(Boolean).join(' | ') || 'General research context';
+async function performPerplexityResearch(userRequest: string): Promise<any> {
+  console.log(`🔍 Performing Perplexity-based active research for: ${userRequest}`);
   
   const researchPrompt = `You are a research specialist conducting comprehensive research on technology implementations.
 
-TOPIC: ${topic}
-CONTEXT: ${contextString}
+USER REQUEST: ${userRequest}
 
-Your task is to find 8-10 high-quality, real sources that provide comprehensive coverage of this topic. Focus on:
+Analyze this request and conduct comprehensive research to find 8-10 high-quality, real sources that provide complete coverage of this implementation scenario.
+
+Based on the request, determine the:
+- Technology/solution being implemented
+- Scale and scope indicators
+- Industry context (if mentioned)
+- Compliance or regulatory considerations
+- Integration and technical requirements
+
+Your task is to find sources that cover:
 
 1. Official vendor documentation and guides
 2. Industry best practices and implementation methodologies  
@@ -1555,18 +1600,30 @@ Focus on current, authoritative sources that collectively provide comprehensive 
 
   try {
     const response = await optimizedClient.callWithOptimizations({
-      model: "perplexity/llama-3.1-sonar-large-128k-online",
+      model: "perplexity/sonar",
       prompt: researchPrompt,
-      cacheKey: `active_research:${topic.substring(0, 50)}`,
+      cacheKey: `active_research:${userRequest.substring(0, 50)}`,
       timeoutMs: 60000
     });
     
     console.log("🔍 Perplexity research response received, parsing...");
+    console.log("📝 Raw response length:", response.length);
+    console.log("📝 First 500 chars:", response.substring(0, 500));
+    console.log("📝 Last 200 chars:", response.substring(Math.max(0, response.length - 200)));
+    
+    const cleanedResponse = cleanAIResponse(response);
+    console.log("🧹 Cleaned response length:", cleanedResponse.length);
+    console.log("🧹 Cleaned first 300 chars:", cleanedResponse.substring(0, 300));
     
     try {
-      const parsed = JSON.parse(cleanAIResponse(response));
+      const parsed = JSON.parse(cleanedResponse);
+      console.log("✅ JSON parsing successful");
+      console.log("📊 Parsed object keys:", Object.keys(parsed));
+      console.log("📊 Sources array length:", parsed.sources?.length || 0);
+      
       if (parsed.sources && Array.isArray(parsed.sources)) {
         console.log(`✅ Found ${parsed.sources.length} sources from Perplexity research`);
+        console.log("🔗 Source titles:", parsed.sources.map(s => s.title).slice(0, 5));
         return {
           sources: parsed.sources.map((source: any) => ({
             ...source,
@@ -1606,420 +1663,7 @@ Focus on current, authoritative sources that collectively provide comprehensive 
   }
 }
 
-// Add a new function to perform web research
-async function performWebResearch(topic: string, model: string = "anthropic/claude-3-opus"): Promise<any> {
-  console.log(`Performing web research on topic: ${topic}`);
-  
-  // Create a research prompt that instructs the model to find real sources
-  const researchPrompt = `You are a professional web researcher tasked with finding authoritative sources about: "${topic}"
 
-Your task is to conduct comprehensive research and provide 8-10 specific, real sources that would be valuable for understanding this topic.
-
-CRITICAL RESEARCH OBJECTIVES:
-1. Find sources that cover implementation methodologies and best practices
-2. Identify sources with specific hour estimates for professional services
-3. Locate compliance and regulatory guidance specific to the industry
-4. Find case studies of similar implementations
-5. Discover technical documentation with specific tools and approaches
-6. Locate sources discussing common challenges and solutions
-7. Find industry benchmarks and standards
-8. Identify sources covering security and data integrity considerations
-
-CRITICAL INSTRUCTIONS:
-1. Return a JSON object with this EXACT structure:
-{
-  "sources": [
-    {
-      "url": "https://www.example.com/specific-page",
-      "title": "Title of the source",
-      "relevance": "Brief explanation of relevance",
-      "category": "Source category"
-    }
-  ]
-}
-
-2. For each source:
-   - Provide REAL URLs to actual websites that exist
-   - Include specific titles that accurately reflect the content
-   - Briefly explain why each source is relevant
-   - Categorize each source (Vendor Documentation, Industry Resource, etc.)
-
-3. Focus on authoritative sources like:
-   - Official vendor documentation
-   - Industry analyst reports
-   - Technical blogs from recognized experts
-   - Professional organizations and standards bodies
-   - Government/regulatory guidance
-   - Industry benchmarks and case studies
-
-4. For technology topics, prioritize:
-   - Official vendor documentation (e.g., cisco.com for Cisco products)
-   - Industry analyst reports (Gartner, Forrester)
-   - Technical implementation guides
-   - Best practices documents
-   - Professional services documentation
-
-IMPORTANT: Return ONLY valid JSON with NO additional text or explanation. Start with { and end with }.`;
-
-  try {
-    // Call the OpenRouter API to perform the research with caching
-    const researchResult = await callOpenRouter({
-      model,
-      prompt: researchPrompt,
-      cacheKey: `research:${topic.substring(0, 50)}`
-    });
-    
-    // Clean the research result
-    const cleanedResult = cleanAIResponse(researchResult);
-    console.log("Web research raw result length:", cleanedResult.length);
-    console.log("First 200 chars:", cleanedResult.substring(0, 200));
-    console.log("Last 200 chars:", cleanedResult.substring(Math.max(0, cleanedResult.length - 200)));
-    
-    // First attempt: Try to parse the JSON directly
-    try {
-      const parsedResult = JSON.parse(cleanedResult);
-      if (parsedResult && parsedResult.sources && Array.isArray(parsedResult.sources)) {
-        // Validate the sources
-        const validatedSources = validateSources(parsedResult.sources, topic);
-        if (validatedSources.length > 0) {
-          console.log(`Successfully parsed ${validatedSources.length} sources from JSON`);
-          return { sources: validatedSources };
-        }
-      }
-    } catch (parseError: any) {
-      console.error("Initial JSON parsing failed:", parseError.message);
-    }
-    
-    // Second attempt: Try to extract using regex
-    const extractedSources = extractSourcesUsingRegex(cleanedResult, topic);
-    if (extractedSources.length > 0) {
-      console.log(`Successfully extracted ${extractedSources.length} sources using regex`);
-      return { sources: extractedSources };
-    }
-    
-    // Third attempt: Try to extract any URLs
-    const extractedUrls = extractUrlsFromText(cleanedResult, topic);
-    if (extractedUrls.length > 0) {
-      console.log(`Extracted ${extractedUrls.length} URLs from text`);
-      return { sources: extractedUrls };
-    }
-    
-    // If all attempts fail, generate dynamic sources based on the topic
-    console.log("All parsing attempts failed, generating dynamic sources based on topic");
-    return generateDynamicSourcesForTopic(topic);
-  } catch (error) {
-    console.error("Error performing web research:", error);
-    // Generate dynamic sources based on the topic
-    return generateDynamicSourcesForTopic(topic);
-  }
-}
-
-// Function to validate sources
-function validateSources(sources: any[], topic: string): any[] {
-  if (!Array.isArray(sources)) return [];
-  
-  return sources.map(source => {
-    // Create a new object with validated fields
-    const validatedSource = {
-      url: validateUrl(source.url || ""),
-      title: source.title || `Resource about ${topic}`,
-      relevance: source.relevance || `Information about ${topic}`,
-      category: source.category || "Technical Resource"
-    };
-    
-    // Ensure URL is not a placeholder
-    if (validatedSource.url.includes("example.com")) {
-      // Try to generate a more realistic URL based on the title and topic
-      validatedSource.url = generateRealisticUrlFromTitle(validatedSource.title, topic);
-    }
-    
-    return validatedSource;
-  }).filter(source => {
-    // Filter out sources with invalid URLs
-    try {
-      new URL(source.url);
-      return true;
-    } catch (e) {
-      return false;
-    }
-  });
-}
-
-// Function to extract sources using regex
-function extractSourcesUsingRegex(text: string, topic: string): any[] {
-  console.log("Attempting to extract sources using regex");
-  
-  const sources: any[] = [];
-  
-  // Look for JSON-like patterns for sources
-  const sourcePattern = /"url"\s*:\s*"([^"]+)"\s*,\s*"title"\s*:\s*"([^"]+)"(?:\s*,\s*"relevance"\s*:\s*"([^"]+)")?(?:\s*,\s*"category"\s*:\s*"([^"]+)")?/g;
-  
-  let match;
-  while ((match = sourcePattern.exec(text)) !== null) {
-    const [_, url, title, relevance, category] = match;
-    
-    sources.push({
-      url: validateUrl(url),
-      title: title || `Resource about ${topic}`,
-      relevance: relevance || `Information about ${topic}`,
-      category: category || "Technical Resource"
-    });
-  }
-  
-  // If we couldn't extract complete sources, try to extract URL-title pairs
-  if (sources.length === 0) {
-    const urlTitlePattern = /"url"\s*:\s*"([^"]+)"\s*(?:,|\}|\]).*?"title"\s*:\s*"([^"]+)"/g;
-    
-    while ((match = urlTitlePattern.exec(text)) !== null) {
-      const [_, url, title] = match;
-      
-      sources.push({
-        url: validateUrl(url),
-        title: title || `Resource about ${topic}`,
-        relevance: `Information about ${topic}`,
-        category: "Technical Resource"
-      });
-    }
-  }
-  
-  return sources;
-}
-
-// Function to extract URLs from text
-function extractUrlsFromText(text: string, topic: string): any[] {
-  console.log("Attempting to extract URLs from text");
-  
-  const sources: any[] = [];
-  const urlPattern = /https?:\/\/[^\s"'<>()]+/g;
-  
-  let match;
-  let index = 0;
-  
-  while ((match = urlPattern.exec(text)) !== null) {
-    const url = match[0];
-    
-    // Try to extract a title near the URL
-    const surroundingText = text.substring(Math.max(0, match.index - 100), Math.min(text.length, match.index + 100));
-    const titleMatch = surroundingText.match(/"title"\s*:\s*"([^"]+)"/);
-    
-    let title = titleMatch ? titleMatch[1] : "";
-    if (!title) {
-      // Try to generate a title from the URL
-      try {
-        const urlObj = new URL(url);
-        const domain = urlObj.hostname.replace('www.', '');
-        title = `${domain.split('.')[0].toUpperCase()} - ${topic}`;
-      } catch (e) {
-        title = `${topic} Resource ${index + 1}`;
-      }
-    }
-    
-    sources.push({
-      url: validateUrl(url),
-      title,
-      relevance: `Information about ${topic}`,
-      category: "Technical Resource"
-    });
-    
-    index++;
-  }
-  
-  return sources;
-}
-
-// Function to generate a realistic URL from a title
-function generateRealisticUrlFromTitle(title: string, topic: string): string {
-  // Extract keywords from title and topic
-  const keywordSet = new Set([
-    ...title.toLowerCase().split(/\s+/).filter(word => word.length > 3),
-    ...topic.toLowerCase().split(/\s+/).filter(word => word.length > 3)
-  ]);
-  const keywords = Array.from(keywordSet);
-  
-  // Identify potential vendor
-  const vendorNames = ['cisco', 'microsoft', 'aws', 'amazon', 'google', 'oracle', 'ibm', 'vmware', 'sap'];
-  let vendor = vendorNames.find(v => 
-    title.toLowerCase().includes(v) || topic.toLowerCase().includes(v)
-  );
-  
-  // Default vendor based on topic keywords
-  if (!vendor) {
-    if (topic.toLowerCase().includes('office 365') || topic.toLowerCase().includes('exchange')) {
-      vendor = 'microsoft';
-    } else if (topic.toLowerCase().includes('aws') || topic.toLowerCase().includes('amazon')) {
-      vendor = 'aws';
-    } else if (topic.toLowerCase().includes('gcp') || topic.toLowerCase().includes('google cloud')) {
-      vendor = 'google';
-    } else {
-      vendor = 'cisco'; // Default fallback
-    }
-  }
-  
-  // Format domain based on vendor
-  const domain = vendor === 'aws' ? 'aws.amazon.com' : `${vendor}.com`;
-  
-  // Generate URL path segments from keywords
-  const pathSegments = keywords.slice(0, 3).join('-');
-  
-  // Create different URL formats based on vendor
-  if (vendor === 'microsoft') {
-    return `https://learn.microsoft.com/en-us/docs/${pathSegments}`;
-  } else if (vendor === 'aws') {
-    return `https://docs.aws.amazon.com/${pathSegments}/latest/guide/index.html`;
-  } else if (vendor === 'google') {
-    return `https://cloud.google.com/docs/${pathSegments}`;
-  } else {
-    return `https://www.${domain}/c/en/us/support/docs/${pathSegments}.html`;
-  }
-}
-
-// Function to generate dynamic sources based on the topic
-function generateDynamicSourcesForTopic(topic: string): { sources: any[] } {
-  console.log("Generating dynamic sources based on topic:", topic);
-  
-  // Extract keywords from the topic
-  const keywords = topic.split(' ').filter(word => word.length > 3);
-  const mainTech = keywords[0] || "Technology";
-  const secondaryTech = keywords.length > 1 ? keywords[1] : "";
-  
-  // Extract vendor name from topic if possible
-  const vendorNames = ['Cisco', 'Microsoft', 'AWS', 'Google', 'Oracle', 'IBM', 'VMware', 'SAP'];
-  const vendor = vendorNames.find(v => topic.includes(v)) || 
-                (topic.toLowerCase().includes('office 365') ? 'Microsoft' : 
-                 topic.toLowerCase().includes('aws') ? 'AWS' : 
-                 topic.toLowerCase().includes('azure') ? 'Microsoft' : 
-                 topic.toLowerCase().includes('google') ? 'Google' : 'Cisco');
-  
-  // Generate dynamic URLs based on the topic and vendor
-  const dynamicSources = [];
-  
-  // Vendor documentation
-  if (vendor === 'Microsoft') {
-    dynamicSources.push({
-      url: `https://learn.microsoft.com/en-us/${mainTech.toLowerCase()}/${secondaryTech.toLowerCase()}/overview`,
-      title: `${mainTech} Documentation - Microsoft Learn`,
-      relevance: `Official Microsoft documentation for ${mainTech}`,
-      category: "Vendor Documentation"
-    });
-  } else if (vendor === 'AWS') {
-    dynamicSources.push({
-      url: `https://docs.aws.amazon.com/${mainTech.toLowerCase()}/latest/userguide/what-is-${mainTech.toLowerCase()}.html`,
-      title: `AWS ${mainTech} User Guide`,
-      relevance: `Official AWS documentation for ${mainTech}`,
-      category: "Vendor Documentation"
-    });
-  } else if (vendor === 'Google') {
-    dynamicSources.push({
-      url: `https://cloud.google.com/${mainTech.toLowerCase()}/docs/overview`,
-      title: `Google Cloud ${mainTech} Documentation`,
-      relevance: `Official Google Cloud documentation for ${mainTech}`,
-      category: "Vendor Documentation"
-    });
-  } else {
-    dynamicSources.push({
-      url: `https://www.${vendor.toLowerCase()}.com/c/en/us/products/${mainTech.toLowerCase()}/${secondaryTech.toLowerCase()}/index.html`,
-      title: `${vendor} ${mainTech} Documentation`,
-      relevance: `Official ${vendor} documentation for ${mainTech}`,
-      category: "Vendor Documentation"
-    });
-  }
-  
-  // Industry analyst report
-  dynamicSources.push({
-    url: `https://www.gartner.com/en/documents/research/${mainTech.toLowerCase()}-${secondaryTech.toLowerCase()}`,
-    title: `Gartner Research: ${mainTech} ${secondaryTech} Market Analysis`,
-    relevance: `Industry analysis of ${mainTech} solutions and market trends`,
-    category: "Industry Research"
-  });
-  
-  // Technical blog
-  dynamicSources.push({
-    url: `https://techcommunity.${vendor.toLowerCase()}.com/t5/${mainTech.toLowerCase()}-blog/best-practices-for-${mainTech.toLowerCase()}-implementation/ba-p/12345`,
-    title: `Best Practices for ${mainTech} Implementation`,
-    relevance: `Technical guidance and best practices for implementing ${mainTech}`,
-    category: "Technical Blog"
-  });
-  
-  // Community forum
-  dynamicSources.push({
-    url: `https://community.${vendor.toLowerCase()}.com/t5/${mainTech.toLowerCase()}-forum/bd-p/12345`,
-    title: `${vendor} Community: ${mainTech} Forum`,
-    relevance: `Community discussions and solutions for ${mainTech} implementations`,
-    category: "Community Resource"
-  });
-  
-  // Implementation guide
-  dynamicSources.push({
-    url: `https://www.${vendor.toLowerCase()}.com/c/en/us/support/docs/${mainTech.toLowerCase()}/${secondaryTech.toLowerCase()}/implementation-guide.html`,
-    title: `${mainTech} Implementation Guide`,
-    relevance: `Step-by-step guide for implementing ${mainTech}`,
-    category: "Implementation Guide"
-  });
-  
-  return { sources: dynamicSources };
-}
-
-// Modify the extractSourcesFromArray function to better handle research results
-const extractSourcesFromArray = (sourceArray: any[]): string[] => {
-  if (!Array.isArray(sourceArray)) return [];
-  
-  return sourceArray.map(source => {
-    // Handle different source formats
-    if (typeof source === 'string') {
-      // If it's just a string, return it
-      return source;
-    } else if (source && typeof source === 'object') {
-      // Handle object format with url and title
-      if (source.url && typeof source.url === 'string') {
-        // Fix URL formatting issues
-        let url = source.url;
-        
-        // Remove quotes if they exist
-        if (url.startsWith('"') && url.endsWith('"')) {
-          url = url.substring(1, url.length - 1);
-        }
-        
-        // Ensure URL starts with http
-        if (!url.startsWith('http')) {
-          url = "https://" + url;
-        }
-        
-        // Create a formatted source string
-        return source.title ? 
-          `${url} | ${source.title}` : 
-          url;
-      } else if (source.source && typeof source.source === 'string') {
-        // Alternative format with source field
-        return source.source;
-      }
-    }
-    return "https://example.com";
-  }).filter(Boolean);
-};
-
-// Helper function to validate and fix URLs
-function validateUrl(url: string | undefined): string {
-  if (!url) return "https://www.cisco.com";
-  
-  // Remove quotes if they exist
-  if (url.startsWith('"') && url.endsWith('"')) {
-    url = url.substring(1, url.length - 1);
-  }
-  
-  // Ensure URL starts with http
-  if (!url.startsWith('http')) {
-    url = "https://" + url;
-  }
-  
-  // Ensure URL is valid
-  try {
-    new URL(url);
-    return url;
-  } catch (e) {
-    // If URL is invalid, return a default URL
-    return "https://www.cisco.com";
-  }
-}
 
 // Add these interfaces at the top of the file
 interface Subservice {
@@ -2394,92 +2038,28 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Helper function to send SSE events
+          // Helper function to send SSE events with safety check
           const sendEvent = (type: string, data: any) => {
-            const event = `data: ${JSON.stringify({ type, ...data })}\n\n`
-            controller.enqueue(encoder.encode(event))
-          }
-
-          // Step 1: Parsing
-          sendEvent("step", { 
-            stepId: "parse", 
-            status: "active", 
-            progress: 10,
-            model: models?.parsing || "anthropic/claude-3.5-sonnet"
-          })
-
-          // Parse input
-          console.log("📊 Step 1: Parsing input...")
-          const parsingPrompt = prompts?.parsing || DEFAULT_PROMPTS.parsing.replace("{input}", input)
-          
-          let parsedData
-          try {
-            const parsingResponse = await callOpenRouter({
-              model: models?.parsing || "anthropic/claude-3.5-sonnet",
-              prompt: parsingPrompt,
-              cacheKey: `parse:${input.substring(0, 50)}`
-            })
-            
-            parsedData = await parseAIResponse(parsingResponse)
-            console.log("✅ Parsing successful:", parsedData)
-            sendEvent("step", { 
-              stepId: "parse", 
-              status: "completed", 
-              progress: 25,
-              model: models?.parsing || "anthropic/claude-3.5-sonnet"
-            })
-          } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error)
-            console.error("❌ Parsing failed:", errorMessage)
-            // Use basic fallback for parsing failure
-            parsedData = {
-              technology: input.split(" ").slice(0, 3).join(" "),
-              scale: "Enterprise",
-              industry: "Technology",
-              compliance: "Standard",
-              complexity: ["Standard implementation"]
+            try {
+              const event = `data: ${JSON.stringify({ type, ...data })}\n\n`
+              controller.enqueue(encoder.encode(event))
+            } catch (error) {
+              console.error(`⚠️ Failed to send SSE event (${type}):`, error instanceof Error ? error.message : String(error))
             }
-            console.log("⚠️ Using fallback parsing data:", parsedData)
-            sendEvent("step", { 
-              stepId: "parse", 
-              status: "completed", 
-              progress: 25,
-              model: models?.parsing || "anthropic/claude-3.5-sonnet"
-            })
           }
-          
-          // Step 2: Research - Enhanced with multi-stage approach
+
+          // Step 1: Active Research - Direct from user input
           sendEvent("step", { 
             stepId: "research", 
             status: "active", 
-            progress: 25,
-            model: models?.research || "anthropic/claude-3.5-sonnet"
+            progress: 10,
+            model: "perplexity/sonar"
           })
+
+          console.log("🔍 Starting direct active research with Perplexity...")
+          console.log("User request:", input)
           
-          console.log("�� Step 2: Conducting actual web research...")
-          
-          // Perform real web research using the LLM
-          console.log("Performing web research with model:", models?.research || "anthropic/claude-3-opus");
-          // Detect industry context for better research targeting
-          const industry = input.toLowerCase().includes("healthcare") || input.toLowerCase().includes("hospital") ? "healthcare" :
-                          input.toLowerCase().includes("finance") || input.toLowerCase().includes("bank") ? "finance" :
-                          input.toLowerCase().includes("retail") || input.toLowerCase().includes("ecommerce") ? "retail" :
-                          undefined;
-          
-          console.log(`Performing ACTIVE research for: ${input} ${industry ? `(${industry} industry)` : ''}`);
-          
-          // Step 2: Active Research - Dynamic source discovery using Perplexity
-          console.log("🔍 Starting active research with Perplexity...");
-          
-          const activeResearchResults = await performPerplexityResearch(
-            input,
-            {
-              industry: industry,
-              technology: parsedData.technology || input,
-              scale: parsedData.scale || "Enterprise",
-              compliance: parsedData.compliance || []
-            }
-          );
+          const activeResearchResults = await performPerplexityResearch(input);
           
           // Extract sources from the active research results
           let researchSources: string[] = [];
@@ -2517,7 +2097,7 @@ export async function POST(request: NextRequest) {
             
             try {
               // Fallback to live research engine
-              const liveResearchResults = await liveResearchEngine.performLiveResearch(input, industry);
+              const liveResearchResults = await liveResearchEngine.performLiveResearch(input, "enterprise");
               if (liveResearchResults && liveResearchResults.sources && liveResearchResults.sources.length > 0) {
                 sourcesForContent = liveResearchResults.sources;
                 researchSources = liveResearchResults.sources.map((source: any) => {
@@ -2527,7 +2107,7 @@ export async function POST(request: NextRequest) {
                 console.log("✅ Fallback to live research successful");
               } else {
                 // Final fallback to enhanced research
-                const enhancedResearchResults = await researchEnhancer.performEnhancedResearch(input, industry);
+                const enhancedResearchResults = await researchEnhancer.performEnhancedResearch(input, "enterprise");
                 if (enhancedResearchResults && enhancedResearchResults.sources) {
                   sourcesForContent = enhancedResearchResults.sources;
                   researchSources = enhancedResearchResults.sources.map((source: any) => {
@@ -2560,8 +2140,8 @@ export async function POST(request: NextRequest) {
           const researchData = {
             sources: sourcesForContent,
             topic: input,
-            technology: parsedData.technology || input,
-            industry: industry,
+            technology: input,
+            industry: "enterprise",
             // Live research content
             liveResearch: {
               totalSourcesChecked: activeResearchResults?.totalSourcesFound || 0,
@@ -2589,7 +2169,7 @@ export async function POST(request: NextRequest) {
             implementation_phases: [],
             // Industry specific data
             industry_specific: {
-              industry
+              industry: "enterprise"
             }
           };
           
@@ -2613,13 +2193,13 @@ export async function POST(request: NextRequest) {
           
           // Stage 1: Extract service components and structure
           console.log("Analysis Stage 1: Extracting service components...")
-          const serviceAnalysisPrompt = `Analyze research findings to extract service components for ${parsedData.technology || input}:
+          const serviceAnalysisPrompt = `Analyze research findings to extract service components for ${input}:
 
 Research Findings: ${JSON.stringify(researchData)}
 Original Request: "${input}"
 
 Extract and structure the following:
-1. Key implementation phases for ${parsedData.technology || input}
+1. Key implementation phases for ${input}
 2. Essential services required for each phase
 3. Typical subservices for each main service
 4. Hour estimates for each service based on industry benchmarks
@@ -2629,13 +2209,13 @@ Format your analysis as structured JSON focusing on service components.${JSON_RE
           
           // Stage 2: Extract scoping questions and calculations (run in parallel)
           console.log("Analysis Stages 1 & 2: Running service and scoping analysis in parallel...")
-          const scopingAnalysisPrompt = `Analyze research findings to extract scoping questions and calculations for ${parsedData.technology || input}:
+          const scopingAnalysisPrompt = `Analyze research findings to extract scoping questions and calculations for ${input}:
 
 Research Findings: ${JSON.stringify(researchData)}
 Original Request: "${input}"
 
 Extract and structure the following:
-1. Key questions that should be asked during scoping for ${parsedData.technology || input}
+1. Key questions that should be asked during scoping for ${input}
 2. Options for each question with appropriate values
 3. Calculation formulas that can be used to estimate effort
 4. Factors that affect pricing and scoping
@@ -2651,7 +2231,7 @@ Format your analysis as structured JSON focusing on scoping components.${JSON_RE
                 const response = await callOpenRouter({
                   model: models?.analysis || "anthropic/claude-3.5-sonnet",
                   prompt: serviceAnalysisPrompt,
-                  cacheKey: `service:${parsedData.technology || input}`
+                  cacheKey: `service:${input}`
                 })
                 return await parseAIResponse(response)
               },
@@ -2659,7 +2239,7 @@ Format your analysis as structured JSON focusing on scoping components.${JSON_RE
                 const response = await callOpenRouter({
                   model: "openai/gpt-4-turbo",
                   prompt: scopingAnalysisPrompt,
-                  cacheKey: `scoping:${parsedData.technology || input}`
+                  cacheKey: `scoping:${input}`
                 })
                 return await parseAIResponse(response)
               }
@@ -2679,8 +2259,8 @@ Format your analysis as structured JSON focusing on scoping components.${JSON_RE
           const analysisData = {
             ...serviceAnalysisData,
             ...scopingAnalysisData,
-            technology: parsedData.technology || input,
-            industry: industry || "enterprise"
+            technology: input,
+            industry: "enterprise"
           }
           
           console.log("✅ Combined analysis successful")
@@ -2726,7 +2306,7 @@ Format your analysis as structured JSON focusing on scoping components.${JSON_RE
           
           console.log(`Extracted ${extractedQuestions.length} questions and ${extractedServices.length} service components from research`);
           
-          const outlinePrompt = `Based on the research about ${parsedData.technology || input}, create a structured outline for professional services content:
+          const outlinePrompt = `Based on the research about ${input}, create a structured outline for professional services content:
 
 Research Findings: ${JSON.stringify(researchData)}
 Analysis: ${JSON.stringify(analysisData)}
@@ -2738,10 +2318,10 @@ CRITICAL: Use the EXACT terminology, questions, and service components extracted
 
 Create a detailed outline with:
 1. Technology-specific questions that should be asked during scoping (use the extracted questions)
-2. Key service phases for ${parsedData.technology || input} implementation (use the extracted service components)
+2. Key service phases for ${input} implementation (use the extracted service components)
 3. Specific subservices that should be included
 4. Calculation factors that affect pricing/scoping
-5. Industry-specific considerations for ${parsedData.technology || input}
+5. Industry-specific considerations for ${input}
 
 Format your response as structured JSON with these sections clearly defined.${JSON_RESPONSE_INSTRUCTION}`
 
@@ -2750,7 +2330,7 @@ Format your response as structured JSON with these sections clearly defined.${JS
             const outlineResponse = await callOpenRouter({
               model: models?.content || "anthropic/claude-3.5-sonnet",
               prompt: outlinePrompt,
-              cacheKey: `outline:${parsedData.technology || input}`
+              cacheKey: `outline:${input}`
             })
             
             outlineObj = await parseAIResponse(outlineResponse)
@@ -2760,7 +2340,7 @@ Format your response as structured JSON with these sections clearly defined.${JS
             console.error(`❌ Outline generation failed: ${errorMessage}`)
             // Use basic structure if outline fails
             outlineObj = {
-              technology: parsedData.technology || input,
+              technology: input,
               questionTopics: ["implementation scope", "timeline", "integration", "compliance", "user adoption"],
               servicePhases: ["Planning", "Design", "Implementation", "Testing", "Go-Live", "Support"],
               calculationFactors: ["complexity", "scale", "customization"]
@@ -2768,54 +2348,56 @@ Format your response as structured JSON with these sections clearly defined.${JS
           }
           
           // Stage 2: Generate detailed content based on outline and research sources
-          console.log("Stage 2: Generating detailed content based on outline and research sources...")
-          const detailPrompt = `Generate complete professional services content based on this outline, research, and sources:
+          console.log("Stage 2: Generating research-driven professional services content...")
+          const detailPrompt = `You are a senior professional services consultant analyzing comprehensive research to design a service delivery framework. Based on the research findings below, extract and synthesize the actual implementation patterns, methodologies, and complexity drivers to create an authentic professional services offering.
 
-Technology: ${parsedData.technology || input}
-Research Findings: ${JSON.stringify(researchData)}
-Analysis: ${JSON.stringify(analysisData)}
-Outline: ${JSON.stringify(outlineObj)}
-Sources: ${JSON.stringify(sourcesForContent)}
+RESEARCH FINDINGS:
+${JSON.stringify(researchData)}
 
-CRITICAL INSTRUCTIONS:
-1. You MUST use the specific terminology, tools, and methodologies found in the research data
-2. DO NOT generate generic service names - every service and subservice must include specific ${parsedData.technology || input} terminology
-3. Use the exact questions and service components found in the research data when available
-4. Include specific tools, platforms, and methodologies mentioned in the research in your service descriptions
-5. Reference industry best practices found in the research data
-6. Base your hour estimates on the research findings, not generic templates
+ANALYSIS INSIGHTS:
+${JSON.stringify(analysisData)}
 
-DISCOVERY QUESTIONS REQUIREMENTS:
-- Generate AT LEAST 10 highly specific discovery questions for ${parsedData.technology || input}
-- Questions MUST be reusable across multiple client engagements for ScopeStack
-- Each question must be quantitative and directly impact service scope/hours
-- Questions should focus on measurable attributes: user counts, data volumes, site counts, etc.
-- Each question must include 3-4 specific options with numerical values
-- Options must represent different scale/complexity levels (e.g., Small: 1-50, Medium: 51-200, Large: 201-500)
-- Questions must be directly mappable to specific services and subservices
-- Include questions that help determine which services are needed and their scope
-- Each question should have a clear, descriptive slug that indicates what it measures
+IMPLEMENTATION FRAMEWORK:
+${JSON.stringify(outlineObj)}
 
-SERVICE REQUIREMENTS:
-- Generate at least 10 services across all phases (Initiating, Planning, Implementation, Monitoring and Controlling, Closing)
-- Each service must have exactly 3 subservices
-- Each service and subservice must have a UNIQUE name specific to ${parsedData.technology || input}
-- NO generic service names - use specific technology terms from research
-- Each service description must be unique and specific to the service
-- Vary the language and structure across different services
-- Include specific tools, methodologies, and components in service names
-- Explicitly map services to specific discovery questions
-- Include clear formulas showing how question answers affect service hours
+AUTHORITATIVE SOURCES:
+${JSON.stringify(sourcesForContent)}
 
-IMPORTANT: Return ONLY valid JSON. Start with { and end with }. Do not include any markdown code blocks or explanations.
-Your response MUST be a valid JSON object with the following structure:
+RESEARCH-DRIVEN CONTENT APPROACH:
+Analyze the research to understand:
+1. What implementation methodologies and phases are actually used in practice
+2. What variables truly drive complexity, duration, and cost
+3. What tools, processes, and activities are standard in this domain
+4. What sizing factors and benchmarks appear in real implementations
+5. What decision points and dependencies exist in actual projects
+
+DISCOVERY QUESTIONS: Extract from research the factors that genuinely impact implementation scope:
+- What environmental variables affect complexity (infrastructure, user base, data volumes, integration points)?
+- What organizational factors influence timeline (change management, training needs, compliance requirements)?
+- What technical factors drive effort (customization needs, legacy system complexity, security requirements)?
+Base questions on actual implementation drivers found in the research, not generic templates.
+
+SERVICES FRAMEWORK: Derive services from actual methodologies mentioned in research:
+- Use implementation phases and activities that appear in the research sources
+- Name services based on the specific processes, tools, and methodologies discovered
+- Structure services around the dependencies and workflows found in real implementations
+- Include deliverables and activities that are standard practice according to the research
+
+CALCULATIONS: Base effort estimates on research findings:
+- Use sizing factors and benchmarks mentioned in the sources
+- Apply scaling ratios and complexity multipliers found in the research
+- Reference industry standards and effort distributions discovered in the analysis
+
+Create a framework that reflects genuine implementation patterns rather than generic service templates.
+
+RESPONSE FORMAT - Return ONLY valid JSON:
 {
-  "technology": "${parsedData.technology || input}",
-  "questions": [...],
-  "calculations": [...],
-  "services": [...],
-  "totalHours": number,
-  "sources": [...]
+  "technology": "research-derived description of the solution domain",
+  "questions": [discovery questions based on actual implementation variables],
+  "calculations": [effort calculations based on research sizing factors],
+  "services": [implementation services derived from research methodologies],
+  "totalHours": estimated total based on research benchmarks,
+  "sources": [research sources that informed the framework]
 }
 
 Do NOT nest the response inside fields like "email_migration_research" or "research_findings" - use the exact structure above.${JSON_RESPONSE_INSTRUCTION}`
@@ -2879,7 +2461,7 @@ Do NOT nest the response inside fields like "email_migration_research" or "resea
             console.log("Stage 3: Enhancing and refining content...")
             try {
               // Enhance services with more specific descriptions
-              const enhancePrompt = `Enhance these services for ${parsedData.technology || input} with more specific descriptions:
+              const enhancePrompt = `Refine these services based on the research findings to ensure they reflect actual implementation practices:
               
 Original Services: ${JSON.stringify(contentObj.services)}
 Research Data: ${JSON.stringify(researchData)}
@@ -2894,12 +2476,12 @@ UNIQUENESS REQUIREMENTS:
 5. Incorporate specific technical terms from the research in different ways
 6. Vary the focus (business value, technical details, operational benefits) across services
 
-Make each service and subservice more specific to ${parsedData.technology || input} by:
-1. Adding technology-specific terminology from the research data
-2. Including industry-standard methodologies mentioned in the research
-3. Referencing specific tools or processes used in ${parsedData.technology || input} implementations
-4. Ensuring descriptions clearly explain the value/purpose using industry-specific language
-5. Using the exact service components and terminology found in the research
+Refine each service by:
+1. Incorporating specific methodologies and processes mentioned in the research
+2. Using terminology and concepts that appear in the research sources
+3. Aligning service structure with implementation patterns found in the research
+4. Ensuring descriptions reflect actual practice rather than generic templates
+5. Connecting services to real dependencies and workflows discovered in research
 
 CRITICAL: Return ONLY a valid JSON array of services. Start with [ and end with ].
 Ensure all property names and string values use double quotes.
@@ -3002,7 +2584,7 @@ Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
             console.log("⚠️ Content generation failed, but will proceed with partial results")
             // Create a minimal valid content object with what we have
             contentObj = {
-              technology: parsedData.technology || input,
+              technology: input,
               questions: [],
               calculations: [],
               services: [],
@@ -3024,7 +2606,7 @@ Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
                     return {
                       url: parts[0] && parts[0].startsWith('http') ? parts[0] : 'https://www.example.com',
                       title: parts[1] || source,
-                      relevance: `Source for ${parsedData.technology || input} implementation`
+                      relevance: `Source for ${input} implementation`
                     };
                   }
                   return source;
@@ -3039,7 +2621,7 @@ Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
                     return {
                       url: parts[0] && parts[0].startsWith('http') ? parts[0] : 'https://www.example.com',
                       title: parts[1] || source,
-                      relevance: `Source for ${parsedData.technology || input} implementation`
+                      relevance: `Source for ${input} implementation`
                     };
                   }
                   return source;
@@ -3076,7 +2658,7 @@ Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
             // Ensure we have a valid content object with required fields
             if (!contentObj || typeof contentObj !== 'object') {
               contentObj = {
-                technology: parsedData.technology || input,
+                technology: input,
                 questions: [],
                 calculations: [],
                 services: [],
@@ -3108,11 +2690,11 @@ Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
                   contentObj.technology = techStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
                 } catch (e) {
                   // Last resort
-                  contentObj.technology = parsedData.technology || input || "Technology Solution";
+                  contentObj.technology = input || "Technology Solution";
                 }
               }
             } else if (!contentObj.technology) {
-              contentObj.technology = parsedData.technology || input || "Technology Solution";
+              contentObj.technology = input || "Technology Solution";
             }
             
             // Continue with the rest of the fields
@@ -3148,12 +2730,20 @@ Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
           console.log("✅ Research process complete!")
           sendEvent("complete", { content: contentObj, progress: 100 })
           
-          // Close the stream
-          controller.close()
+          // Close the stream safely
+          try {
+            controller.close()
+          } catch (closeError) {
+            console.error("⚠️ Controller close error:", closeError instanceof Error ? closeError.message : String(closeError))
+          }
         } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : String(error)
           console.error("❌ Error in SSE stream:", errorMessage)
-          controller.error(errorMessage)
+          try {
+            controller.error(errorMessage)
+          } catch (controllerError) {
+            console.error("⚠️ Controller error handling failed:", controllerError instanceof Error ? controllerError.message : String(controllerError))
+          }
         }
       }
     })
