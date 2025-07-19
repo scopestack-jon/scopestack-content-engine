@@ -1,0 +1,156 @@
+
+> my-v0-project@0.1.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use, trying 3001 instead.
+   ▲ Next.js 15.2.4
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.7.111:3001
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1183ms
+ ✓ Compiled /api/research in 403ms (410 modules)
+OPENROUTER_API_KEY: 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
+ POST /api/research 400 in 505ms
+🔍 Starting research for: test openrouter api key
+🔍 Performing Perplexity-based active research for: test openrouter api key
+API call attempt 1 failed: HTTP 404: Not Found
+Retrying after 1135.4069937520696ms...
+API call attempt 2 failed: HTTP 404: Not Found
+Retrying after 2816.830304827192ms...
+API call attempt 3 failed: HTTP 404: Not Found
+❌ Perplexity research failed: Error: HTTP 404: Not Found
+    at OptimizedAPIClient.makeAPICall (lib/api-optimizations.ts:183:16)
+    at async CircuitBreaker.execute (lib/api-optimizations.ts:83:21)
+    at async OptimizedAPIClient.callWithOptimizations (lib/api-optimizations.ts:140:19)
+    at async performPerplexityResearch (app/api/research/route.ts:1289:21)
+    at async Object.start (app/api/research/route.ts:1864:31)
+  181 |         
+  182 |         if (!response.ok) {
+> 183 |           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      |                ^
+  184 |         }
+  185 |         
+  186 |         const data = await response.json()
+✅ Generated 5 AI-driven questions based on research
+✅ Generated 3 AI-driven services based on research
+✅ Generated 5 calculations mapped to actual questions
+ POST /api/research 200 in 26769ms
+ ✓ Compiled in 110ms (134 modules)
+ ✓ Compiled in 62ms (134 modules)
+OPENROUTER_API_KEY: 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
+🔍 Starting research for: test perplexity model fix
+🔍 Performing Perplexity-based active research for: test perplexity model fix
+API call attempt 1 failed: HTTP 400: Bad Request
+Retrying after 1922.612198653737ms...
+API call attempt 2 failed: HTTP 400: Bad Request
+Retrying after 2688.04366908731ms...
+API call attempt 3 failed: HTTP 400: Bad Request
+❌ Perplexity research failed: Error: HTTP 400: Bad Request
+    at OptimizedAPIClient.makeAPICall (lib/api-optimizations.ts:183:16)
+    at async CircuitBreaker.execute (lib/api-optimizations.ts:83:21)
+    at async OptimizedAPIClient.callWithOptimizations (lib/api-optimizations.ts:140:19)
+    at async performPerplexityResearch (app/api/research/route.ts:1289:21)
+    at async Object.start (app/api/research/route.ts:1864:31)
+  181 |         
+  182 |         if (!response.ok) {
+> 183 |           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      |                ^
+  184 |         }
+  185 |         
+  186 |         const data = await response.json()
+✅ Generated 5 AI-driven questions based on research
+Failed to parse AI services: SyntaxError: Unexpected token 'I', "I apologiz"... is not valid JSON
+    at JSON.parse (<anonymous>)
+    at generateServicesFromResearch (app/api/research/route.ts:1659:24)
+    at async Object.start (app/api/research/route.ts:1907:27)
+  1657 |         services = JSON.parse(jsonMatch[0]);
+  1658 |       } else {
+> 1659 |         services = JSON.parse(aiContent);
+       |                        ^
+  1660 |       }
+  1661 |     } catch (parseError) {
+  1662 |       console.warn('Failed to parse AI services:', parseError);
+✅ Generated 5 calculations mapped to actual questions
+ POST /api/research 200 in 18741ms
+ ✓ Compiled in 10ms
+ ✓ Compiled /api/research in 95ms (134 modules)
+OPENROUTER_API_KEY: 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
+🔍 Starting research for: Salesforce implementation for healthcare with 200 users
+🔍 Performing Perplexity-based active research for: Salesforce implementation for healthcare with 200 users
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 6669
+📝 First 500 chars: {
+  "sources": [    {
+      "title": "Salesforce Health Cloud Implementation Guide 2025",
+      "url": "https://www.getgenerative.ai/salesforce-health-cloud-implementation-guide/",
+      "summary": "Provides a detailed step-by-step guide for implementing Salesforce Health Cloud in healthcare settings, covering business objectives, team building, data assessment, platform configuration, and integration with EHR systems using FHIR standards. It emphasizes compliance and regulatory alignment and in
+📝 Last 200 chars: tinuity of care during the transition.",
+    "Security architecture must incorporate encryption, access controls, and compliance auditing to protect sensitive patient data."
+  ],
+  "confidence": 0.9
+}
+🧹 Cleaned response length: 6669
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "Salesforce Health Cloud Implementation Guide 2025",
+      "url": "https://www.getgenerative.ai/salesforce-health-cloud-implementation-guide/",
+      "summary": "Provides a detailed step-by-step guide for implementing Salesforce Health Cloud in healthcare setting
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 9
+✅ Found 9 sources from Perplexity research
+🔗 Source titles: [
+  'Salesforce Health Cloud Implementation Guide 2025',
+  'The Ultimate Guide to Salesforce Health Cloud Implementation for Healthcare Providers',
+  'Salesforce Health Cloud Implementation Guide 2024',
+  'Successfully Implementing Salesforce for Healthcare',
+  'Complete Guide to Salesforce Health Cloud'
+]
+✅ Generated 5 AI-driven questions based on research
+✅ Generated 4 AI-driven services based on research
+✅ Generated 5 calculations mapped to actual questions
+ POST /api/research 200 in 74276ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1230ms (927 modules)
+Checking if should render ContentOutput. generatedContent: null
+ GET / 200 in 1393ms
+ ✓ Compiled in 209ms (401 modules)
+ ✓ Compiled /api/research in 81ms (546 modules)
+OPENROUTER_API_KEY: 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
+🔍 Starting research for: Apple MDM Solution for a corporate environment 
+🔍 Performing Perplexity-based active research for: Apple MDM Solution for a corporate environment 
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 7807
+📝 First 500 chars: ```json
+{
+  "sources": [    {
+      "title": "Apple Business Manager - Getting Started Guide",
+      "url": "https://www.apple.com/business/docs/site/Apple_Business_Manager_Getting_Started_Guide.pdf",
+      "summary": "Official Apple guide for setting up and managing Apple Business Manager, including MDM server authorization, device assignment, and integration with Apple Configurator. Covers both Apple-purchased and third-party devices, provisioning workflows, and default server assignment.",
+  
+📝 Last 200 chars: , security, architecture, and regulatory considerations.
+
+**Confidence**: High, due to reliance on Apple’s own documentation and support resources, which are current, comprehensive, and authoritative.
+🧹 Cleaned response length: 6198
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "Apple Business Manager - Getting Started Guide",
+      "url": "https://www.apple.com/business/docs/site/Apple_Business_Manager_Getting_Started_Guide.pdf",
+      "summary": "Official Apple guide for setting up and managing Apple Business Manager, including MDM se
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 10
+✅ Found 10 sources from Perplexity research
+🔗 Source titles: [
+  'Apple Business Manager - Getting Started Guide',
+  'Managed Devices and Corporate Data',
+  'Choose a mobile device management solution - Apple Support',
+  "Exploring Apple's MDM Framework",
+  'Understanding How MDM Works'
+]
+✅ Generated 6 AI-driven questions based on research
+✅ Generated 4 AI-driven services based on research
+✅ Generated 6 calculations mapped to actual questions
+ POST /api/research 200 in 73239ms

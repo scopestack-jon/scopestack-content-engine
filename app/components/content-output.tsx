@@ -1026,33 +1026,6 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                             </div>
                             <p className="text-xs text-gray-600 mb-2">{sub.description || 'No description available'}</p>
 
-                            {/* New language fields for the subservice */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-                              <div>
-                                <div className="font-semibold text-xs text-gray-700 mb-1">Service Description</div>
-                                <div className="text-xs text-gray-600 bg-white p-1 rounded border">
-                                  {sub.serviceDescription || "Not specified"}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="font-semibold text-xs text-gray-700 mb-1">Key Assumptions</div>
-                                <div className="text-xs text-gray-600 bg-white p-1 rounded border">
-                                  {sub.keyAssumptions || "Not specified"}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="font-semibold text-xs text-gray-700 mb-1">Client Responsibilities</div>
-                                <div className="text-xs text-gray-600 bg-white p-1 rounded border">
-                                  {sub.clientResponsibilities || "Not specified"}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="font-semibold text-xs text-gray-700 mb-1">Out of Scope</div>
-                                <div className="text-xs text-gray-600 bg-white p-1 rounded border">
-                                  {sub.outOfScope || "Not specified"}
-                                </div>
-                              </div>
-                            </div>
 
                             {/* Scope Language */}
                             {sub.serviceDescription && (

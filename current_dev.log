@@ -446,3 +446,125 @@ OPENROUTER_API_KEY: sk-or-v1-5784660e3272627334509c8e9fa8aebcc724ea214eec9fc6104
 ✅ Generated 4 AI-driven services based on research
 ✅ Generated 6 calculations mapped to actual questions
  POST /api/research 200 in 60642ms
+ ✓ Compiled in 341ms (927 modules)
+Checking if should render ContentOutput. generatedContent: null
+ GET / 200 in 177ms
+ ✓ Compiled /api/research in 35ms (546 modules)
+OPENROUTER_API_KEY: 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
+🔍 Starting research for: Simple network router configuration for small office
+🔍 Performing Perplexity-based active research for: Simple network router configuration for small office
+API call attempt 1 failed: HTTP 401: Unauthorized
+Retrying after 1989.795870777274ms...
+API call attempt 2 failed: HTTP 401: Unauthorized
+Retrying after 2942.299061251324ms...
+API call attempt 3 failed: HTTP 401: Unauthorized
+❌ Perplexity research failed: Error: HTTP 401: Unauthorized
+    at OptimizedAPIClient.makeAPICall (lib/api-optimizations.ts:183:16)
+    at async CircuitBreaker.execute (lib/api-optimizations.ts:83:21)
+    at async OptimizedAPIClient.callWithOptimizations (lib/api-optimizations.ts:140:19)
+    at async performPerplexityResearch (app/api/research/route.ts:1289:21)
+    at async Object.start (app/api/research/route.ts:1864:31)
+  181 |         
+  182 |         if (!response.ok) {
+> 183 |           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      |                ^
+  184 |         }
+  185 |         
+  186 |         const data = await response.json()
+Failed to generate AI questions, using fallback
+Failed to generate AI services, using fallback
+✅ Generated 3 calculations mapped to actual questions
+ POST /api/research 200 in 6821ms
+Checking if should render ContentOutput. generatedContent: null
+ GET / 200 in 120ms
+ ✓ Compiled /_not-found in 102ms (937 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 184ms
+OPENROUTER_API_KEY: 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
+🔍 Starting research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
+🔍 Performing Perplexity-based active research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
+API call attempt 1 failed: HTTP 401: Unauthorized
+Retrying after 1734.867568887445ms...
+API call attempt 2 failed: HTTP 401: Unauthorized
+Retrying after 2714.512578950257ms...
+API call attempt 3 failed: HTTP 401: Unauthorized
+❌ Perplexity research failed: Error: HTTP 401: Unauthorized
+    at OptimizedAPIClient.makeAPICall (lib/api-optimizations.ts:183:16)
+    at async CircuitBreaker.execute (lib/api-optimizations.ts:83:21)
+    at async OptimizedAPIClient.callWithOptimizations (lib/api-optimizations.ts:140:19)
+    at async performPerplexityResearch (app/api/research/route.ts:1289:21)
+    at async Object.start (app/api/research/route.ts:1864:31)
+  181 |         
+  182 |         if (!response.ok) {
+> 183 |           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      |                ^
+  184 |         }
+  185 |         
+  186 |         const data = await response.json()
+Failed to generate AI questions, using fallback
+Failed to generate AI services, using fallback
+✅ Generated 3 calculations mapped to actual questions
+ POST /api/research 200 in 5738ms
+ ✓ Compiled in 193ms (927 modules)
+ GET / 200 in 91ms
+ ✓ Compiled in 78ms (401 modules)
+ GET / 200 in 7ms
+ ✓ Compiled /api/research in 101ms (546 modules)
+OPENROUTER_API_KEY: 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
+🔍 Starting research for: test network setup
+🔍 Performing Perplexity-based active research for: test network setup
+ GET / 200 in 96ms
+API call attempt 1 failed: HTTP 401: Unauthorized
+Retrying after 1602.5725140969616ms...
+API call attempt 2 failed: HTTP 401: Unauthorized
+Retrying after 2557.507873072836ms...
+API call attempt 3 failed: HTTP 401: Unauthorized
+❌ Perplexity research failed: Error: HTTP 401: Unauthorized
+    at OptimizedAPIClient.makeAPICall (lib/api-optimizations.ts:183:16)
+    at async CircuitBreaker.execute (lib/api-optimizations.ts:83:21)
+    at async OptimizedAPIClient.callWithOptimizations (lib/api-optimizations.ts:140:19)
+    at async performPerplexityResearch (app/api/research/route.ts:1289:21)
+    at async Object.start (app/api/research/route.ts:1864:31)
+  181 |         
+  182 |         if (!response.ok) {
+> 183 |           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      |                ^
+  184 |         }
+  185 |         
+  186 |         const data = await response.json()
+Failed to generate AI questions, using fallback
+Failed to generate AI services, using fallback
+✅ Generated 3 calculations mapped to actual questions
+ POST /api/research 200 in 5408ms
+ ✓ Compiled in 100ms (401 modules)
+ GET / 200 in 23ms
+   Reload env: .env.local
+ ✓ Compiled in 65ms (933 modules)
+ GET / 200 in 44ms
+ ✓ Compiled in 84ms (401 modules)
+ GET / 200 in 22ms
+ ✓ Compiled in 177ms (927 modules)
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/jon/scopestack-content-engine/.next/server/app/page.js'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/jon/scopestack-content-engine/.next/server/app/page.js',
+  page: '/'
+}
+ ✓ Compiled /_error in 285ms (1243 modules)
+ GET / 500 in 701ms
+ GET / 200 in 58ms
+ GET / 200 in 7ms
+Checking if should render ContentOutput. generatedContent: null
+ GET / 200 in 111ms
+ ✓ Compiled /_not-found in 149ms (1247 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 231ms
+ GET /_next/static/css/app/layout.css?v=1752954153606 404 in 258ms
+ GET /_next/static/chunks/app/page.js 404 in 40ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 42ms
+ ✓ Compiled in 90ms (646 modules)
+ ✓ Compiled in 121ms (642 modules)
+ ✓ Compiled in 88ms (642 modules)
+ ✓ Compiled /_not-found in 150ms (1204 modules)
+ GET / 404 in 286ms
+ GET /_next/static/css/app/layout.css?v=1752954446284 404 in 35ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 20ms
