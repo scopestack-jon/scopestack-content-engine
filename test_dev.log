@@ -326,3 +326,84 @@ API call attempt 1
  ✓ Compiled in 155ms (927 modules)
  GET / 200 in 88ms
 <w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+Checking if should render ContentOutput. generatedContent: null
+ GET / 200 in 115ms
+ ✓ Compiled /api/research in 58ms (553 modules)
+🔍 Starting research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
+🔍 Performing Perplexity-based active research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
+ GET / 200 in 105ms
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 5312
+📝 First 500 chars: ```json
+{
+  "sources": [    {
+      "title": "How to seamlessly migrate Microsoft Exchange to Office 365",
+      "url": "https://exclaimer.com/email-signature-handbook/how-to-migrate-microsoft-exchange-to-office-365/",
+      "summary": "Provides a step-by-step guide for migrating from Microsoft Exchange to Office 365, including domain verification, directory synchronization, migration endpoint setup, mail flow configuration, and mailbox migration. Emphasizes coexistence planning and monitoring d
+📝 Last 200 chars: rtner with healthcare experience can mitigate risks and accelerate the migration, especially for organizations with complex integrations or compliance requirements[3]."
+  ],
+  "confidence": 0.85
+}
+```
+🧹 Cleaned response length: 5300
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "How to seamlessly migrate Microsoft Exchange to Office 365",
+      "url": "https://exclaimer.com/email-signature-handbook/how-to-migrate-microsoft-exchange-to-office-365/",
+      "summary": "Provides a step-by-step guide for migrating from Microsoft Exchange to 
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  'How to seamlessly migrate Microsoft Exchange to Office 365',
+  'Use the Microsoft 365 and Office 365 mail migration advisor',
+  'Ways to migrate multiple email accounts to Microsoft 365 or Office 365',
+  'Microsoft 365 Migration Guide: Steps & Checklist',
+  'Office 365 Migration Plan: 8 Key Steps For a Successful Email Migration'
+]
+API call attempt 1
+✅ Generated 7 AI-driven questions based on research
+API call attempt 1
+✅ Generated 4 AI-driven services based on research
+✅ Generated 8 calculations mapped to actual questions
+ POST /api/research 200 in 43442ms
+Checking if should render ContentOutput. generatedContent: null
+ GET / 200 in 100ms
+🔍 Starting research for: Nutanix hyperconverged infrastructure install to support E Clinical Works EMR Build - supporting redundancy across 2 data centers.
+🔍 Performing Perplexity-based active research for: Nutanix hyperconverged infrastructure install to support E Clinical Works EMR Build - supporting redundancy across 2 data centers.
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 6614
+📝 First 500 chars: {
+  "sources": [    {
+      "title": "The Definitive Guide to Hyperconverged Infrastructure - SHI",
+      "url": "https://www.content.shi.com/cms-content/accelerator/media/pdfs/nutanix/nutanix-032023-ebook-hyperconverged-infrastructure.pdf",
+      "summary": "This comprehensive guide provides an overview of Nutanix hyperconverged infrastructure (HCI) including hardware platform configurations that can be independently scaled for CPU, RAM, and storage. It details Nutanix Cloud Infrastructure (NCI
+📝 Last 200 chars: intain synchronous or asynchronous failover.",
+    "Compliance with healthcare regulations demands robust data protection, auditability, and disaster recovery capabilities."
+  ],
+  "confidence": 0.9
+}
+🧹 Cleaned response length: 6614
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "The Definitive Guide to Hyperconverged Infrastructure - SHI",
+      "url": "https://www.content.shi.com/cms-content/accelerator/media/pdfs/nutanix/nutanix-032023-ebook-hyperconverged-infrastructure.pdf",
+      "summary": "This comprehensive guide provides an ove
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  'The Definitive Guide to Hyperconverged Infrastructure - SHI',
+  'Nutanix Cloud Infrastructure (NCI) - The Foundation for Your Hybrid Cloud',
+  '5 Easy Steps to Setting up and Managing Cloud-ready Infrastructure',
+  'Cisco Compute Hyperconverged with Nutanix - Software Support Guidelines',
+  'What is Hyperconverged Infrastructure (HCI) - FAQs | Nutanix'
+]
+API call attempt 1
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+✅ Generated 4 AI-driven services based on research
+✅ Generated 7 calculations mapped to actual questions
+ POST /api/research 200 in 42539ms
