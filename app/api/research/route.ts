@@ -1,6 +1,7 @@
 console.log("OPENROUTER_API_KEY:", process.env.OPENROUTER_API_KEY);
 import { generateText } from "ai"
 import type { NextRequest } from "next/server"
+import { NextResponse } from "next/server"
 import { OptimizedAPIClient, OptimizedJSONParser } from "../../../lib/api-optimizations"
 import { DynamicResearchEnhancer } from "../../../lib/dynamic-research-enhancer"
 import { LiveResearchEngine } from "../../../lib/live-research-engine"
@@ -834,6 +835,61 @@ function normalizeNestedStructure(parsed: any): any {
       }));
     }
     
+    // Collect questions from multiple sources (merge them instead of else-if)
+    let allQuestions: any[] = [];
+    let questionCounter = 1;
+    
+    // Helper function to format questions consistently
+    const formatQuestion = (q: any, prefix: string) => {
+      const options = Array.isArray(q.options) ? q.options.map((opt: string | any, i: number) => {
+        if (typeof opt === 'string') {
+          return {
+            key: opt,
+            value: i + 1,
+            default: i === 0
+          };
+        } else if (typeof opt === 'object' && opt !== null) {
+          return {
+            key: opt.key || opt.text || opt.label || `Option ${i + 1}`,
+            value: i + 1,
+            default: !!opt.default || i === 0
+          };
+        } else {
+          return {
+            key: `Option ${i + 1}`,
+            value: i + 1,
+            default: i === 0
+          };
+        }
+      }) : [];
+      
+      return {
+        id: q.id || `q${questionCounter++}`,
+        slug: q.slug || `${prefix}-question-${questionCounter - 1}`,
+        question: q.question || `${prefix} Question ${questionCounter - 1}`,
+        options: options
+      };
+    };
+    
+    // Collect scoping_questions
+    if (parsed.scoping_questions && Array.isArray(parsed.scoping_questions)) {
+      allQuestions = allQuestions.concat(
+        parsed.scoping_questions.map((q: any) => formatQuestion(q, 'scoping'))
+      );
+    }
+    
+    // Collect technology_specific_questions
+    if (parsed.technology_specific_questions && Array.isArray(parsed.technology_specific_questions)) {
+      allQuestions = allQuestions.concat(
+        parsed.technology_specific_questions.map((q: any) => formatQuestion(q, 'tech'))
+      );
+    }
+    
+    // If we found questions from the new sources, use them
+    if (allQuestions.length > 0) {
+      normalized.questions = allQuestions;
+    }
+    
     // Extract services from various possible locations
     if (Array.isArray(parsed.services)) {
       normalized.services = parsed.services;
@@ -1118,433 +1174,64 @@ function validateContentStructure(content: any): boolean {
     }
   }
 
-  // Validate or create questions
-  if (!Array.isArray(content.questions) || content.questions.length < 10) {
-    console.warn(`⚠️ Insufficient questions: ${content.questions?.length || 0}/10 minimum, generating default questions`)
-    
-    // Keep existing questions if any
-    const existingQuestions = Array.isArray(content.questions) ? content.questions : [];
-    
-    // We should not add static questions - log a warning instead
-    console.log(`❗ Warning: Only ${existingQuestions.length} questions found. Using what's available.`);
-    
-    // Assign existing questions without adding default ones
-    content.questions = existingQuestions;
+  // Ensure questions array exists and trust research-driven content
+  if (!Array.isArray(content.questions)) {
+    content.questions = [];
+  }
+  if (content.questions.length > 0) {
+    console.log(`✅ Using ${content.questions.length} research-driven questions`);
+  } else {
+    console.warn(`⚠️ No questions generated from research`);
   }
 
-  // Validate or create calculations
-  if (!Array.isArray(content.calculations) || content.calculations.length < 5) {
-    console.warn(`⚠️ Insufficient calculations: ${content.calculations?.length || 0}/5 minimum, generating default calculations`)
-    
-    // Keep existing calculations if any
-    const existingCalculations = Array.isArray(content.calculations) ? content.calculations : [];
-    
-    // Find available question slugs to map calculations to
-    const availableQuestionSlugs = Array.isArray(content.questions) ? 
-      content.questions.map((q: any) => q.slug || '') : [];
-    
-    // Categorize questions by type to map to appropriate calculations
-    const userCountQuestions = availableQuestionSlugs.filter((slug: string) => 
-      slug.includes('user') || slug.includes('count') || slug.includes('employees'));
-    
-    const volumeQuestions = availableQuestionSlugs.filter((slug: string) => 
-      slug.includes('volume') || slug.includes('size') || slug.includes('data'));
-    
-    const complexityQuestions = availableQuestionSlugs.filter((slug: string) => 
-      slug.includes('complex') || slug.includes('custom') || slug.includes('requirement'));
-    
-    const timelineQuestions = availableQuestionSlugs.filter((slug: string) => 
-      slug.includes('timeline') || slug.includes('schedule') || slug.includes('deadline'));
-    
-    const locationQuestions = availableQuestionSlugs.filter((slug: string) => 
-      slug.includes('location') || slug.includes('site') || slug.includes('office'));
-    
-    // Generate technology-specific calculations that map to different questions
-    const defaultCalculations = [
-      {
-        id: "scale_factor",
-        slug: "scale_factor",
-        name: `${content.technology} Scale Factor`,
-        description: `Adjusts hours based on the number of users/devices in the ${content.technology} implementation`,
-        formula: userCountQuestions.length > 0 ? userCountQuestions[0] : (availableQuestionSlugs.length > 0 ? availableQuestionSlugs[0] : "question_1"),
-        mappedQuestions: userCountQuestions.length > 0 ? [userCountQuestions[0]] : 
-                         (availableQuestionSlugs.length > 0 ? [availableQuestionSlugs[0]] : []),
-        resultType: "multiplier"
-      },
-      {
-        id: "data_volume",
-        slug: "data_volume",
-        name: `${content.technology} Data Volume Factor`,
-        description: `Adjusts hours based on the volume of data involved in the ${content.technology} implementation`,
-        formula: volumeQuestions.length > 0 ? volumeQuestions[0] : (availableQuestionSlugs.length > 1 ? availableQuestionSlugs[1] : "question_2"),
-        mappedQuestions: volumeQuestions.length > 0 ? [volumeQuestions[0]] : 
-                        (availableQuestionSlugs.length > 1 ? [availableQuestionSlugs[1]] : []),
-        resultType: "multiplier"
-      },
-      {
-        id: "complexity_factor",
-        slug: "complexity_factor",
-        name: `${content.technology} Complexity Factor`,
-        description: `Adjusts hours based on the complexity of the ${content.technology} implementation`,
-        formula: complexityQuestions.length > 0 ? complexityQuestions[0] : (availableQuestionSlugs.length > 2 ? availableQuestionSlugs[2] : "question_3"),
-        mappedQuestions: complexityQuestions.length > 0 ? [complexityQuestions[0]] : 
-                        (availableQuestionSlugs.length > 2 ? [availableQuestionSlugs[2]] : []),
-        resultType: "multiplier"
-      },
-      {
-        id: "timeline_factor",
-        slug: "timeline_factor",
-        name: `${content.technology} Timeline Factor`,
-        description: `Adjusts hours based on the implementation timeline requirements`,
-        formula: timelineQuestions.length > 0 ? timelineQuestions[0] : (availableQuestionSlugs.length > 3 ? availableQuestionSlugs[3] : "question_4"),
-        mappedQuestions: timelineQuestions.length > 0 ? [timelineQuestions[0]] : 
-                        (availableQuestionSlugs.length > 3 ? [availableQuestionSlugs[3]] : []),
-        resultType: "multiplier"
-      },
-      {
-        id: "location_factor",
-        slug: "location_factor",
-        name: `${content.technology} Location Factor`,
-        description: `Adjusts hours based on the number of locations/sites involved`,
-        formula: locationQuestions.length > 0 ? locationQuestions[0] : (availableQuestionSlugs.length > 4 ? availableQuestionSlugs[4] : "question_5"),
-        mappedQuestions: locationQuestions.length > 0 ? [locationQuestions[0]] : 
-                        (availableQuestionSlugs.length > 4 ? [availableQuestionSlugs[4]] : []),
-        resultType: "multiplier"
-      }
-    ];
-    
-    // Ensure existing calculations have descriptive slugs
-    existingCalculations.forEach((calc: any) => {
-      // Check if the slug is generic like "calc1" or missing
-      if (!calc.slug || calc.slug.match(/^calc\d+$/)) {
-        // Generate a descriptive slug based on the calculation name
-        const baseName = (calc.name || "calculation").toLowerCase().replace(/[^a-z0-9]+/g, '_');
-        calc.slug = `${baseName}_factor`;
-      }
-      
-      // Ensure each calculation has a descriptive name
-      if (!calc.name || calc.name.match(/^Calculation \d+$/)) {
-        calc.name = `${content.technology} ${calc.id || "Factor"}`;
-      }
-      
-      // Ensure each calculation is mapped to at least one question
-      if (!calc.mappedQuestions || !Array.isArray(calc.mappedQuestions) || calc.mappedQuestions.length === 0) {
-        if (availableQuestionSlugs.length > 0) {
-          // Try to find a quantitative question to map to
-          const quantitativeQuestionSlugs = availableQuestionSlugs.filter((slug: string) => 
-            slug.includes('user') || slug.includes('count') || 
-            slug.includes('volume') || slug.includes('number') || 
-            slug.includes('size') || slug.includes('quantity')
-          );
-          
-          if (quantitativeQuestionSlugs.length > 0) {
-            calc.mappedQuestions = [quantitativeQuestionSlugs[0]];
-          } else {
-            calc.mappedQuestions = [availableQuestionSlugs[0]];
-          }
-        } else {
-          calc.mappedQuestions = [];
-        }
-      }
-    });
-    
-    // We'll use existing calculations first, then add default ones only if needed
-    const additionalNeeded = Math.max(0, 5 - existingCalculations.length);
-    const additionalCalculations = defaultCalculations.slice(0, additionalNeeded);
-    
-    content.calculations = [...existingCalculations, ...additionalCalculations];
-    
-    if (additionalNeeded > 0) {
-      console.log(`✅ Generated ${additionalNeeded} additional calculations to meet minimum requirements`);
-    }
+  // Ensure calculations array exists and trust research-driven content  
+  if (!Array.isArray(content.calculations)) {
+    content.calculations = [];
+  }
+  if (content.calculations.length > 0) {
+    console.log(`✅ Using ${content.calculations.length} research-driven calculations`);
+  } else {
+    console.warn(`⚠️ No calculations generated from research`);
   }
 
-  // Validate or create services
-  if (!Array.isArray(content.services) || content.services.length < 10) {
-    console.warn(`⚠️ Insufficient services: ${content.services?.length || 0}/10 minimum, generating default services`)
-    
-    // Keep existing services if any
-    const existingServices = Array.isArray(content.services) ? content.services : [];
-    
-    // Define the required phases
-    const phases = ["Initiating", "Planning", "Implementation", "Monitoring and Controlling", "Closing"];
-    
-    // Group existing services by phase
-    const servicesByPhase: {[key: string]: any[]} = {};
-    phases.forEach(phase => servicesByPhase[phase] = []);
-    
-    existingServices.forEach((service: Service) => {
-      const phase = service.phase || "Implementation";
-      if (!servicesByPhase[phase]) {
-        servicesByPhase[phase] = [];
-      }
-      servicesByPhase[phase].push(service);
-    });
-    
-    // Add more services if needed to reach minimum of 10
-    if (existingServices.length < 10) {
-      const additionalNeeded = 10 - existingServices.length;
-      
-      // Define additional specialized services for each phase
-      const specializedServices = {
-        "Initiating": [
-          `${content.technology} Requirements Analysis`,
-          `${content.technology} Project Charter Development`,
-          `${content.technology} Stakeholder Analysis`
-        ],
-        "Planning": [
-          `${content.technology} Architecture Design`,
-          `${content.technology} Resource Planning`,
-          `${content.technology} Risk Assessment`
-        ],
-        "Implementation": [
-          `${content.technology} Core Configuration`,
-          `${content.technology} Integration Services`,
-          `${content.technology} Data Migration`,
-          `${content.technology} Security Implementation`,
-          `${content.technology} Testing and Validation`
-        ],
-        "Monitoring and Controlling": [
-          `${content.technology} Performance Monitoring`,
-          `${content.technology} Quality Assurance`,
-          `${content.technology} Change Management`
-        ],
-        "Closing": [
-          `${content.technology} Knowledge Transfer`,
-          `${content.technology} Documentation Finalization`,
-          `${content.technology} Project Closure`
-        ]
-      };
-      
-      // Generate default services
-      const defaultServices = [];
-      
-      // First ensure each phase has at least 1 service
-      phases.forEach(phase => {
-        if (servicesByPhase[phase].length === 0) {
-          const serviceName = specializedServices[phase as keyof typeof specializedServices][0];
-          const service = createDetailedService(content.technology, phase, serviceName);
-          defaultServices.push(service);
-          servicesByPhase[phase].push(service);
-        }
-      });
-      
-      // Then ensure Implementation phase has at least 3 services
-      if (servicesByPhase["Implementation"].length < 3) {
-        const implementationCount = servicesByPhase["Implementation"].length;
-        for (let i = implementationCount; i < 3; i++) {
-          const serviceName = specializedServices["Implementation"][i];
-          const service = createDetailedService(content.technology, "Implementation", serviceName);
-          defaultServices.push(service);
-          servicesByPhase["Implementation"].push(service);
-        }
-      }
-      
-      // Add more services if needed to reach minimum of 10
-      if (defaultServices.length < additionalNeeded) {
-        let moreNeeded = additionalNeeded - defaultServices.length;
-        let phaseIndex = 0;
-        
-        while (moreNeeded > 0) {
-          const phase = phases[phaseIndex % phases.length];
-          const phaseServices = specializedServices[phase as keyof typeof specializedServices];
-          const serviceIndex = servicesByPhase[phase].length;
-          
-          if (serviceIndex < phaseServices.length) {
-            const serviceName = phaseServices[serviceIndex];
-            const service = createDetailedService(content.technology, phase, serviceName);
-            defaultServices.push(service);
-            servicesByPhase[phase].push(service);
-            moreNeeded--;
-          }
-          
-          phaseIndex++;
-        }
-      }
-      
-      // Add default services to existing services
-      content.services = [...existingServices, ...defaultServices];
-      console.log(`✅ Generated ${defaultServices.length} additional services to meet minimum requirements`);
-    }
-    
-    // Recalculate total hours
-    content.totalHours = content.services.reduce((total: number, service: any) => total + (service.hours || 0), 0);
+  // Ensure services array exists and trust research-driven content
+  if (!Array.isArray(content.services)) {
+    content.services = [];
   }
-  
-  // Ensure each service has proper scope language fields
-  for (const [index, service] of content.services.entries()) {
-    // Check for missing scope language fields
-    if (!service.serviceDescription || service.serviceDescription.length < 100) {
-      service.serviceDescription = generateServiceDescription(content.technology, service.name || service.service, service.phase);
-    }
-    
-    if (!service.keyAssumptions || service.keyAssumptions.length < 100) {
-      service.keyAssumptions = generateKeyAssumptions(content.technology, service.name || service.service, service.phase);
-    }
-    
-    if (!service.clientResponsibilities || service.clientResponsibilities.length < 100) {
-      service.clientResponsibilities = generateClientResponsibilities(content.technology, service.name || service.service, service.phase);
-    }
-    
-    if (!service.outOfScope || service.outOfScope.length < 100) {
-      service.outOfScope = generateOutOfScope(content.technology, service.name || service.service, service.phase);
-    }
-    
-    // Check each subservice
-    if (Array.isArray(service.subservices)) {
-      for (const [subIndex, subservice] of service.subservices.entries()) {
-        if (!subservice.name || !subservice.description) {
-          console.warn(`⚠️ Subservice at index ${index}.${subIndex} is missing fields, fixing`);
-          subservice.name = subservice.name || `${service.name || service.service} Component ${subIndex + 1}`;
-          subservice.description = subservice.description || `${subservice.name} for ${content.technology}`;
-        }
-        
-        if (typeof subservice.hours !== 'number' || isNaN(subservice.hours)) {
-          subservice.hours = Math.floor((service.hours || 40) / 3);
-        }
-        
-        // Add or improve scope language fields for subservices
-        if (!subservice.serviceDescription || subservice.serviceDescription.length < 100) {
-          subservice.serviceDescription = generateSubserviceDescription(content.technology, subservice.name, service.name || service.service);
-        }
-        
-        if (!subservice.keyAssumptions || subservice.keyAssumptions.length < 100) {
-          subservice.keyAssumptions = generateSubserviceKeyAssumptions(content.technology, subservice.name, service.name || service.service);
-        }
-        
-        if (!subservice.clientResponsibilities || subservice.clientResponsibilities.length < 100) {
-          subservice.clientResponsibilities = generateSubserviceClientResponsibilities(content.technology, subservice.name, service.name || service.service);
-        }
-        
-        if (!subservice.outOfScope || subservice.outOfScope.length < 100) {
-          subservice.outOfScope = generateSubserviceOutOfScope(content.technology, subservice.name, service.name || service.service);
-        }
-        
-        // Map subservices to questions and calculations
-        if (!subservice.mappedQuestions || !Array.isArray(subservice.mappedQuestions) || subservice.mappedQuestions.length === 0) {
-          // Categorize questions by type
-          const availableQuestionSlugs = Array.isArray(content.questions) ? 
-            content.questions.map((q: any) => q.slug || '') : [];
-            
-          // Find appropriate questions based on subservice type
-          const subserviceName = subservice.name.toLowerCase();
-          let mappedQuestions: string[] = [];
-          
-          if (subserviceName.includes('assessment') || subserviceName.includes('requirements') || subserviceName.includes('planning')) {
-            // Find complexity or requirement questions
-            const complexityQuestions = availableQuestionSlugs.filter((slug: string) => 
-              slug.includes('complex') || slug.includes('requirement') || slug.includes('assessment'));
-            if (complexityQuestions.length > 0) {
-              mappedQuestions = [complexityQuestions[0]];
-            }
-          } else if (subserviceName.includes('design') || subserviceName.includes('architecture')) {
-            // Find design or architecture questions
-            const designQuestions = availableQuestionSlugs.filter((slug: string) => 
-              slug.includes('design') || slug.includes('architecture') || slug.includes('custom'));
-            if (designQuestions.length > 0) {
-              mappedQuestions = [designQuestions[0]];
-            }
-          } else if (subserviceName.includes('deploy') || subserviceName.includes('implement') || subserviceName.includes('configuration')) {
-            // Find scale or volume questions
-            const scaleQuestions = availableQuestionSlugs.filter((slug: string) => 
-              slug.includes('user') || slug.includes('count') || slug.includes('volume'));
-            if (scaleQuestions.length > 0) {
-              mappedQuestions = [scaleQuestions[0]];
-            }
-          } else if (subserviceName.includes('test') || subserviceName.includes('validation')) {
-            // Find testing or validation questions
-            const testingQuestions = availableQuestionSlugs.filter((slug: string) => 
-              slug.includes('test') || slug.includes('validation') || slug.includes('quality'));
-            if (testingQuestions.length > 0) {
-              mappedQuestions = [testingQuestions[0]];
-            }
-          } else if (subserviceName.includes('migration') || subserviceName.includes('data')) {
-            // Find data or migration questions
-            const dataQuestions = availableQuestionSlugs.filter((slug: string) => 
-              slug.includes('data') || slug.includes('migration') || slug.includes('volume'));
-            if (dataQuestions.length > 0) {
-              mappedQuestions = [dataQuestions[0]];
-            }
-          }
-          
-          // If no specific questions found, use a question based on subservice index
-          if (mappedQuestions.length === 0 && availableQuestionSlugs.length > 0) {
-            const questionIndex = (index + subIndex) % availableQuestionSlugs.length;
-            mappedQuestions = [availableQuestionSlugs[questionIndex]];
-          }
-          
-          subservice.mappedQuestions = mappedQuestions;
-        }
-        
-        // Map to appropriate calculation if not already mapped
-        if (!subservice.calculationSlug && subservice.mappedQuestions && subservice.mappedQuestions.length > 0) {
-          const mappedQuestion = subservice.mappedQuestions[0];
-          const availableCalculations = Array.isArray(content.calculations) ? content.calculations : [];
-          
-          // Find a calculation that maps to this question
-          const matchingCalculation = availableCalculations.find((calc: any) => 
-            calc.mappedQuestions && Array.isArray(calc.mappedQuestions) && 
-            calc.mappedQuestions.includes(mappedQuestion));
-          
-          if (matchingCalculation) {
-            subservice.calculationSlug = matchingCalculation.slug;
-          } else if (availableCalculations.length > 0) {
-            // If no direct match, assign a calculation based on subservice index
-            const calcIndex = (index + subIndex) % availableCalculations.length;
-            subservice.calculationSlug = availableCalculations[calcIndex].slug;
-          }
-        }
-      }
-    }
+  if (content.services.length > 0) {
+    console.log(`✅ Using ${content.services.length} research-driven services`);
+  } else {
+    console.warn(`⚠️ No services generated from research`);
   }
 
-  // Validate or create sources
-  if (!Array.isArray(content.sources) || content.sources.length < 1) {
-    console.warn('⚠️ Missing sources, adding default sources')
-    content.sources = [
-      {
-        url: "https://docs.microsoft.com",
-        title: `${content.technology} Documentation`,
-        relevance: "Official documentation"
-      },
-      {
-        url: "https://www.gartner.com",
-        title: "Gartner Research",
-        relevance: "Industry analysis and benchmarks"
-      }
-    ]
+  // Calculate total hours from services
+  content.totalHours = content.services.reduce((total: number, service: any) => {
+    const serviceHours = typeof service.hours === 'number' ? service.hours : 0;
+    return total + serviceHours;
+  }, 0);
+
+  // Ensure sources array exists
+  if (!Array.isArray(content.sources)) {
+    content.sources = [];
   }
 
-  // Validate or calculate total hours
-  if (typeof content.totalHours !== 'number' || isNaN(content.totalHours) || content.totalHours === 0) {
-    console.warn('⚠️ Missing or invalid totalHours, calculating from services')
-    content.totalHours = content.services.reduce((total: number, service: any) => {
-      // Include both service hours and sum of subservice hours in the calculation
-      const serviceHours = typeof service.hours === 'number' && !isNaN(service.hours) ? service.hours : 0;
-      let subserviceHours = 0;
-      
-      if (Array.isArray(service.subservices)) {
-        subserviceHours = service.subservices.reduce((subTotal: number, subservice: any) => {
-          return subTotal + (typeof subservice.hours === 'number' && !isNaN(subservice.hours) ? subservice.hours : 0);
-        }, 0);
-      }
-      
-      // If subservices have hours, use their sum; otherwise use service hours
-      return total + (subserviceHours > 0 ? subserviceHours : serviceHours);
-    }, 0);
-    
-    console.log(`✅ Calculated total hours: ${content.totalHours}`);
-  }
-
-  console.log('✅ Content structure validated and fixed where needed')
+  console.log('✅ Content structure validated (research-driven approach)')
   return true
 }
+
+// Duplicate function removed - using working version at line 1628
+
+// All orphaned code from duplicate functions removed
 
 // Function removed - no longer using fallback content
 
 // Fallback functions removed - no longer using static content
 
-// Function removed - no longer generating static questions
+// Corrupted function removed - using working version below
+
+// Function removed - no longer using fallback content
+
+// Fallback functions removed - no longer using static content
 
 // Enhanced active research using Perplexity
 async function performPerplexityResearch(userRequest: string): Promise<any> {
@@ -1663,8 +1350,6 @@ Focus on current, authoritative sources that collectively provide comprehensive 
   }
 }
 
-
-
 // Add these interfaces at the top of the file
 interface Subservice {
   name: string;
@@ -1681,1261 +1366,524 @@ interface Subservice {
 interface Service {
   phase: string;
   service: string;
-  name?: string;
   description: string;
   hours: number;
-  serviceDescription?: string;
-  keyAssumptions?: string;
-  clientResponsibilities?: string;
-  outOfScope?: string;
   subservices: Subservice[];
 }
 
-// Add the SOW prompt template
-const SOW_PROMPT_TEMPLATE = {
-  "role": "You are a senior IT Services Consultant and Statement of Work specialist.",
-  "goal": "Your goal is to write clear, professional, and client-ready Statement of Work (SOW) descriptions that define deliverables, scope boundaries, assumptions, and success criteria for specific IT services tasks.",
-  "context": "Each SOW entry should be written at the subservice level, but should reflect the context of its parent Service and the Phase in which it occurs.",
-  "writing_guidelines": [
-    "Use precise, outcome-oriented language",
-    "Anchor the language in the context of the Phase (e.g., Planning, Implementation, Post-Go Live)",
-    "Reference the parent Service when needed to provide clarity or grouping",
-    "Use active voice and professional tone",
-    "Avoid overly technical jargon unless necessary",
-    "Use bullets or short paragraphs for readability",
-    "Include these sections: Overview, Deliverables, Out of Scope, Assumptions, and Success Criteria"
-  ],
-  "output_rules": [
-    "Return only a structured JSON object",
-    "Each section should be written in full sentences with clear formatting",
-    "Total word count should be between 300 and 400 words"
-  ]
-};
-
-// SOW content generation is handled by the generateSowContent function below
-
-// Function to generate scope language for a subservice
 async function generateSowContent(
   technology: string,
-  phase: string,
-  serviceName: string,
-  subserviceName: string,
-  model: string = "openai/gpt-4o"
+  services: any[],
+  questions: any[],
+  calculations: any[]
 ): Promise<any> {
-  try {
-    console.log(`Generating scope language for ${subserviceName} in ${serviceName} (${phase})...`);
-    
-    // Get the custom prompt from localStorage or use default
-    let promptTemplate = `Generate professional scope language for the following IT service:
-
-Technology: {technology}
-Phase: {phase}
-Service: {serviceName}
-Subservice: {subserviceName}
-
-You are a senior IT Services Consultant and Statement of Work specialist. Your goal is to write clear, professional, and client-ready Statement of Work (SOW) descriptions that define deliverables, scope boundaries, assumptions, and client responsibilities for specific IT services tasks.
-
-Each SOW entry should be written at the subservice level, but should reflect the context of its parent Service and the Phase in which it occurs.
-
-Writing guidelines:
-- Use precise, outcome-oriented language
-- Anchor the language in the context of the Phase (e.g., Planning, Implementation, Post-Go Live)
-- Reference the parent Service when needed to provide clarity or grouping
-- Use active voice and professional tone
-- Avoid overly technical jargon unless necessary
-- Keep each section concise but comprehensive
-
-Return a JSON object with ONLY these four sections:
-{
-  "serviceDescription": "Comprehensive explanation of what this subservice entails and delivers",
-  "keyAssumptions": "List of assumptions made for this subservice",
-  "clientResponsibilities": "What the client must provide or do for this subservice",
-  "outOfScope": "What is explicitly excluded from this subservice"
+  return {
+    title: `${technology} Implementation Statement of Work`,
+    services: services,
+    questions: questions,
+    calculations: calculations,
+    totalHours: services.reduce((total: number, service: any) => total + (service.hours || 0), 0)
+  };
 }
 
-IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON object.`;
-
-    // Check if there's a custom prompt in localStorage
-    if (typeof localStorage !== 'undefined') {
-      const customPrompt = localStorage.getItem("scope_language_prompt");
-      if (customPrompt) {
-        promptTemplate = customPrompt;
-      }
-    }
-    
-    // Replace placeholders with actual values
-    const prompt = promptTemplate
-      .replace(/{technology}/g, technology)
-      .replace(/{phase}/g, phase)
-      .replace(/{serviceName}/g, serviceName)
-      .replace(/{subserviceName}/g, subserviceName);
-
-    const response = await callOpenRouter({
-      model,
-      prompt
-    });
-    
-    // Clean and parse the response
-    const cleaned = cleanAIResponse(response);
-    
-    try {
-      const parsed = JSON.parse(cleaned);
-      return parsed;
-    } catch (parseError) {
-      console.error(`Failed to parse scope language for ${subserviceName}:`, parseError);
-      // Return a basic structure if parsing fails
-      return {
-        serviceDescription: `This subservice provides ${subserviceName} as part of the ${serviceName} service for ${technology}.`,
-        keyAssumptions: `Client will provide necessary access and information for ${subserviceName}.`,
-        clientResponsibilities: `Provide timely access to systems and resources required for ${subserviceName}.`,
-        outOfScope: `Any activities not directly related to ${subserviceName}.`
-      };
-    }
-  } catch (error) {
-    console.error(`Error generating scope language for ${subserviceName}:`, error);
-    // Return a basic structure if generation fails
-    return {
-      serviceDescription: `This subservice provides ${subserviceName} as part of the ${serviceName} service for ${technology}.`,
-      keyAssumptions: `Client will provide necessary access and information for ${subserviceName}.`,
-      clientResponsibilities: `Provide timely access to systems and resources required for ${subserviceName}.`,
-      outOfScope: `Any activities not directly related to ${subserviceName}.`
-    };
-  }
-}
-
-// Add this function near the top of the file with other helper functions
 function deepStringifyObjects(obj: any): any {
   if (obj === null || obj === undefined) {
     return obj;
   }
   
-  // Handle the root technology object
-  if (obj && typeof obj === 'object') {
-    // Make a copy to avoid modifying the original
-    const result = Array.isArray(obj) ? [...obj] : {...obj};
-    
-    // Special handling for the technology field at the root level
-    if (result.technology && typeof result.technology === 'object') {
-      // Try to extract a meaningful name from technology object
-      if (result.technology.platform) {
-        result.technology = result.technology.platform;
-      } else if (result.technology.primary) {
-        result.technology = result.technology.primary;
-      } else if (result.technology.name) {
-        result.technology = result.technology.name;
-      } else if (result.technology.type) {
-        result.technology = result.technology.type;
-      } else if (result.technology.product) {
-        result.technology = result.technology.product;
-      } else if (result.technology.components && Array.isArray(result.technology.components) && result.technology.components.length > 0) {
-        result.technology = result.technology.components[0];
-      } else if (result.technology.source && result.technology.destination) {
-        result.technology = `${result.technology.destination} Migration from ${result.technology.source}`;
-      } else {
-        // Try to stringify the object in a clean way
-        try {
-          const techStr = JSON.stringify(result.technology);
-          result.technology = techStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
-        } catch (e) {
-          // Last resort
-          result.technology = "Technology Solution";
-        }
-      }
+  if (Array.isArray(obj)) {
+    return obj.map(deepStringifyObjects);
+  }
+  
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = deepStringifyObjects(value);
     }
-    
-    // Special handling for services array
-    if (result.services && Array.isArray(result.services)) {
-      result.services = result.services.map((service: any) => {
-        if (service && typeof service === 'object') {
-          // Create a copy of the service
-          const processedService = {...service};
-          
-          // Handle service name field
-          if (processedService.name && typeof processedService.name === 'object') {
-            if (processedService.name.name) {
-              processedService.name = processedService.name.name;
-            } else if (processedService.name.value) {
-              processedService.name = processedService.name.value;
-            } else if (processedService.name.text) {
-              processedService.name = processedService.name.text;
-            } else if (processedService.name.title) {
-              processedService.name = processedService.name.title;
-            } else {
-              try {
-                const nameStr = JSON.stringify(processedService.name);
-                if (nameStr !== '{}') {
-                  processedService.name = nameStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
-                } else {
-                  processedService.name = processedService.service || "Service";
-                }
-              } catch (e) {
-                processedService.name = processedService.service || "Service";
-              }
-            }
-          }
-          
-          // Handle service field
-          if (processedService.service && typeof processedService.service === 'object') {
-            if (processedService.service.name) {
-              processedService.service = processedService.service.name;
-            } else if (processedService.service.value) {
-              processedService.service = processedService.service.value;
-            } else if (processedService.service.text) {
-              processedService.service = processedService.service.text;
-            } else if (processedService.service.title) {
-              processedService.service = processedService.service.title;
-            } else {
-              try {
-                const serviceStr = JSON.stringify(processedService.service);
-                if (serviceStr !== '{}') {
-                  processedService.service = serviceStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
-                } else {
-                  processedService.service = processedService.name || "Service";
-                }
-              } catch (e) {
-                processedService.service = processedService.name || "Service";
-              }
-            }
-          }
-          
-          // Ensure both name and service fields exist and are strings
-          if (!processedService.name && processedService.service) {
-            processedService.name = processedService.service;
-          } else if (!processedService.service && processedService.name) {
-            processedService.service = processedService.name;
-          } else if (!processedService.name && !processedService.service) {
-            processedService.name = processedService.phase ? `${processedService.phase} Service` : "Service";
-            processedService.service = processedService.name;
-          }
-          
-          // Process subservices recursively
-          if (processedService.subservices && Array.isArray(processedService.subservices)) {
-            processedService.subservices = processedService.subservices.map((subservice: any) => {
-              if (subservice && typeof subservice === 'object') {
-                const processedSubservice = {...subservice};
-                
-                // Handle subservice name field
-                if (processedSubservice.name && typeof processedSubservice.name === 'object') {
-                  if (processedSubservice.name.name) {
-                    processedSubservice.name = processedSubservice.name.name;
-                  } else if (processedSubservice.name.value) {
-                    processedSubservice.name = processedSubservice.name.value;
-                  } else if (processedSubservice.name.text) {
-                    processedSubservice.name = processedSubservice.name.text;
-                  } else {
-                    try {
-                      const nameStr = JSON.stringify(processedSubservice.name);
-                      if (nameStr !== '{}') {
-                        processedSubservice.name = nameStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
-                      } else {
-                        processedSubservice.name = "Subservice";
-                      }
-                    } catch (e) {
-                      processedSubservice.name = "Subservice";
-                    }
-                  }
-                }
-                
-                // Process other fields recursively
-                for (const key in processedSubservice) {
-                  if (key !== 'name' && processedSubservice[key] && typeof processedSubservice[key] === 'object') {
-                    processedSubservice[key] = deepStringifyObjects(processedSubservice[key]);
-                  }
-                }
-                
-                return processedSubservice;
-              }
-              return subservice;
-            });
-          }
-          
-          // Process other fields recursively
-          for (const key in processedService) {
-            if (!['name', 'service', 'subservices'].includes(key) && processedService[key] && typeof processedService[key] === 'object') {
-              processedService[key] = deepStringifyObjects(processedService[key]);
-            }
-          }
-          
-          return processedService;
-        }
-        return service;
-      });
-    }
-    
-    // Process all other fields recursively
-    for (const key in result) {
-      if (Object.prototype.hasOwnProperty.call(result, key) && !['technology', 'services'].includes(key)) {
-        const value = result[key];
-        
-        // Process arrays
-        if (Array.isArray(value)) {
-          result[key] = value.map(item => deepStringifyObjects(item));
-        } 
-        // Process objects (but not Date or other special objects)
-        else if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
-          // Special handling for specific fields that often cause [object Object] issues
-          if (['name', 'service', 'phase', 'description', 'formula'].includes(key) && 
-              (typeof value === 'object')) {
-            // Try to extract a string representation
-            if (value.name) {
-              result[key] = value.name;
-            } else if (value.value) {
-              result[key] = value.value;
-            } else if (value.text) {
-              result[key] = value.text;
-            } else if (value.title) {
-              result[key] = value.title;
-            } else if (value.expression) {
-              result[key] = value.expression;
-            } else {
-              // Try to convert the object to a string
-              try {
-                const str = JSON.stringify(value);
-                if (str !== '{}') {
-                  result[key] = str.replace(/[{}"]/g, '').replace(/,/g, ', ');
-                } else {
-                  result[key] = key === 'name' ? 'Item' : 
-                              key === 'service' ? 'Service' : 
-                              key === 'phase' ? 'Implementation' : 
-                              key === 'description' ? 'Description' : 
-                              key === 'formula' ? 'Calculation' : 'Value';
-                }
-              } catch (e) {
-                result[key] = key === 'name' ? 'Item' : 
-                             key === 'service' ? 'Service' : 
-                             key === 'phase' ? 'Implementation' : 
-                             key === 'description' ? 'Description' : 
-                             key === 'formula' ? 'Calculation' : 'Value';
-              }
-            }
-          } else {
-            // Recursively process nested objects
-            result[key] = deepStringifyObjects(value);
-          }
-        }
-      }
-    }
-    
     return result;
   }
   
   return obj;
 }
 
-export async function POST(request: NextRequest) {
+function extractTechnologyName(userRequest: string): string {
+  // Simple extraction - can be enhanced with more sophisticated parsing
+  return userRequest.split(' ').slice(0, 3).join(' ');
+}
+
+async function generateQuestionsFromResearch(researchData: any, userRequest: string): Promise<any[]> {
+  const technology = extractTechnologyName(userRequest);
+  
   try {
-    const data = await request.json()
-    const { input, models, prompts } = data
-
-    if (!input) {
-      return Response.json({ error: "Input is required" }, { status: 400 })
-    }
-
-    console.log("🔍 Starting research for:", input)
-
-    // Set up SSE stream
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          // Helper function to send SSE events with safety check
-          const sendEvent = (type: string, data: any) => {
-            try {
-              const event = `data: ${JSON.stringify({ type, ...data })}\n\n`
-              controller.enqueue(encoder.encode(event))
-            } catch (error) {
-              console.error(`⚠️ Failed to send SSE event (${type}):`, error instanceof Error ? error.message : String(error))
-            }
-          }
-
-          // Step 1: Active Research - Direct from user input
-          sendEvent("step", { 
-            stepId: "research", 
-            status: "active", 
-            progress: 10,
-            model: "perplexity/sonar"
-          })
-
-          console.log("🔍 Starting direct active research with Perplexity...")
-          console.log("User request:", input)
-          
-          const activeResearchResults = await performPerplexityResearch(input);
-          
-          // Extract sources from the active research results
-          let researchSources: string[] = [];
-          let sourcesForContent: any[] = [];
-          
-          if (activeResearchResults && activeResearchResults.sources && activeResearchResults.sources.length > 0) {
-            // Use active research results
-            sourcesForContent = activeResearchResults.sources;
-            
-            // Convert sources to UI format with quality indicators
-            researchSources = activeResearchResults.sources.map((source: any) => {
-              const credibilityIcon = source.credibility === 'high' ? '⭐' : source.credibility === 'medium' ? '✅' : '📋';
-              const relevanceScore = Math.round((source.relevance || 0.5) * 100);
-              return `${source.url} | ${source.title} | ${credibilityIcon} ${source.credibility?.toUpperCase() || 'MEDIUM'} | ${relevanceScore}% relevance`;
-            });
-            
-            console.log(`✅ ACTIVE research completed:
-              - ${activeResearchResults.totalSourcesFound} sources discovered
-              - ${activeResearchResults.sources.filter((s: any) => s.credibility === 'high').length} high-credibility sources
-              - ${activeResearchResults.sources.filter((s: any) => (s.relevance || 0) >= 0.7).length} highly relevant sources (70%+)
-              - Research confidence: ${Math.round((activeResearchResults.confidence || 0.5) * 100)}%
-              - Key insights: ${activeResearchResults.keyInsights?.length || 0}`);
-              
-            // Log research insights
-            if (activeResearchResults.keyInsights && activeResearchResults.keyInsights.length > 0) {
-              console.log(`🔍 Research insights:`, activeResearchResults.keyInsights.slice(0, 3));
-            }
-            
-            // Log research summary
-            if (activeResearchResults.researchSummary) {
-              console.log(`📝 Research summary: ${activeResearchResults.researchSummary}`);
-            }
-          } else {
-            console.log("❌ Active research failed, falling back to legacy research engines...");
-            
-            try {
-              // Fallback to live research engine
-              const liveResearchResults = await liveResearchEngine.performLiveResearch(input, "enterprise");
-              if (liveResearchResults && liveResearchResults.sources && liveResearchResults.sources.length > 0) {
-                sourcesForContent = liveResearchResults.sources;
-                researchSources = liveResearchResults.sources.map((source: any) => {
-                  const indicator = source.isLive ? '🔴 LIVE' : '❌ OFFLINE';
-                  return `${source.url} | ${source.title} | ${indicator}`;
-                });
-                console.log("✅ Fallback to live research successful");
-              } else {
-                // Final fallback to enhanced research
-                const enhancedResearchResults = await researchEnhancer.performEnhancedResearch(input, "enterprise");
-                if (enhancedResearchResults && enhancedResearchResults.sources) {
-                  sourcesForContent = enhancedResearchResults.sources;
-                  researchSources = enhancedResearchResults.sources.map((source: any) => {
-                    return `${source.url} | ${source.title} | ${source.isValidated ? '✓ VALIDATED' : '⚡ GENERATED'}`;
-                  });
-                  console.log("✅ Fallback to enhanced research successful");
-                }
-              }
-            } catch (fallbackError) {
-              console.log("⚠️ All research engines failed, using basic fallback");
-            }
-          }
-          
-          // Ensure we have quality sources
-          if (researchSources.length === 0) {
-            console.log("🔄 No sources found, generating fallback research...");
-            researchSources = [
-              `https://docs.microsoft.com | Microsoft Documentation | ⭐ HIGH`,
-              `https://www.gartner.com/research | Gartner Research | ⭐ HIGH`,
-              `https://docs.aws.amazon.com | AWS Documentation | ⭐ HIGH`
-            ];
-          }
-          
-          console.log(`Final sources for UI display (${researchSources.length}):`, researchSources);
-          console.log("✅ Active research phase completed successfully");
-          
-          // Industry context already detected above
-          
-          // Create comprehensive research data object with live content and insights
-          const researchData = {
-            sources: sourcesForContent,
-            topic: input,
-            technology: input,
-            industry: "enterprise",
-            // Live research content
-            liveResearch: {
-              totalSourcesChecked: activeResearchResults?.totalSourcesFound || 0,
-              liveSourcesFound: activeResearchResults?.sources?.length || 0,
-              researchSummary: activeResearchResults?.keyInsights?.join(', ') || '',
-              lastUpdated: new Date().toISOString()
-            },
-            // Enhanced dynamic content from research
-            insights: [
-              ...(activeResearchResults?.keyInsights || [])
-            ],
-            implementations: [],
-            considerations: [],
-            timeEstimates: {},
-            // Service-related properties populated from enhanced research
-            service_phases: [],
-            services: [],
-            subservices: [],
-            // Implementation methodologies
-            implementation_methodologies: {
-              recommended_frameworks: []
-            },
-            // Implementation phases
-            keyImplementationPhases: [],
-            implementation_phases: [],
-            // Industry specific data
-            industry_specific: {
-              industry: "enterprise"
-            }
-          };
-          
-          sendEvent("step", { 
-            stepId: "research", 
-            status: "completed", 
-            progress: 50,
-            model: models?.research || "anthropic/claude-3.5-sonnet",
-            sources: researchSources
-          });
-
-          // Step 3: Analysis - Enhanced with specialized focus
-          sendEvent("step", { 
-            stepId: "analyze", 
-            status: "active", 
-            progress: 50,
-            model: models?.analysis || "anthropic/claude-3.5-sonnet"
-          })
-          
-          console.log("🔬 Step 3: Analyzing research with specialized focus...")
-          
-          // Stage 1: Extract service components and structure
-          console.log("Analysis Stage 1: Extracting service components...")
-          const serviceAnalysisPrompt = `Analyze research findings to extract service components for ${input}:
-
-Research Findings: ${JSON.stringify(researchData)}
-Original Request: "${input}"
-
-Extract and structure the following:
-1. Key implementation phases for ${input}
-2. Essential services required for each phase
-3. Typical subservices for each main service
-4. Hour estimates for each service based on industry benchmarks
-5. Dependencies between services
-
-Format your analysis as structured JSON focusing on service components.${JSON_RESPONSE_INSTRUCTION}`
-          
-          // Stage 2: Extract scoping questions and calculations (run in parallel)
-          console.log("Analysis Stages 1 & 2: Running service and scoping analysis in parallel...")
-          const scopingAnalysisPrompt = `Analyze research findings to extract scoping questions and calculations for ${input}:
-
-Research Findings: ${JSON.stringify(researchData)}
-Original Request: "${input}"
-
-Extract and structure the following:
-1. Key questions that should be asked during scoping for ${input}
-2. Options for each question with appropriate values
-3. Calculation formulas that can be used to estimate effort
-4. Factors that affect pricing and scoping
-5. Risk factors that should be considered
-
-Format your analysis as structured JSON focusing on scoping components.${JSON_RESPONSE_INSTRUCTION}`
-          
-          // Run service and scoping analysis in parallel
-          let serviceAnalysisData, scopingAnalysisData
-          try {
-            const [serviceResult, scopingResult] = await optimizedClient.executeInParallel([
-              async () => {
-                const response = await callOpenRouter({
-                  model: models?.analysis || "anthropic/claude-3.5-sonnet",
-                  prompt: serviceAnalysisPrompt,
-                  cacheKey: `service:${input}`
-                })
-                return await parseAIResponse(response)
-              },
-              async () => {
-                const response = await callOpenRouter({
-                  model: "openai/gpt-4-turbo",
-                  prompt: scopingAnalysisPrompt,
-                  cacheKey: `scoping:${input}`
-                })
-                return await parseAIResponse(response)
-              }
-            ], 2)
-            
-            serviceAnalysisData = serviceResult
-            scopingAnalysisData = scopingResult
-            console.log("✅ Parallel analysis successful!")
-          } catch (analysisError) {
-            const errorMessage = analysisError instanceof Error ? analysisError.message : String(analysisError)
-            console.error(`❌ Parallel analysis failed: ${errorMessage}`)
-            serviceAnalysisData = { service_components: [] }
-            scopingAnalysisData = { scoping_components: [] }
-          }
-          
-          // Combine analysis results
-          const analysisData = {
-            ...serviceAnalysisData,
-            ...scopingAnalysisData,
-            technology: input,
-            industry: "enterprise"
-          }
-          
-          console.log("✅ Combined analysis successful")
-          sendEvent("step", { 
-            stepId: "analyze", 
-            status: "completed", 
-            progress: 75,
-            model: models?.analysis || "anthropic/claude-3.5-sonnet"
-          })
-
-          // Step 4: Content Generation - Updated with multi-stage approach
-          sendEvent("step", { 
-            stepId: "generate", 
-            status: "active", 
-            progress: 75,
-            model: models?.content || "anthropic/claude-3.5-sonnet"
-          })
-          
-          console.log("📝 Step 4: Generating content using multi-stage approach...")
-          console.log(`Using ${sourcesForContent.length} research sources for content generation:`, 
-            sourcesForContent.map((s: any) => s.title).join(", "))
-          
-          // Stage 1: Generate structured outline based on research
-          console.log("Stage 1: Generating structured outline...")
-          
-          // Extract specific questions and service components from research data for direct use
-          let extractedQuestions: string[] = [];
-          let extractedServices: string[] = [];
-          
-          // Try to extract technology-specific questions from research
-          if (researchData?.insights && Array.isArray(researchData.insights)) {
-            extractedQuestions = researchData.insights.filter((insight: any) => 
-              typeof insight === 'string' && insight.includes('?')
-            );
-          }
-          
-          // Try to extract service components from research
-          if (researchData?.insights && Array.isArray(researchData.insights)) {
-            extractedServices = researchData.insights.filter((insight: any) => 
-              typeof insight === 'string' && (insight.toLowerCase().includes('service') || insight.toLowerCase().includes('implementation'))
-            );
-          }
-          
-          console.log(`Extracted ${extractedQuestions.length} questions and ${extractedServices.length} service components from research`);
-          
-          const outlinePrompt = `Based on the research about ${input}, create a structured outline for professional services content:
-
-Research Findings: ${JSON.stringify(researchData)}
-Analysis: ${JSON.stringify(analysisData)}
-Original Request: ${input}
-Extracted Questions: ${JSON.stringify(extractedQuestions)}
-Extracted Service Components: ${JSON.stringify(extractedServices)}
-
-CRITICAL: Use the EXACT terminology, questions, and service components extracted from the research.
-
-Create a detailed outline with:
-1. Technology-specific questions that should be asked during scoping (use the extracted questions)
-2. Key service phases for ${input} implementation (use the extracted service components)
-3. Specific subservices that should be included
-4. Calculation factors that affect pricing/scoping
-5. Industry-specific considerations for ${input}
-
-Format your response as structured JSON with these sections clearly defined.${JSON_RESPONSE_INSTRUCTION}`
-
-          let outlineObj
-          try {
-            const outlineResponse = await callOpenRouter({
-              model: models?.content || "anthropic/claude-3.5-sonnet",
-              prompt: outlinePrompt,
-              cacheKey: `outline:${input}`
-            })
-            
-            outlineObj = await parseAIResponse(outlineResponse)
-            console.log("✅ Outline generation successful!")
-          } catch (outlineError) {
-            const errorMessage = outlineError instanceof Error ? outlineError.message : String(outlineError)
-            console.error(`❌ Outline generation failed: ${errorMessage}`)
-            // Use basic structure if outline fails
-            outlineObj = {
-              technology: input,
-              questionTopics: ["implementation scope", "timeline", "integration", "compliance", "user adoption"],
-              servicePhases: ["Planning", "Design", "Implementation", "Testing", "Go-Live", "Support"],
-              calculationFactors: ["complexity", "scale", "customization"]
-            }
-          }
-          
-          // Stage 2: Generate detailed content based on outline and research sources
-          console.log("Stage 2: Generating research-driven professional services content...")
-          const detailPrompt = `You are a senior professional services consultant analyzing comprehensive research to design a service delivery framework. Based on the research findings below, extract and synthesize the actual implementation patterns, methodologies, and complexity drivers to create an authentic professional services offering.
-
-RESEARCH FINDINGS:
-${JSON.stringify(researchData)}
-
-ANALYSIS INSIGHTS:
-${JSON.stringify(analysisData)}
-
-IMPLEMENTATION FRAMEWORK:
-${JSON.stringify(outlineObj)}
-
-AUTHORITATIVE SOURCES:
-${JSON.stringify(sourcesForContent)}
-
-RESEARCH-DRIVEN CONTENT APPROACH:
-Analyze the research to understand:
-1. What implementation methodologies and phases are actually used in practice
-2. What variables truly drive complexity, duration, and cost
-3. What tools, processes, and activities are standard in this domain
-4. What sizing factors and benchmarks appear in real implementations
-5. What decision points and dependencies exist in actual projects
-
-DISCOVERY QUESTIONS: Extract from research the factors that genuinely impact implementation scope:
-- What environmental variables affect complexity (infrastructure, user base, data volumes, integration points)?
-- What organizational factors influence timeline (change management, training needs, compliance requirements)?
-- What technical factors drive effort (customization needs, legacy system complexity, security requirements)?
-Base questions on actual implementation drivers found in the research, not generic templates.
-
-SERVICES FRAMEWORK: Derive services from actual methodologies mentioned in research:
-- Use implementation phases and activities that appear in the research sources
-- Name services based on the specific processes, tools, and methodologies discovered
-- Structure services around the dependencies and workflows found in real implementations
-- Include deliverables and activities that are standard practice according to the research
-
-CALCULATIONS: Base effort estimates on research findings:
-- Use sizing factors and benchmarks mentioned in the sources
-- Apply scaling ratios and complexity multipliers found in the research
-- Reference industry standards and effort distributions discovered in the analysis
-
-Create a framework that reflects genuine implementation patterns rather than generic service templates.
-
-RESPONSE FORMAT - Return ONLY valid JSON:
-{
-  "technology": "research-derived description of the solution domain",
-  "questions": [discovery questions based on actual implementation variables],
-  "calculations": [effort calculations based on research sizing factors],
-  "services": [implementation services derived from research methodologies],
-  "totalHours": estimated total based on research benchmarks,
-  "sources": [research sources that informed the framework]
-}
-
-Do NOT nest the response inside fields like "email_migration_research" or "research_findings" - use the exact structure above.${JSON_RESPONSE_INSTRUCTION}`
-
-          let contentObj
-          let shouldUseFallback = false
-          
-          try {
-            console.log("Attempting to generate content with model:", models?.content || "anthropic/claude-3.5-sonnet")
-            // Try up to 3 times with the primary model before falling back
-            try {
-              contentObj = await generateWithRetry(
-                detailPrompt,
-                models?.content || "anthropic/claude-3.5-sonnet",
-                3 // Increase max attempts to 3
-              )
-              
-              // Check if we got a valid structure or need to normalize a nested structure
-              if (contentObj.email_migration_research || contentObj.research_findings || 
-                  contentObj.project_scope || contentObj.assessment_questions) {
-                console.log("Detected nested structure, normalizing...");
-                contentObj = normalizeNestedStructure(contentObj);
-              }
-              
-              console.log("✅ Content generation successful!")
-            } catch (primaryModelError) {
-              const errorMessage = primaryModelError instanceof Error ? primaryModelError.message : String(primaryModelError)
-              console.error(`❌ Primary model content generation failed: ${errorMessage}`)
-              
-              // Try a different model as backup before using fallback content
-              console.log("Attempting with backup model: openai/gpt-4...")
-              try {
-                const backupResponse = await callOpenRouter({
-                  model: "openai/gpt-4",
-                  prompt: detailPrompt,
-                })
-                
-                contentObj = await parseAIResponse(backupResponse)
-                
-                if (contentObj.email_migration_research || contentObj.research_findings || 
-                    contentObj.project_scope || contentObj.assessment_questions) {
-                  console.log("Detected nested structure in backup response, normalizing...");
-                  contentObj = normalizeNestedStructure(contentObj);
-                }
-                
-                console.log("✅ Backup model content generation successful!")
-              } catch (backupError) {
-                const backupErrorMessage = backupError instanceof Error ? backupError.message : String(backupError)
-                console.error(`❌ Backup model content generation failed: ${backupErrorMessage}`)
-                shouldUseFallback = true
-              }
-            }
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error)
-            console.error(`❌ Content generation failed: ${errorMessage}`)
-            shouldUseFallback = true
-          }
-
-          // Stage 3: Enhance and refine content if we have a valid base
-          if (!shouldUseFallback && contentObj) {
-            console.log("Stage 3: Enhancing and refining content...")
-            try {
-              // Enhance services with more specific descriptions
-              const enhancePrompt = `Refine these services based on the research findings to ensure they reflect actual implementation practices:
-              
-Original Services: ${JSON.stringify(contentObj.services)}
-Research Data: ${JSON.stringify(researchData)}
-
-CRITICAL: Use the EXACT terminology, tools, methodologies, and best practices from the research data.
-
-UNIQUENESS REQUIREMENTS:
-1. Each service and subservice must have a COMPLETELY UNIQUE description
-2. Vary the sentence structure, length, and style across different services
-3. Use different terminology and phrasing for each service
-4. No two services should follow the same descriptive pattern
-5. Incorporate specific technical terms from the research in different ways
-6. Vary the focus (business value, technical details, operational benefits) across services
-
-Refine each service by:
-1. Incorporating specific methodologies and processes mentioned in the research
-2. Using terminology and concepts that appear in the research sources
-3. Aligning service structure with implementation patterns found in the research
-4. Ensuring descriptions reflect actual practice rather than generic templates
-5. Connecting services to real dependencies and workflows discovered in research
-
-CRITICAL: Return ONLY a valid JSON array of services. Start with [ and end with ].
-Ensure all property names and string values use double quotes.
-Do not add any explanations or markdown formatting.${JSON_RESPONSE_INSTRUCTION}`
-
-              const enhanceResponse = await callOpenRouter({
-                model: "openai/gpt-4-turbo",
-                prompt: enhancePrompt,
-              });
-              
-              try {
-                // First clean and prepare the response
-                let enhancedServicesText = cleanAIResponse(enhanceResponse);
-                
-                // If the response doesn't start with [, try to extract the array
-                if (!enhancedServicesText.startsWith('[')) {
-                  const arrayMatch = enhancedServicesText.match(/\[([\s\S]*)\]/);
-                  if (arrayMatch && arrayMatch[0]) {
-                    enhancedServicesText = arrayMatch[0];
-                  } else {
-                    throw new Error("Could not find services array in response");
-                  }
-                }
-                
-                const enhancedServices = JSON.parse(enhancedServicesText);
-                
-                if (Array.isArray(enhancedServices) && enhancedServices.length > 0) {
-                  // Validate that the services have the required structure
-                  const validServices = enhancedServices.every(service => 
-                    service && typeof service === 'object' && 
-                    ((typeof service.name === 'string') || (typeof service.service === 'string')) && 
-                    (typeof service.description === 'string' || typeof service.description === 'undefined') && 
-                    Array.isArray(service.subservices)
-                  );
-                  
-                  if (validServices) {
-                    contentObj.services = enhancedServices;
-                    console.log("✅ Service enhancement successful!");
-                    
-                    // Now generate SOW content for each subservice
-                    console.log("Generating SOW content for subservices...");
-                    
-                    // Use a model that's good at structured content
-                    const sowModel = models?.format || "openai/gpt-4o";
-                    
-                    // Process services sequentially to avoid overwhelming the API
-                    for (let i = 0; i < contentObj.services.length; i++) {
-                      const service = contentObj.services[i];
-                      const serviceName = service.name || service.service || `Service ${i+1}`;
-                      const phase = service.phase || "Implementation";
-                      
-                      // Process subservices for this service
-                      if (Array.isArray(service.subservices)) {
-                        for (let j = 0; j < service.subservices.length; j++) {
-                          const subservice = service.subservices[j];
-                          const subserviceName = subservice.name || `Subservice ${j+1}`;
-                          
-                          // Generate SOW content for this subservice
-                          try {
-                            const sowContent = await generateSowContent(
-                              contentObj.technology,
-                              phase,
-                              serviceName,
-                              subserviceName,
-                              sowModel
-                            );
-                            
-                            // Add SOW content to the subservice
-                            subservice.sowContent = sowContent;
-                            
-                            // Add a brief delay to avoid rate limiting
-                            await new Promise(resolve => setTimeout(resolve, 500));
-                          } catch (sowError) {
-                            console.error(`Failed to generate SOW content for ${subserviceName}:`, sowError);
-                          }
-                        }
-                      }
-                    }
-                    
-                    console.log("✅ SOW content generation complete!");
-                  } else {
-                    console.error("⚠️ Enhanced services have invalid structure, keeping original");
-                  }
-                } else {
-                  console.error("⚠️ Enhanced services is not a valid array, keeping original");
-                }
-              } catch (enhanceError) {
-                const errorMessage = enhanceError instanceof Error ? enhanceError.message : String(enhanceError);
-                console.error(`⚠️ Service enhancement parsing failed: ${errorMessage}`);
-                console.error("Keeping original services");
-              }
-            } catch (enhanceError) {
-              const errorMessage = enhanceError instanceof Error ? enhanceError.message : String(enhanceError);
-              console.error(`⚠️ Service enhancement step failed: ${errorMessage}`);
-              console.error("Keeping original services");
-            }
-          }
-
-          if (shouldUseFallback) {
-            console.log("⚠️ Content generation failed, but will proceed with partial results")
-            // Create a minimal valid content object with what we have
-            contentObj = {
-              technology: input,
-              questions: [],
-              calculations: [],
-              services: [],
-              totalHours: 0,
-              sources: sourcesForContent || []
-            }
-          }
-
-          // Process content structure to preserve actual research sources
-          try {
-            // Make sure we preserve the sources from research
-            if (researchSources && researchSources.length > 0) {
-              // If we have sources from research but none in the content, add them
-              if (!contentObj.sources || !Array.isArray(contentObj.sources) || contentObj.sources.length === 0) {
-                contentObj.sources = researchSources.map(source => {
-                  // Parse the source string if needed
-                  if (typeof source === 'string') {
-                    const parts = source.split(' | ');
-                    return {
-                      url: parts[0] && parts[0].startsWith('http') ? parts[0] : 'https://www.example.com',
-                      title: parts[1] || source,
-                      relevance: `Source for ${input} implementation`
-                    };
-                  }
-                  return source;
-                });
-              } 
-              // If we have sources in both places, make sure research sources are included
-              else {
-                // Convert research sources to proper format if needed
-                const formattedResearchSources = researchSources.map(source => {
-                  if (typeof source === 'string') {
-                    const parts = source.split(' | ');
-                    return {
-                      url: parts[0] && parts[0].startsWith('http') ? parts[0] : 'https://www.example.com',
-                      title: parts[1] || source,
-                      relevance: `Source for ${input} implementation`
-                    };
-                  }
-                  return source;
-                });
-                
-                // Add any missing research sources to the content sources
-                contentObj.sources = [...contentObj.sources, ...formattedResearchSources].slice(0, 7);
-              }
-            }
-            
-            console.log("✅ Content structure processed with actual research sources")
-          } catch (validationError) {
-            const errorMessage = validationError instanceof Error ? validationError.message : String(validationError)
-            console.error(`❌ Content source processing failed: ${errorMessage}`)
-          }
-
-          sendEvent("step", { 
-            stepId: "generate", 
-            status: "completed", 
-            progress: 90,
-            model: models?.content || "anthropic/claude-3.5-sonnet"
-          })
-
-          // Step 5: Formatting
-          sendEvent("step", { 
-            stepId: "format", 
-            status: "active", 
-            progress: 90,
-            model: models?.format || "openai/gpt-4o"
-          })
-
-          // Final check to ensure we have a valid content object
-          try {
-            // Ensure we have a valid content object with required fields
-            if (!contentObj || typeof contentObj !== 'object') {
-              contentObj = {
-                technology: input,
-                questions: [],
-                calculations: [],
-                services: [],
-                totalHours: 0,
-                sources: []
-              };
-            }
-            
-            // Ensure all required fields exist
-            // Special handling for technology field
-            if (contentObj.technology && typeof contentObj.technology === 'object') {
-              // Try to extract a meaningful name from technology object
-              if (contentObj.technology.platform) {
-                contentObj.technology = contentObj.technology.platform;
-              } else if (contentObj.technology.primary) {
-                contentObj.technology = contentObj.technology.primary;
-              } else if (contentObj.technology.name) {
-                contentObj.technology = contentObj.technology.name;
-              } else if (contentObj.technology.type) {
-                contentObj.technology = contentObj.technology.type;
-              } else if (contentObj.technology.product) {
-                contentObj.technology = contentObj.technology.product;
-              } else if (contentObj.technology.source && contentObj.technology.destination) {
-                contentObj.technology = `${contentObj.technology.destination} Migration from ${contentObj.technology.source}`;
-              } else {
-                // Try to stringify the object in a clean way
-                try {
-                  const techStr = JSON.stringify(contentObj.technology);
-                  contentObj.technology = techStr.replace(/[{}"]/g, '').replace(/,/g, ', ');
-                } catch (e) {
-                  // Last resort
-                  contentObj.technology = input || "Technology Solution";
-                }
-              }
-            } else if (!contentObj.technology) {
-              contentObj.technology = input || "Technology Solution";
-            }
-            
-            // Continue with the rest of the fields
-            contentObj.questions = Array.isArray(contentObj.questions) ? contentObj.questions : [];
-            contentObj.calculations = Array.isArray(contentObj.calculations) ? contentObj.calculations : [];
-            contentObj.services = Array.isArray(contentObj.services) ? contentObj.services : [];
-            contentObj.totalHours = contentObj.totalHours || 0;
-            contentObj.sources = Array.isArray(contentObj.sources) ? contentObj.sources : [];
-
-            // Sanitize source relevance fields
-            contentObj = sanitizeSourceRelevance(contentObj);
-            
-            // Validate and fix content structure to ensure it meets minimum requirements
-            validateContentStructure(contentObj);
-            
-            // Apply deep stringification to fix object representation issues
-            contentObj = deepStringifyObjects(contentObj);
-            
-            console.log("✅ Content structure finalized")
-          } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error)
-            console.error("❌ Content finalization failed:", errorMessage)
-          }
-
-          sendEvent("step", { 
-            stepId: "format", 
-            status: "completed", 
-            progress: 100,
-            model: models?.format || "openai/gpt-4o"
-          })
-
-          // Send final complete event with content
-          console.log("✅ Research process complete!")
-          sendEvent("complete", { content: contentObj, progress: 100 })
-          
-          // Close the stream safely
-          try {
-            controller.close()
-          } catch (closeError) {
-            console.error("⚠️ Controller close error:", closeError instanceof Error ? closeError.message : String(closeError))
-          }
-        } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : String(error)
-          console.error("❌ Error in SSE stream:", errorMessage)
-          try {
-            controller.error(errorMessage)
-          } catch (controllerError) {
-            console.error("⚠️ Controller error handling failed:", controllerError instanceof Error ? controllerError.message : String(controllerError))
-          }
-        }
-      }
-    })
-
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-      },
-    })
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error("❌ Error in research endpoint:", errorMessage)
-    return Response.json({ error: errorMessage }, { status: 500 })
-  }
-}
-
-// Helper functions for generating detailed scope language
-
-function createDetailedService(technology: string, phase: string, serviceName: string): any {
-  // Create a service object with all required fields
-  const service: Service = {
-    phase: phase,
-    service: serviceName,
-    name: serviceName,
-    description: `${serviceName} for ${technology}`,
-    hours: 40,
-    serviceDescription: generateServiceDescription(technology, serviceName, phase),
-    keyAssumptions: generateKeyAssumptions(technology, serviceName, phase),
-    clientResponsibilities: generateClientResponsibilities(technology, serviceName, phase),
-    outOfScope: generateOutOfScope(technology, serviceName, phase),
-    subservices: []
-  };
-  
-  // Generate subservices based on the service type
-  const subserviceTypes = [];
-  
-  if (phase === "Initiating") {
-    subserviceTypes.push("Assessment", "Requirements Gathering", "Project Planning");
-  } else if (phase === "Planning") {
-    subserviceTypes.push("Design", "Architecture", "Documentation");
-  } else if (phase === "Implementation") {
-    subserviceTypes.push("Configuration", "Deployment", "Testing");
-  } else if (phase === "Monitoring and Controlling") {
-    subserviceTypes.push("Performance Monitoring", "Quality Assurance", "Issue Resolution");
-  } else if (phase === "Closing") {
-    subserviceTypes.push("Knowledge Transfer", "Documentation Finalization", "Project Closure");
-  } else {
-    subserviceTypes.push("Planning", "Execution", "Validation");
-  }
-  
-  // Create 3 subservices
-  for (let i = 0; i < 3; i++) {
-    const subserviceType = subserviceTypes[i] || `Component ${i+1}`;
-    const subName = `${serviceName} ${subserviceType}`;
-    
-    const subservice: Subservice = {
-      name: subName,
-      description: `${subserviceType} activities for ${serviceName}`,
-      hours: Math.floor(service.hours / 3),
-      serviceDescription: generateSubserviceDescription(technology, subName, serviceName),
-      keyAssumptions: generateSubserviceKeyAssumptions(technology, subName, serviceName),
-      clientResponsibilities: generateSubserviceClientResponsibilities(technology, subName, serviceName),
-      outOfScope: generateSubserviceOutOfScope(technology, subName, serviceName),
-      // These will be populated later when mapping to questions and calculations
-      mappedQuestions: [],
-      calculationSlug: ""
+    // Extract key insights from research to inform question generation
+    const researchContext = {
+      sources: researchData.sources || [],
+      summary: researchData.researchSummary || '',
+      insights: researchData.keyInsights || [],
+      userRequest: userRequest
     };
     
-    service.subservices.push(subservice);
+    // Create a prompt for AI to generate contextual questions based on research
+    const prompt = `Based on this research about "${userRequest}", generate 4-6 specific, actionable questions that would help scope a professional services project.
+
+Research Context:
+- User Request: ${userRequest}
+- Research Summary: ${researchContext.summary}
+- Key Insights: ${researchContext.insights.join(', ')}
+- Source Topics: ${researchContext.sources.map((s: any) => s.title).slice(0, 5).join(', ')}
+
+Generate questions that are:
+1. Specific to the technology and use case mentioned
+2. Based on the actual research findings above
+3. Practical for professional services scoping
+4. Include multiple choice options with realistic values/hours/complexities
+
+Return ONLY a JSON array of questions in this exact format:
+[
+  {
+    "id": "q1",
+    "slug": "descriptive_slug",
+    "question": "Question text here?",
+    "options": [
+      {"key": "Option 1", "value": 1, "default": false},
+      {"key": "Option 2", "value": 2, "default": true},
+      {"key": "Option 3", "value": 3, "default": false}
+    ]
   }
-  
-  return service;
-}
+]`;
 
-function generateServiceDescription(technology: string, serviceName: string, phase: string): string {
-  const phaseDescriptions: {[key: string]: string} = {
-    "Initiating": `We will establish the foundation for a successful ${technology} implementation by defining project parameters, stakeholder needs, and initial requirements.\nOur team will conduct thorough discovery sessions, document business and technical requirements, and establish project governance.\nThis service ensures alignment with organizational objectives and creates a solid foundation for the project.`,
-    
-    "Planning": `We will deliver comprehensive planning for your ${technology} implementation, including detailed architecture design, resource allocation, and risk assessment.\nOur experts will create a tailored implementation roadmap that addresses your specific business needs and technical environment.\nThis planning phase establishes clear milestones, dependencies, and success criteria for the project.`,
-    
-    "Implementation": `We will execute expert implementation of ${technology} components according to the approved design specifications.\nOur certified consultants will configure, integrate, and optimize your ${technology} solution to meet your specific business requirements.\nAll implementation activities follow industry best practices and vendor recommendations to ensure optimal performance.`,
-    
-    "Monitoring and Controlling": `We will ensure your ${technology} implementation maintains optimal performance and security through proactive monitoring and quality control.\nOur specialists will establish monitoring frameworks, conduct regular reviews, and implement necessary adjustments.\nThis service maintains system integrity and addresses potential issues before they impact operations.`,
-    
-    "Closing": `We will provide formal closure activities for your ${technology} implementation, including comprehensive knowledge transfer and documentation finalization.\nOur team will ensure all project deliverables are completed, accepted, and properly transitioned to your team.\nThis service includes final system validation and transition to operational support.`
-  };
-  
-  return phaseDescriptions[phase] || `We will provide comprehensive ${serviceName} for your ${technology} implementation, delivered by our expert consultants.\nOur team will work closely with your stakeholders to ensure the solution meets your specific business requirements.\nAll activities follow industry best practices and methodologies to ensure a successful outcome.`;
-}
+    // Call OpenRouter API to generate research-driven questions
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000
+      })
+    });
 
-function generateKeyAssumptions(technology: string, serviceName: string, phase: string): string {
-  const phaseAssumptions: {[key: string]: string} = {
-    "Initiating": `Access to key stakeholders and subject matter experts will be provided for requirements gathering.\nExisting documentation related to current environment and business processes will be made available.\nA project sponsor with decision-making authority will be designated by the client.`,
-    
-    "Planning": `Environment documentation is accurate and up-to-date for planning purposes.\nTimely feedback on design documents and implementation plans will be provided.\nHardware and software prerequisites will be identified and documented before implementation begins.`,
-    
-    "Implementation": `Administrative access to required systems and environments will be provided during implementation.\nImplementation activities can be performed during agreed-upon maintenance windows.\nHardware and software prerequisites are in place before implementation begins.`,
-    
-    "Monitoring and Controlling": `Access to monitoring systems and performance data will be granted as needed.\nAll changes to the environment will follow the established change management process.\nPersonnel responsible for ongoing monitoring activities will be identified and available.`,
-    
-    "Closing": `All project deliverables have been completed and accepted before closure activities begin.\nAppropriate resources will be allocated for knowledge transfer sessions.\nPersonnel responsible for ongoing support and maintenance will be available for transition activities.`
-  };
-  
-  return phaseAssumptions[phase] || `Timely access to necessary systems, information, and personnel will be provided throughout the project.\nThe environment meets the minimum technical requirements for ${technology} implementation.\nWork will be performed during standard business hours unless otherwise specified.\nAll necessary licenses and entitlements for ${technology} components are available prior to implementation.`;
-}
+    if (!response.ok) {
+      console.warn('Failed to generate AI questions, using fallback');
+      return getFallbackQuestions(technology);
+    }
 
-function generateClientResponsibilities(technology: string, serviceName: string, phase: string): string {
-  const phaseResponsibilities: {[key: string]: string} = {
-    "Initiating": `Grant access to key stakeholders and subject matter experts for requirements gathering sessions.\nProvide existing documentation related to current environment and business processes.\nAssign a project sponsor with decision-making authority.\nReview and approve project charter and scope documents.`,
-    
-    "Planning": `Evaluate and provide timely feedback on design documents and implementation plans.\nConfirm necessary hardware and software prerequisites are in place.\nAssign technical resources to collaborate with our implementation team.\nApprove the final implementation plan and schedule.`,
-    
-    "Implementation": `Grant administrative access to required systems and environments for implementation.\nVerify necessary hardware and software prerequisites are in place.\nParticipate in testing and validation activities.\nReview and approve implementation deliverables.`,
-    
-    "Monitoring and Controlling": `Supply access to monitoring systems and performance data as needed.\nAdhere to the established change management process for system modifications.\nAttend regular status meetings and reviews.\nCommunicate any issues or concerns promptly.`,
-    
-    "Closing": `Dedicate appropriate resources for knowledge transfer sessions.\nReview and approve final documentation deliverables.\nParticipate in project closure activities and sign-off.\nAssign personnel responsible for ongoing support and maintenance.`
-  };
-  
-  return phaseResponsibilities[phase] || `Grant timely access to necessary systems, information, and personnel throughout the project.\nEnsure appropriate stakeholders are available for meetings and decision-making.\nReview and approve deliverables within the agreed timeframe.\nProvide timely notification of any issues or concerns.\nDesignate a primary point of contact for project coordination.`;
-}
+    const aiResponse = await response.json();
+    const aiContent = aiResponse.choices?.[0]?.message?.content;
 
-function generateOutOfScope(technology: string, serviceName: string, phase: string): string {
-  const phaseOutOfScope: {[key: string]: string} = {
-    "Initiating": `Development of custom solutions beyond standard ${technology} capabilities is not included.\nBusiness process reengineering activities are excluded from this service.\nDetailed technical design and implementation planning are addressed in subsequent phases.\nHardware procurement or installation services are not part of this service.\nEnd-user training on ${technology} functionality is excluded.`,
-    
-    "Planning": `Execution of the designed solution is not included in this planning service.\nAcquisition of hardware or software licenses is excluded.\nCustom development beyond standard ${technology} features is not covered.\nCreation of end-user training materials is not included.\nOngoing operational support after implementation is excluded.`,
-    
-    "Implementation": `Procurement or installation of hardware is excluded unless explicitly included.\nDevelopment of custom applications outside standard ${technology} functionality is not covered.\nEnd-user training beyond knowledge transfer to administrators is excluded.\nOngoing support beyond the implementation period is not included.\nIntegration with systems not specified in requirements is excluded.`,
-    
-    "Monitoring and Controlling": `24/7 monitoring services are excluded unless explicitly included in the agreement.\nResolution of issues not related to the implemented ${technology} solution is out of scope.\nDevelopment of custom monitoring tools is not included.\nEnd-user support and training activities are excluded.\nPerformance tuning beyond initial implementation is not covered.`,
-    
-    "Closing": `Support services beyond the project closure period are excluded.\nCreation of custom training materials is not included.\nHardware decommissioning or disposal activities are out of scope.\nMigration of additional systems not included in the original scope is excluded.\nExtended warranty or maintenance services are not included.`
-  };
-  
-  return phaseOutOfScope[phase] || `Hardware procurement or installation is excluded unless explicitly included in the agreement.\nDevelopment of custom applications beyond standard ${technology} capabilities is not covered.\nEnd-user training beyond knowledge transfer to system administrators is excluded.\nSupport services beyond the implementation period are not included.\nIntegration with systems not explicitly mentioned in requirements is out of scope.`;
-}
+    if (!aiContent) {
+      console.warn('No AI response content, using fallback');
+      return getFallbackQuestions(technology);
+    }
 
-function generateSubserviceDescription(technology: string, subserviceName: string, serviceName: string): string {
-  if (subserviceName.includes("Assessment")) {
-    return `We will conduct a thorough assessment of your current environment and requirements for ${serviceName}.\nOur consultants will analyze your existing infrastructure, document specific requirements, and identify potential challenges.\nWe will develop detailed specifications to guide the implementation process and establish a solid foundation for successful ${technology} deployment.`;
-  } else if (subserviceName.includes("Implementation")) {
-    return `We will execute the core implementation activities for ${serviceName} based on the approved design.\nOur certified consultants will configure ${technology} components, perform necessary integrations with your existing systems, and implement security controls.\nWe will follow industry best practices and vendor recommendations to ensure optimal performance and reliability.`;
-  } else if (subserviceName.includes("Validation")) {
-    return `We will verify that the ${serviceName} implementation meets all requirements and performs as expected.\nOur team will conduct comprehensive testing, validate functionality against acceptance criteria, and troubleshoot any issues.\nWe will document the final configuration and conduct knowledge transfer sessions with your technical team to ensure a smooth transition.`;
-  } else if (subserviceName.includes("Planning")) {
-    return `We will develop a comprehensive plan for ${serviceName} tailored to your environment.\nOur experts will create detailed implementation plans, resource schedules, and risk mitigation strategies.\nWe will incorporate industry best practices and lessons learned from similar ${technology} implementations to ensure a smooth deployment process.`;
-  } else {
-    return `We will provide specialized expertise for ${subserviceName} as part of the overall ${serviceName} service.\nOur consultants will apply industry best practices and proven methodologies to meet your specific business requirements.\nWe will deliver detailed documentation and knowledge transfer to your team to ensure long-term success.`;
+    // Parse the AI-generated questions
+    let questions;
+    try {
+      // Extract JSON from the response
+      const jsonMatch = aiContent.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        questions = JSON.parse(jsonMatch[0]);
+      } else {
+        questions = JSON.parse(aiContent);
+      }
+    } catch (parseError) {
+      console.warn('Failed to parse AI questions:', parseError);
+      return getFallbackQuestions(technology);
+    }
+
+    // Validate the structure
+    if (Array.isArray(questions) && questions.length > 0) {
+      // Ensure all questions have required fields
+      const validatedQuestions = questions.map((q: any, index: number) => ({
+        id: q.id || `q${index + 1}`,
+        slug: q.slug || `question_${index + 1}`,
+        question: q.question || `Question ${index + 1}`,
+        options: Array.isArray(q.options) ? q.options : [
+          { key: "Yes", value: 1, default: true },
+          { key: "No", value: 0, default: false }
+        ]
+      }));
+
+      console.log(`✅ Generated ${validatedQuestions.length} AI-driven questions based on research`);
+      return validatedQuestions.slice(0, 6); // Limit to 6 questions max
+    }
+
+  } catch (error) {
+    console.warn('Error generating research-driven questions:', error);
   }
+
+  // Fallback to basic questions if AI generation fails
+  return getFallbackQuestions(technology);
 }
 
-function generateSubserviceKeyAssumptions(technology: string, subserviceName: string, serviceName: string): string {
-  if (subserviceName.includes("Assessment")) {
-    return `Access to current environment documentation and configurations will be provided for analysis.\nKey stakeholders and subject matter experts will be available for interviews and information gathering.\nTimely responses to information requests will be provided during the assessment.\nThe current environment is stable and accessible for assessment activities.`;
-  } else if (subserviceName.includes("Implementation")) {
-    return `Assessment and planning phases have been completed and approved prior to implementation.\nAdministrative access to systems required for implementation will be granted as needed.\nThe environment meets the minimum technical requirements for ${technology} deployment.\nImplementation can be performed during agreed-upon maintenance windows.\nRequired licenses and entitlements are available for use.`;
-  } else if (subserviceName.includes("Validation")) {
-    return `Implementation activities have been completed successfully before validation begins.\nAccess to test environments and data will be provided for validation purposes.\nClient participation in acceptance testing activities is expected throughout this phase.\nTimely feedback on validation results will be provided by stakeholders.\nValidation can be performed during standard business hours unless otherwise specified.`;
-  } else if (subserviceName.includes("Planning")) {
-    return `Assessment phase has been completed and requirements are documented before planning begins.\nTimely feedback on planning deliverables will be provided by stakeholders.\nAppropriate technical and business resources will be designated for planning activities.\nCurrent environment documentation is accurate and up-to-date for planning purposes.`;
-  } else {
-    return `Access to systems and information required for ${subserviceName} will be provided as needed.\nAppropriate stakeholders will be available for consultation and decision-making.\nThe environment meets the minimum technical requirements for this component of ${technology}.\nWork can be performed during standard business hours unless otherwise specified.`;
+function getFallbackQuestions(technology: string): any[] {
+  return [
+    {
+      id: "q1",
+      slug: "project_scope",
+      question: `What is the primary scope of your ${technology} project?`,
+      options: [
+        { key: "New implementation", value: 3, default: true },
+        { key: "Upgrade/migration", value: 2, default: false },
+        { key: "Configuration changes", value: 1, default: false },
+        { key: "Troubleshooting", value: 1, default: false }
+      ]
+    },
+    {
+      id: "q2",
+      slug: "environment_size",
+      question: `What is the size of your environment?`,
+      options: [
+        { key: "Small (1-50 users)", value: 1, default: false },
+        { key: "Medium (51-500 users)", value: 2, default: true },
+        { key: "Large (501-2000 users)", value: 3, default: false },
+        { key: "Enterprise (2000+ users)", value: 4, default: false }
+      ]
+    },
+    {
+      id: "q3",
+      slug: "timeline",
+      question: `What is your target timeline?`,
+      options: [
+        { key: "Rush (1-2 weeks)", value: 4, default: false },
+        { key: "Standard (3-8 weeks)", value: 2, default: true },
+        { key: "Extended (2-6 months)", value: 1, default: false }
+      ]
+    }
+  ];
+}
+
+async function generateServicesFromResearch(researchData: any, userRequest: string): Promise<any[]> {
+  const technology = extractTechnologyName(userRequest);
+  
+  try {
+    // Extract research context for AI generation
+    const researchContext = {
+      sources: researchData.sources || [],
+      summary: researchData.researchSummary || '',
+      insights: researchData.keyInsights || [],
+      userRequest: userRequest
+    };
+    
+    // Create a prompt for AI to generate contextual services based on research
+    const prompt = `Based on this research about "${userRequest}", generate 3-5 professional services phases with specific subservices that would be needed for this project.
+
+Research Context:
+- User Request: ${userRequest}
+- Research Summary: ${researchContext.summary}
+- Key Insights: ${researchContext.insights.join(', ')}
+- Source Topics: ${researchContext.sources.map((s: any) => s.title).slice(0, 5).join(', ')}
+
+Generate services that are:
+1. Specific to the technology and use case mentioned in the research
+2. Based on actual implementation patterns found in the research
+3. Realistic hour estimates for professional services
+4. Include detailed subservices with specific tasks
+
+Return ONLY a JSON array of services in this exact format:
+[
+  {
+    "phase": "Phase Name",
+    "service": "Service Name",
+    "description": "Service description",
+    "hours": 40,
+    "subservices": [
+      {
+        "name": "Subservice Name", 
+        "description": "Subservice description",
+        "hours": 15
+      }
+    ]
   }
-}
+]`;
 
-function generateSubserviceClientResponsibilities(technology: string, subserviceName: string, serviceName: string): string {
-  if (subserviceName.includes("Assessment")) {
-    return `Supply access to current environment documentation and configurations for assessment.\nEnsure key stakeholders and subject matter experts are available for interviews.\nDeliver timely responses to information requests throughout the assessment phase.\nProvide access to systems required for assessment activities.\nReview and approve assessment findings and recommendations.`;
-  } else if (subserviceName.includes("Implementation")) {
-    return `Grant administrative access to systems required for implementation activities.\nConfirm environment meets the minimum technical requirements for ${technology}.\nMake technical resources available to assist with implementation when needed.\nEvaluate and approve implementation results in a timely manner.\nReport any issues or concerns promptly during the implementation process.`;
-  } else if (subserviceName.includes("Validation")) {
-    return `Participate in acceptance testing activities throughout the validation phase.\nProvide access to test environments and data needed for comprehensive validation.\nDeliver timely feedback on validation results and findings.\nAllocate appropriate resources for knowledge transfer sessions.\nReview and approve validation documentation and deliverables.`;
-  } else if (subserviceName.includes("Planning")) {
-    return `Provide timely feedback on planning deliverables throughout this phase.\nAssign appropriate technical and business resources to participate in planning.\nEnsure current environment documentation is accurate and up-to-date.\nReview and approve the final implementation plan and schedule.`;
-  } else {
-    return `Provide access to systems and information required for ${subserviceName}.\nEnsure appropriate stakeholders are available for consultation when needed.\nReview and approve deliverables within the agreed timeframe.\nCommunicate any issues or concerns related to this component promptly.`;
+    // Call OpenRouter API to generate research-driven services
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 3000
+      })
+    });
+
+    if (!response.ok) {
+      console.warn('Failed to generate AI services, using fallback');
+      return getFallbackServices(technology);
+    }
+
+    const aiResponse = await response.json();
+    const aiContent = aiResponse.choices?.[0]?.message?.content;
+
+    if (!aiContent) {
+      console.warn('No AI response content for services, using fallback');
+      return getFallbackServices(technology);
+    }
+
+    // Parse the AI-generated services
+    let services;
+    try {
+      // Extract JSON from the response
+      const jsonMatch = aiContent.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        services = JSON.parse(jsonMatch[0]);
+      } else {
+        services = JSON.parse(aiContent);
+      }
+    } catch (parseError) {
+      console.warn('Failed to parse AI services:', parseError);
+      return getFallbackServices(technology);
+    }
+
+    // Validate the structure
+    if (Array.isArray(services) && services.length > 0) {
+      // Ensure all services have required fields
+      const validatedServices = services.map((s: any, index: number) => ({
+        phase: s.phase || `Phase ${index + 1}`,
+        service: s.service || `${technology} Service ${index + 1}`,
+        description: s.description || `Service description for ${technology}`,
+        hours: typeof s.hours === 'number' ? s.hours : 40,
+        subservices: Array.isArray(s.subservices) ? s.subservices.map((sub: any) => ({
+          name: sub.name || 'Subservice',
+          description: sub.description || 'Subservice description',
+          hours: typeof sub.hours === 'number' ? sub.hours : 10
+        })) : []
+      }));
+
+      console.log(`✅ Generated ${validatedServices.length} AI-driven services based on research`);
+      return validatedServices.slice(0, 5); // Limit to 5 services max
+    }
+
+  } catch (error) {
+    console.warn('Error generating research-driven services:', error);
   }
+
+  // Fallback to basic services if AI generation fails
+  return getFallbackServices(technology);
 }
 
-function generateSubserviceOutOfScope(technology: string, subserviceName: string, serviceName: string): string {
-  if (subserviceName.includes("Assessment")) {
-    return `Evaluation of systems or applications not directly related to ${technology} is excluded.\nBusiness process reengineering activities are not part of this assessment.\nImplementation of recommendations from the assessment is addressed in subsequent phases.\nHardware procurement or installation services are not included.\nPerformance testing or load testing of existing systems is out of scope.`;
-  } else if (subserviceName.includes("Implementation")) {
-    return `Deployment of features or components not explicitly included in the approved design is excluded.\nCustom development beyond standard ${technology} capabilities is not covered.\nEnd-user training beyond knowledge transfer to administrators is not included.\nHardware procurement or installation is excluded unless explicitly stated.\nIntegration with systems not specified in requirements is out of scope.`;
-  } else if (subserviceName.includes("Validation")) {
-    return `Performance testing or load testing beyond basic functionality validation is not included.\nSecurity penetration testing is excluded unless explicitly stated in requirements.\nCreation of custom validation tools or scripts is not covered.\nEnd-user training activities are outside the scope of validation.\nSupport services beyond the validation period are not included.`;
-  } else if (subserviceName.includes("Planning")) {
-    return `Execution of the planned solution is addressed in subsequent phases.\nAcquisition of hardware or software components is not included.\nDevelopment of custom applications is excluded from planning activities.\nCreation of end-user training materials is not covered.\nDetailed technical design beyond high-level architecture is addressed separately.`;
-  } else {
-    return `Activities not directly related to ${subserviceName} are excluded from this service.\nCustom development beyond standard configuration is not covered.\nIntegration with systems not explicitly mentioned in requirements is out of scope.\nEnd-user training beyond knowledge transfer to administrators is not included.\nSupport services beyond the implementation period are excluded.`;
+function getFallbackServices(technology: string): any[] {
+  return [
+    {
+      phase: "Assessment",
+      service: `${technology} Requirements Assessment`,
+      description: `Assessment of current environment and ${technology} requirements`,
+      hours: 40,
+      subservices: [
+        {
+          name: "Current State Analysis",
+          description: `Analysis of existing infrastructure and systems`,
+          hours: 20
+        },
+        {
+          name: "Requirements Gathering",
+          description: `Detailed requirements collection for ${technology}`,
+          hours: 20
+        }
+      ]
+    },
+    {
+      phase: "Implementation",
+      service: `${technology} Core Implementation`,
+      description: `Core implementation and configuration of ${technology}`,
+      hours: 80,
+      subservices: [
+        {
+          name: "Installation & Configuration",
+          description: `Installation and basic configuration of ${technology}`,
+          hours: 40
+        },
+        {
+          name: "Testing & Validation",
+          description: `System testing and validation`,
+          hours: 40
+        }
+      ]
+    }
+  ];
+}
+
+function generateCalculationsFromResearch(questions: any[]): any[] {
+  const calculations = [
+    {
+      id: "complexity_factor",
+      slug: "complexity_factor", 
+      name: "Implementation Complexity Factor",
+      description: "Adjusts hours based on implementation complexity level",
+      formula: "implementation_complexity",
+      mappedQuestions: ["implementation_complexity"]
+    },
+    {
+      id: "user_scale_factor",
+      slug: "user_scale_factor",
+      name: "User Scale Factor", 
+      description: "Adjusts hours based on number of users affected",
+      formula: "user_count",
+      mappedQuestions: ["user_count"]
+    },
+    {
+      id: "timeline_factor",
+      slug: "timeline_factor",
+      name: "Timeline Pressure Factor",
+      description: "Adjusts hours based on timeline requirements", 
+      formula: "timeline_requirements",
+      mappedQuestions: ["timeline_requirements"]
+    },
+    {
+      id: "compliance_factor", 
+      slug: "compliance_factor",
+      name: "Compliance Requirements Factor",
+      description: "Adjusts hours based on compliance requirements",
+      formula: "compliance_requirements", 
+      mappedQuestions: ["compliance_requirements"]
+    }
+  ];
+  
+  return calculations;
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const userRequest = body.input || body.request;
+    
+    if (!userRequest) {
+      return NextResponse.json({ error: 'Input or request is required' }, { status: 400 });
+    }
+
+    console.log('🔍 Starting research for:', userRequest);
+    
+    // Create streaming response
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        
+        const sendSSE = (data: any) => {
+          try {
+            const message = `data: ${JSON.stringify(data)}\n\n`;
+            controller.enqueue(encoder.encode(message));
+          } catch (error) {
+            console.log('SSE controller closed, cannot send data:', error);
+            return false; // Indicate that sending failed
+          }
+          return true; // Indicate success
+        };
+        
+        try {
+          // Step 1: Research phase
+          if (!sendSSE({
+            type: "step",
+            stepId: "research",
+            status: "in-progress",
+            progress: 20,
+            model: "perplexity/sonar"
+          })) return;
+          
+          const researchData = await performPerplexityResearch(userRequest);
+          
+          // Format sources for frontend (expects "URL | Title | Quality" format)
+          const formattedSources = researchData.sources.map((source: any) => 
+            `${source.url} | ${source.title} | ${source.credibility.toUpperCase()}`
+          );
+          
+          if (!sendSSE({
+            type: "step", 
+            stepId: "research",
+            status: "completed",
+            progress: 40,
+            sources: formattedSources
+          })) return;
+          
+          // Step 2: Analysis phase  
+          if (!sendSSE({
+            type: "step",
+            stepId: "analysis", 
+            status: "in-progress",
+            progress: 60,
+            model: "analysis"
+          })) return;
+          
+          // Generate questions from research
+          const questions = await generateQuestionsFromResearch(researchData, userRequest);
+          
+          if (!sendSSE({
+            type: "step",
+            stepId: "analysis",
+            status: "completed", 
+            progress: 80
+          })) return;
+          
+          // Step 3: Content generation
+          if (!sendSSE({
+            type: "step",
+            stepId: "content",
+            status: "in-progress", 
+            progress: 90,
+            model: "content"
+          })) return;
+          
+          const services = await generateServicesFromResearch(researchData, userRequest);
+          const calculations = generateCalculationsFromResearch(questions);
+          
+          // Final completion
+          if (!sendSSE({
+            type: "complete",
+            progress: 100,
+            content: {
+              technology: extractTechnologyName(userRequest),
+              questions: questions,
+              services: services, 
+              calculations: calculations,
+              sources: researchData.sources,
+              totalHours: services.reduce((total: number, service: any) => total + (service.hours || 0), 0)
+            }
+          })) return;
+          
+          controller.close();
+          
+        } catch (error) {
+          console.error('❌ Streaming error:', error);
+          sendSSE({
+            type: "error",
+            message: error instanceof Error ? error.message : 'Unknown error'
+          });
+          controller.close();
+        }
+      }
+    });
+    
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
+    
+  } catch (error) {
+    console.error('❌ Research API error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
