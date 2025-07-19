@@ -568,3 +568,7 @@ Checking if should render ContentOutput. generatedContent: null
  GET / 404 in 286ms
  GET /_next/static/css/app/layout.css?v=1752954446284 404 in 35ms
  GET /_next/static/chunks/app-pages-internals.js 404 in 20ms
+ ✓ Compiled in 318ms (1214 modules)
+ ✓ Compiled in 134ms (1214 modules)
+ ✓ Compiled in 206ms (1214 modules)
+ ✓ Compiled in 142ms (1214 modules)

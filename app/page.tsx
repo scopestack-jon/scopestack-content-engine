@@ -175,18 +175,14 @@ export default function ScopeStackContentEngine() {
 
     // Initialize research steps
     const steps: ResearchStep[] = [
-      { id: "parse", title: "Parsing Technology Requirements", status: "active" },
       { id: "research", title: "Conducting Live Web Research", status: "pending" },
-      { id: "analyze", title: "Analyzing Research Findings", status: "pending" },
-      { id: "generate", title: "Generating Content Structure", status: "pending" },
-      { id: "format", title: "Formatting for ScopeStack", status: "pending" },
+      { id: "content", title: "Generating Content Structure", status: "pending" },
     ]
     setResearchSteps(steps)
 
     try {
-      // Step 1: Parse technology requirements
+      // Start live research
       setProgress(10)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
 
       console.log("Sending research request to API...")
       const response = await fetch("/api/research", {
@@ -396,6 +392,15 @@ export default function ScopeStackContentEngine() {
                   if (!data.content.sources || !Array.isArray(data.content.sources)) {
                     data.content.sources = []
                   }
+                  
+                  // Mark final step as completed
+                  setResearchSteps((prev) =>
+                    prev.map((step) =>
+                      step.id === "content"
+                        ? { ...step, status: "completed" }
+                        : step,
+                    ),
+                  )
                   
                   // Set the validated content
                   setGeneratedContent(data.content)

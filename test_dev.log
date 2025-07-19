@@ -154,3 +154,87 @@ OPENROUTER_API_KEY: sk-or-v1-902cc39dcc50d7b1249292d47f562a86b78817e7df82294cc1d
 ✅ Generated 4 AI-driven services based on research
 ✅ Generated 6 calculations mapped to actual questions
  POST /api/research 200 in 73239ms
+ ✓ Compiled in 266ms (927 modules)
+ ✓ Compiled in 199ms (927 modules)
+Checking if should render ContentOutput. generatedContent: null
+ GET / 200 in 148ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/1.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/1.pack.gz'
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/server-development/12.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/server-development/12.pack.gz'
+ ✓ Compiled /api/research in 45ms (546 modules)
+OPENROUTER_API_KEY: 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
+🔍 Starting research for: Cisco Firepower Firewall implantation, migrating from a Palo Alto firewall with 100 ACL's, and support for 10 remote sites and 100 vpn users.
+🔍 Performing Perplexity-based active research for: Cisco Firepower Firewall implantation, migrating from a Palo Alto firewall with 100 ACL's, and support for 10 remote sites and 100 vpn users.
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 6905
+📝 First 500 chars: {
+  "sources": [    {
+      "title": "Cisco Firewall Quick Start Guide (Firepower 1010 setup) - YouTube",
+      "url": "https://www.youtube.com/watch?v=-mzRctMg2pM",
+      "summary": "Step-by-step video guide for initial setup and configuration of Cisco Firepower 1010 firewall, including interface setup, routing, licensing, ACLs, NAT, and policy configuration, useful for understanding baseline deployment and ACL migration.",
+      "credibility": "medium",
+      "relevance": 0.75,
+      "sourceTy
+📝 Last 200 chars: user bases and site-to-site connectivity.",
+    "Official installation and upgrade guides ensure proper hardware and software deployment for Firepower 1000 series devices."
+  ],
+  "confidence": 0.90
+}
+🧹 Cleaned response length: 6905
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "Cisco Firewall Quick Start Guide (Firepower 1010 setup) - YouTube",
+      "url": "https://www.youtube.com/watch?v=-mzRctMg2pM",
+      "summary": "Step-by-step video guide for initial setup and configuration of Cisco Firepower 1010 firewall, including interface s
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 10
+✅ Found 10 sources from Perplexity research
+🔗 Source titles: [
+  'Cisco Firewall Quick Start Guide (Firepower 1010 setup) - YouTube',
+  'Cisco Firepower Hardening Guide - Department of Defense',
+  'Cisco Secure Firewall Reference Guide',
+  'Cisco Firepower 1000 Series - Install and Upgrade Guides',
+  'Cisco Secure Firewall Threat Defense - Install and Upgrade Guides'
+]
+✅ Generated 5 AI-driven questions based on research
+✅ Generated 4 AI-driven services based on research
+✅ Generated 5 calculations mapped to actual questions
+ POST /api/research 200 in 61710ms
+ ✓ Compiled in 209ms (927 modules)
+ GET / 200 in 66ms
+ ✓ Compiled in 136ms (927 modules)
+ GET / 200 in 51ms
+ ✓ Compiled /api/research in 37ms (546 modules)
+OPENROUTER_API_KEY: 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
+🔍 Starting research for: Cisco Wireless Survey and Implementation for 5ghz in a warehouse
+🔍 Performing Perplexity-based active research for: Cisco Wireless Survey and Implementation for 5ghz in a warehouse
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 4259
+📝 First 500 chars: ```json
+{
+  "sources": [    {
+      "title": "Understand Site Survey Guidelines for WLAN Deployment",
+      "url": "https://www.cisco.com/c/en/us/support/docs/wireless/5500-series-wireless-controllers/116057-site-survey-guidelines-wlan-00.html",
+      "summary": "Cisco’s official guide on WLAN site surveys, covering planning, preparation, and execution for wireless deployments, including passive, active, and predictive survey types. Essential for understanding Cisco’s methodology for RF assessme
+📝 Last 200 chars: ditional sources from Cisco’s technical whitepaper library, regulatory bodies (e.g., FCC, ETSI), and professional services case studies would be ideal but were not found in the current search results.
+🧹 Cleaned response length: 3691
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "Understand Site Survey Guidelines for WLAN Deployment",
+      "url": "https://www.cisco.com/c/en/us/support/docs/wireless/5500-series-wireless-controllers/116057-site-survey-guidelines-wlan-00.html",
+      "summary": "Cisco’s official guide on WLAN site surveys,
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 4
+✅ Found 4 sources from Perplexity research
+🔗 Source titles: [
+  'Understand Site Survey Guidelines for WLAN Deployment',
+  'Warehouse Wi-Fi - Best Practice',
+  'Survey Mode 5Ghz ? - The Meraki Community',
+  'optimizing wireless signal in warehouse'
+]
+✅ Generated 6 AI-driven questions based on research
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz'
+✅ Generated 4 AI-driven services based on research
+✅ Generated 6 calculations mapped to actual questions
+ POST /api/research 200 in 49145ms
