@@ -68,15 +68,15 @@ export async function POST(request: NextRequest) {
               });
             } else if (event.type === 'complete') {
               // Format sources for frontend compatibility (expects "URL | Title | Quality" format)
-              const formattedSources = event.content?.sources?.map((source: any) => 
+              const formattedSources = content.sources.map((source: any) => 
                 `${source.url} | ${source.title} | ${source.credibility.toUpperCase()}`
-              ) || [];
+              );
               
               sendSSE({
                 type: "complete",
                 progress: 100,
                 content: {
-                  ...event.content,
+                  ...content,
                   sources: formattedSources
                 }
               });

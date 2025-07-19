@@ -238,3 +238,91 @@ OPENROUTER_API_KEY: sk-or-v1-902cc39dcc50d7b1249292d47f562a86b78817e7df82294cc1d
 ✅ Generated 4 AI-driven services based on research
 ✅ Generated 6 calculations mapped to actual questions
  POST /api/research 200 in 49145ms
+ ✓ Compiled in 79ms (401 modules)
+ GET / 200 in 53ms
+ ✓ Compiled in 58ms (401 modules)
+ GET / 200 in 8ms
+ ✓ Compiled in 56ms (401 modules)
+ GET / 200 in 21ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+ ✓ Compiled in 74ms (401 modules)
+ GET / 200 in 26ms
+ ✓ Compiled in 57ms (401 modules)
+ GET / 200 in 8ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+ ✓ Compiled in 88ms (401 modules)
+ GET / 200 in 41ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+ ✓ Compiled in 67ms (401 modules)
+ GET / 200 in 28ms
+ ✓ Compiled in 54ms (401 modules)
+ GET / 200 in 7ms
+ ✓ Compiled in 51ms (401 modules)
+ GET / 200 in 9ms
+ ✓ Compiled in 52ms (401 modules)
+ GET / 200 in 31ms
+ ✓ Compiled in 53ms (401 modules)
+ GET / 200 in 7ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+ ✓ Compiled in 70ms (401 modules)
+ GET / 200 in 117ms
+ ✓ Compiled in 75ms (401 modules)
+ GET / 200 in 8ms
+ ✓ Compiled in 111ms (927 modules)
+ GET / 200 in 78ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+Checking if should render ContentOutput. generatedContent: null
+ GET / 200 in 110ms
+ ✓ Compiled /api/research in 113ms (553 modules)
+🔍 Starting research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
+🔍 Performing Perplexity-based active research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
+ GET / 200 in 91ms
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 5278
+📝 First 500 chars: {
+  "sources": [    {
+      "title": "How to seamlessly migrate Microsoft Exchange to Office 365",
+      "url": "https://exclaimer.com/email-signature-handbook/how-to-migrate-microsoft-exchange-to-office-365/",
+      "summary": "This guide details a staged migration approach from Microsoft Exchange to Office 365, including domain verification, DNS record updates, directory synchronization with Azure AD Connect, migration endpoint creation, mail flow configuration, coexistence planning, and mailb
+📝 Last 200 chars: hared mailboxes must be carefully managed to avoid service disruption",
+    "Migration timelines should accommodate testing phases for mail flow and user access validation"
+  ],
+  "confidence": 0.85
+}
+🧹 Cleaned response length: 5278
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "How to seamlessly migrate Microsoft Exchange to Office 365",
+      "url": "https://exclaimer.com/email-signature-handbook/how-to-migrate-microsoft-exchange-to-office-365/",
+      "summary": "This guide details a staged migration approach from Microsoft Exchange 
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  'How to seamlessly migrate Microsoft Exchange to Office 365',
+  'Use the Microsoft 365 and Office 365 mail migration advisor',
+  'Ways to migrate multiple email accounts to Microsoft 365 or Office 365',
+  'Microsoft 365 Migration Guide: Steps & Checklist',
+  'Office 365 Migration Plan: 8 Key Steps For a Successful Migration'
+]
+API call attempt 1
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+✅ Generated 4 AI-driven services based on research
+✅ Generated 7 calculations mapped to actual questions
+❌ Research orchestration failed: ReferenceError: Cannot access 'content' before initialization
+    at eval (app/api/research/route.ts:71:39)
+    at ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:103:19)
+    at async Object.start (app/api/research/route.ts:44:26)
+  69 |             } else if (event.type === 'complete') {
+  70 |               // Format sources for frontend compatibility (expects "URL | Title | Quality" format)
+> 71 |               const formattedSources = content.sources.map((source: any) => 
+     |                                       ^
+  72 |                 `${source.url} | ${source.title} | ${source.credibility.toUpperCase()}`
+  73 |               );
+  74 |               
+ POST /api/research 200 in 47486ms
+ ✓ Compiled in 155ms (927 modules)
+ GET / 200 in 88ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check

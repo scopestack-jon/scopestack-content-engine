@@ -572,3 +572,72 @@ Checking if should render ContentOutput. generatedContent: null
  ✓ Compiled in 134ms (1214 modules)
  ✓ Compiled in 206ms (1214 modules)
  ✓ Compiled in 142ms (1214 modules)
+ ✓ Compiled in 98ms (642 modules)
+ ✓ Compiled in 69ms (642 modules)
+ ✓ Compiled in 60ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+ ✓ Compiled in 80ms (642 modules)
+ ✓ Compiled in 62ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+ ✓ Compiled in 104ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+ ✓ Compiled in 76ms (642 modules)
+ ✓ Compiled in 59ms (642 modules)
+ ✓ Compiled in 56ms (642 modules)
+ ✓ Compiled in 59ms (642 modules)
+ ✓ Compiled in 78ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+ ✓ Compiled in 88ms (642 modules)
+ ✓ Compiled in 95ms (642 modules)
+ ✓ Compiled in 65ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+ ✓ Compiled in 82ms (642 modules)
+ ✓ Compiled /api/research in 153ms (599 modules)
+🔍 Starting research for: test modular system
+🔍 Performing Perplexity-based active research for: test modular system
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 3257
+📝 First 500 chars: ```json
+{
+  "sources": [
+    {
+      "title": "Mastering Modular Driven Testing - Ultimate Guide",
+      "url": "https://www.numberanalytics.com/blog/modular-driven-testing-ultimate-guide",
+      "summary": "This guide covers modular driven testing, including techniques for breaking down complex test cases into smaller modules, handling test data, and using tools like Selenium and Appium for support.",
+      "credibility": "high",
+      "relevance": 0.9,
+      "sourceType": "blog"
+    },
+    {
+ 
+📝 Last 200 chars:   "Automating testing using CI/CD tools is recommended for efficiency.",
+    "Early integration of testing in the development lifecycle is vital for quality assurance."
+  ],
+  "confidence": 0.85
+}
+```
+🧹 Cleaned response length: 3245
+🧹 Cleaned first 300 chars: {
+  "sources": [
+    {
+      "title": "Mastering Modular Driven Testing - Ultimate Guide",
+      "url": "https://www.numberanalytics.com/blog/modular-driven-testing-ultimate-guide",
+      "summary": "This guide covers modular driven testing, including techniques for breaking down complex test cases 
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  'Mastering Modular Driven Testing - Ultimate Guide',
+  'Mastering Modular Testing',
+  'Developing Modular Software: Top Strategies and Best Practices',
+  'Automated Software Testing Implementation Guide',
+  'Guide to Effective Test Software Development with TestStand'
+]
+API call attempt 1
+✅ Generated 7 AI-driven questions based on research
+API call attempt 1
+✅ Generated 4 AI-driven services based on research
+✅ Generated 8 calculations mapped to actual questions
+ POST /api/research 200 in 45181ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
