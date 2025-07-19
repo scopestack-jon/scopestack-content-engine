@@ -264,3 +264,94 @@ This JSON output provides a research-grade, actionable resource list for hospita
 ✅ Generated 4 AI-driven questions based on research
 ✅ Generated 4 AI-driven services based on research
  POST /api/research 200 in 39415ms
+ ✓ Compiled in 204ms (927 modules)
+ GET / 200 in 76ms
+ ✓ Compiled in 85ms (401 modules)
+ GET / 200 in 7ms
+ ✓ Compiled in 82ms (401 modules)
+ GET / 200 in 8ms
+ ✓ Compiled in 70ms (401 modules)
+ GET / 200 in 7ms
+ ✓ Compiled in 69ms (401 modules)
+ GET / 200 in 7ms
+ ✓ Compiled /api/research in 78ms (546 modules)
+OPENROUTER_API_KEY: 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
+🔍 Starting research for: Salesforce CRM implementation for healthcare organization with 500 users
+🔍 Performing Perplexity-based active research for: Salesforce CRM implementation for healthcare organization with 500 users
+ GET / 200 in 104ms
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 6445
+📝 First 500 chars: ## Research Findings
+
+### Sources
+
+```json
+{
+  "sources": [
+    {
+      "title": "Salesforce Health Cloud Implementation Guide 2025",
+      "url": "https://www.getgenerative.ai/salesforce-health-cloud-implementation-guide/",
+      "summary": "Provides a step-by-step guide on implementing Salesforce Health Cloud, focusing on defining business objectives, building a cross-functional team, assessing data landscapes, configuring the platform, and integrating with EHR systems.",
+      "credibility": 
+📝 Last 200 chars: practices, technical requirements, and compliance considerations. They are primarily from authoritative sources like Salesforce and reputable consulting firms, ensuring high credibility and relevance.
+🧹 Cleaned response length: 5261
+🧹 Cleaned first 300 chars: {
+  "sources": [
+    {
+      "title": "Salesforce Health Cloud Implementation Guide 2025",
+      "url": "https://www.getgenerative.ai/salesforce-health-cloud-implementation-guide/",
+      "summary": "Provides a step-by-step guide on implementing Salesforce Health Cloud, focusing on defining business
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 9
+✅ Found 9 sources from Perplexity research
+🔗 Source titles: [
+  'Salesforce Health Cloud Implementation Guide 2025',
+  'The Ultimate Guide to Salesforce Health Cloud Implementation for Healthcare Providers',
+  'Salesforce Health Cloud Implementation Guide 2024',
+  'Successfully Implementing Salesforce for Healthcare Organizations',
+  'Healthcare CRM Software: A Complete Guide'
+]
+✅ Generated 5 AI-driven questions based on research
+✅ Generated 5 AI-driven services based on research
+✅ Generated 5 calculations mapped to actual questions
+ POST /api/research 200 in 33280ms
+🔍 Starting research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
+🔍 Performing Perplexity-based active research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 5780
+📝 First 500 chars: ```json
+{
+  "sources": [    {
+      "title": "How to seamlessly migrate Microsoft Exchange to Office 365",
+      "url": "https://exclaimer.com/email-signature-handbook/how-to-migrate-microsoft-exchange-to-office-365/",
+      "summary": "Step-by-step guide for migrating Microsoft Exchange to Office 365, including domain verification, directory synchronization, mail flow configuration, and mailbox migration. Covers both technical steps and planning considerations.",
+      "credibility": "medium",
+
+📝 Last 200 chars: rprise-grade migrations.",
+    "Successful migrations depend on infrastructure readiness, identity management, mail flow configuration, and ongoing user communication."
+  ],
+  "confidence": 0.90
+}
+```
+🧹 Cleaned response length: 5768
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "How to seamlessly migrate Microsoft Exchange to Office 365",
+      "url": "https://exclaimer.com/email-signature-handbook/how-to-migrate-microsoft-exchange-to-office-365/",
+      "summary": "Step-by-step guide for migrating Microsoft Exchange to Office 365, incl
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 10
+✅ Found 10 sources from Perplexity research
+🔗 Source titles: [
+  'How to seamlessly migrate Microsoft Exchange to Office 365',
+  'Ways to migrate multiple email accounts to Microsoft 365 or Office 365',
+  'Microsoft 365 Migration Guide: Steps & Checklist',
+  'Office 365 Migration Plan: 8 Key Steps For a Successful Email Migration',
+  'Emails in the cloud: Office 365 Exchange Online migration checklist'
+]
+✅ Generated 6 AI-driven questions based on research
+✅ Generated 5 AI-driven services based on research
+✅ Generated 6 calculations mapped to actual questions
+ POST /api/research 200 in 47092ms

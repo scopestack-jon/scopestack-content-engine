@@ -1424,7 +1424,7 @@ async function generateQuestionsFromResearch(researchData: any, userRequest: str
     };
     
     // Create a prompt for AI to generate contextual questions based on research
-    const prompt = `Based on this research about "${userRequest}", generate 4-6 specific, actionable questions that would help scope a professional services project.
+    const prompt = `Based on this research about "${userRequest}", generate 5-8 specific, actionable questions that would help scope a professional services project.
 
 Research Context:
 - User Request: ${userRequest}
@@ -1514,7 +1514,7 @@ Return ONLY a JSON array of questions in this exact format:
       }));
 
       console.log(`✅ Generated ${validatedQuestions.length} AI-driven questions based on research`);
-      return validatedQuestions.slice(0, 6); // Limit to 6 questions max
+      return validatedQuestions.slice(0, 8); // Limit to 8 questions max
     }
 
   } catch (error) {
@@ -1575,7 +1575,7 @@ async function generateServicesFromResearch(researchData: any, userRequest: stri
     };
     
     // Create a prompt for AI to generate contextual services based on research
-    const prompt = `Based on this research about "${userRequest}", generate 3-5 professional services phases with specific subservices that would be needed for this project.
+    const prompt = `Based on this research about "${userRequest}", generate 4-6 professional services phases with specific subservices that would be needed for this project.
 
 Research Context:
 - User Request: ${userRequest}
@@ -1670,7 +1670,7 @@ Return ONLY a JSON array of services in this exact format:
       }));
 
       console.log(`✅ Generated ${validatedServices.length} AI-driven services based on research`);
-      return validatedServices.slice(0, 5); // Limit to 5 services max
+      return validatedServices.slice(0, 6); // Limit to 6 services max
     }
 
   } catch (error) {
@@ -1723,41 +1723,63 @@ function getFallbackServices(technology: string): any[] {
 }
 
 function generateCalculationsFromResearch(questions: any[]): any[] {
-  const calculations = [
-    {
-      id: "complexity_factor",
-      slug: "complexity_factor", 
-      name: "Implementation Complexity Factor",
-      description: "Adjusts hours based on implementation complexity level",
-      formula: "implementation_complexity",
-      mappedQuestions: ["implementation_complexity"]
-    },
-    {
-      id: "user_scale_factor",
-      slug: "user_scale_factor",
-      name: "User Scale Factor", 
-      description: "Adjusts hours based on number of users affected",
-      formula: "user_count",
-      mappedQuestions: ["user_count"]
-    },
-    {
-      id: "timeline_factor",
-      slug: "timeline_factor",
-      name: "Timeline Pressure Factor",
-      description: "Adjusts hours based on timeline requirements", 
-      formula: "timeline_requirements",
-      mappedQuestions: ["timeline_requirements"]
-    },
-    {
-      id: "compliance_factor", 
-      slug: "compliance_factor",
-      name: "Compliance Requirements Factor",
-      description: "Adjusts hours based on compliance requirements",
-      formula: "compliance_requirements", 
-      mappedQuestions: ["compliance_requirements"]
+  // Generate calculations dynamically based on the actual questions generated
+  const calculations = questions.map((question: any, index: number) => {
+    // Determine the type of calculation based on question content and options
+    let resultType = "multiplier";
+    let description = `Adjusts project hours based on ${question.question.toLowerCase()}`;
+    
+    // Analyze the question to determine the best calculation type
+    if (question.question.toLowerCase().includes('timeline') || 
+        question.question.toLowerCase().includes('deadline') ||
+        question.question.toLowerCase().includes('rush')) {
+      resultType = "multiplier";
+      description = `Timeline pressure factor - adjusts hours based on urgency requirements`;
+    } else if (question.question.toLowerCase().includes('compliance') || 
+               question.question.toLowerCase().includes('regulation') ||
+               question.question.toLowerCase().includes('audit')) {
+      resultType = "additive";
+      description = `Compliance overhead - adds additional hours for regulatory requirements`;
+    } else if (question.question.toLowerCase().includes('size') || 
+               question.question.toLowerCase().includes('users') ||
+               question.question.toLowerCase().includes('scale')) {
+      resultType = "multiplier";
+      description = `Scale factor - adjusts hours based on project size and scope`;
+    } else if (question.question.toLowerCase().includes('complexity') || 
+               question.question.toLowerCase().includes('rules') ||
+               question.question.toLowerCase().includes('migration')) {
+      resultType = "multiplier";
+      description = `Complexity factor - adjusts hours based on technical complexity`;
+    } else {
+      resultType = "conditional";
+      description = `${question.question.replace('?', '')} factor - conditional adjustment based on selection`;
     }
-  ];
-  
+
+    return {
+      id: `calc_${question.slug}`,
+      slug: `${question.slug}_factor`,
+      name: `${question.question.replace('?', '')} Factor`,
+      description: description,
+      formula: question.slug,
+      mappedQuestions: [question.slug],
+      resultType: resultType
+    };
+  });
+
+  // Add a base complexity calculation if we don't have many questions
+  if (calculations.length < 3) {
+    calculations.push({
+      id: "base_complexity",
+      slug: "base_complexity_factor",
+      name: "Base Implementation Complexity",
+      description: "Standard complexity factor for implementation projects",
+      formula: "1.2", // 20% base complexity multiplier
+      mappedQuestions: [],
+      resultType: "multiplier"
+    });
+  }
+
+  console.log(`✅ Generated ${calculations.length} calculations mapped to actual questions`);
   return calculations;
 }
 
