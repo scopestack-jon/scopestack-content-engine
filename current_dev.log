@@ -355,3 +355,94 @@ OPENROUTER_API_KEY: sk-or-v1-5784660e3272627334509c8e9fa8aebcc724ea214eec9fc6104
 ✅ Generated 5 AI-driven services based on research
 ✅ Generated 6 calculations mapped to actual questions
  POST /api/research 200 in 47092ms
+ ✓ Compiled in 186ms (927 modules)
+ GET / 200 in 74ms
+ ✓ Compiled in 76ms (401 modules)
+ GET / 200 in 7ms
+ ✓ Compiled in 73ms (401 modules)
+ GET / 200 in 9ms
+ ✓ Compiled /api/research in 65ms (546 modules)
+OPENROUTER_API_KEY: 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
+🔍 Starting research for: AWS cloud migration for financial services company with compliance requirements
+🔍 Performing Perplexity-based active research for: AWS cloud migration for financial services company with compliance requirements
+ GET / 200 in 30ms
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 6355
+📝 First 500 chars: Given the search results, I will provide a structured analysis based on the available information and supplement it with general knowledge about AWS cloud migration for financial services companies. Here is the analysis and the requested JSON format:
+
+## Analysis
+
+- **Technology/Solution Being Implemented**: AWS cloud migration.
+- **Scale and Scope Indicators**: Financial services companies, which typically involve large-scale data and complex regulatory environments.
+- **Industry Context**: Fin
+📝 Last 200 chars: .
+
+## Confidence Level
+
+The confidence level in this analysis is 0.85, reflecting the reliance on general knowledge and hypothetical sources due to the limited availability of specific search results.
+🧹 Cleaned response length: 4564
+🧹 Cleaned first 300 chars: {
+  "sources": [
+    {
+      "title": "AWS Cloud Migration Guide for Financial Services",
+      "url": "https://aws.amazon.com/financialservices/migration-guide/",
+      "summary": "Official AWS guide for migrating financial services to the cloud, covering compliance and security best practices.",
+ 
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 10
+✅ Found 10 sources from Perplexity research
+🔗 Source titles: [
+  'AWS Cloud Migration Guide for Financial Services',
+  'Navigating Compliance in Cross-Region Cloud Migrations',
+  'Cloud Security for Financial Services',
+  'PCI DSS Compliance in the Cloud',
+  'AWS Compliance Programs'
+]
+✅ Generated 6 AI-driven questions based on research
+✅ Generated 4 AI-driven services based on research
+✅ Generated 6 calculations mapped to actual questions
+ POST /api/research 200 in 52476ms
+Checking if should render ContentOutput. generatedContent: null
+ GET / 200 in 128ms
+ ✓ Compiled /_not-found in 212ms (917 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 332ms
+ ✓ Compiled /api/research in 70ms (547 modules)
+OPENROUTER_API_KEY: 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
+🔍 Starting research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
+🔍 Performing Perplexity-based active research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 6160
+📝 First 500 chars: Given the search results, I will provide a structured response based on the available information and supplement it with general knowledge on the topic.
+
+## Research Findings
+
+### Technology/Solution Being Implemented
+- **Microsoft Email Migration to Office 365**: This involves moving email services from an on-premises Exchange server to Office 365, which is part of Microsoft 365.
+
+### Scale and Scope Indicators
+- **1000 Users**: This indicates a medium to large-scale migration, requiring carefu
+📝 Last 200 chars: ervices**: For complex migrations, consider partnering with experienced service providers.
+5. **Conduct Thorough Testing**: Test mail flow and user access post-migration to ensure a smooth transition.
+🧹 Cleaned response length: 4153
+🧹 Cleaned first 300 chars: {
+  "sources": [
+    {
+      "title": "How to seamlessly migrate Microsoft Exchange to Office 365",
+      "url": "https://exclaimer.com/email-signature-handbook/how-to-migrate-microsoft-exchange-to-office-365/",
+      "summary": "Provides step-by-step guidance on migrating Exchange to Office 365, in
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 9
+✅ Found 9 sources from Perplexity research
+🔗 Source titles: [
+  'How to seamlessly migrate Microsoft Exchange to Office 365',
+  'Microsoft 365 and Office 365 mail migration advisor',
+  'Ways to migrate multiple email accounts to Microsoft 365 or Office 365',
+  'Office 365 & Email Archive Migration for Expansive Medical Group',
+  'Microsoft 365 Migration Guide: Steps & Checklist'
+]
+✅ Generated 6 AI-driven questions based on research
+✅ Generated 4 AI-driven services based on research
+✅ Generated 6 calculations mapped to actual questions
+ POST /api/research 200 in 60642ms

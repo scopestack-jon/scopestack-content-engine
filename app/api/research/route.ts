@@ -1588,18 +1588,27 @@ Generate services that are:
 2. Based on actual implementation patterns found in the research
 3. Realistic hour estimates for professional services
 4. Include detailed subservices with specific tasks
+5. Include comprehensive scope language for professional services
 
 Return ONLY a JSON array of services in this exact format:
 [
   {
     "phase": "Phase Name",
     "service": "Service Name",
-    "description": "Service description",
+    "description": "Brief service description",
+    "serviceDescription": "Detailed 2-3 sentence description of what this service provides, based on research findings",
+    "keyAssumptions": "Key assumptions for this service based on typical project requirements found in research",
+    "clientResponsibilities": "What the client needs to provide or do for this service to be successful",
+    "outOfScope": "What is specifically not included in this service scope",
     "hours": 40,
     "subservices": [
       {
         "name": "Subservice Name", 
         "description": "Subservice description",
+        "serviceDescription": "Detailed description of this subservice based on research best practices",
+        "keyAssumptions": "Assumptions specific to this subservice",
+        "clientResponsibilities": "Client responsibilities for this subservice",
+        "outOfScope": "What's not included in this subservice",
         "hours": 15
       }
     ]
@@ -1661,10 +1670,18 @@ Return ONLY a JSON array of services in this exact format:
         phase: s.phase || `Phase ${index + 1}`,
         service: s.service || `${technology} Service ${index + 1}`,
         description: s.description || `Service description for ${technology}`,
+        serviceDescription: s.serviceDescription || `This service provides comprehensive ${s.service || 'implementation'} for ${technology} based on industry best practices and research findings.`,
+        keyAssumptions: s.keyAssumptions || `Client will provide timely access to required systems and stakeholders. Existing infrastructure meets minimum requirements for ${technology}.`,
+        clientResponsibilities: s.clientResponsibilities || `Provide access to systems and stakeholders. Make technical staff available for consultation. Provide existing documentation and requirements.`,
+        outOfScope: s.outOfScope || `Hardware procurement and infrastructure setup are not included. Training beyond standard knowledge transfer is excluded. Support for third-party integrations not directly related to ${technology}.`,
         hours: typeof s.hours === 'number' ? s.hours : 40,
         subservices: Array.isArray(s.subservices) ? s.subservices.map((sub: any) => ({
           name: sub.name || 'Subservice',
           description: sub.description || 'Subservice description',
+          serviceDescription: sub.serviceDescription || `This subservice provides essential ${sub.name || 'implementation'} activities for ${technology} according to industry best practices.`,
+          keyAssumptions: sub.keyAssumptions || `Required access and documentation will be provided. Work will be performed during standard business hours unless otherwise specified.`,
+          clientResponsibilities: sub.clientResponsibilities || `Provide timely access to required systems. Make appropriate staff available for meetings and testing.`,
+          outOfScope: sub.outOfScope || `Custom development beyond standard configuration. Hardware procurement and setup.`,
           hours: typeof sub.hours === 'number' ? sub.hours : 10
         })) : []
       }));
@@ -1687,16 +1704,28 @@ function getFallbackServices(technology: string): any[] {
       phase: "Assessment",
       service: `${technology} Requirements Assessment`,
       description: `Assessment of current environment and ${technology} requirements`,
+      serviceDescription: `This service provides a comprehensive assessment of your current environment and detailed requirements gathering for ${technology} implementation. Our team will conduct stakeholder interviews, document existing systems, and identify key success factors for your project.`,
+      keyAssumptions: `Client stakeholders will be available for requirements gathering sessions. Existing system documentation will be provided where available. Current infrastructure meets minimum requirements for ${technology} implementation.`,
+      clientResponsibilities: `Provide access to key stakeholders and subject matter experts. Share existing documentation, network diagrams, and system configurations. Make technical staff available for interviews and system access.`,
+      outOfScope: `Hardware procurement and infrastructure upgrades are not included. Business process reengineering beyond ${technology} implementation scope. Integration with systems not directly related to ${technology}.`,
       hours: 40,
       subservices: [
         {
           name: "Current State Analysis",
           description: `Analysis of existing infrastructure and systems`,
+          serviceDescription: `This subservice provides detailed analysis of your current infrastructure, identifying integration points, potential challenges, and baseline configurations for ${technology} implementation.`,
+          keyAssumptions: `Access to current systems and documentation will be provided. Technical staff will be available for system reviews and questions.`,
+          clientResponsibilities: `Provide access to existing systems and environments. Make technical documentation available. Ensure appropriate staff are available for consultation.`,
+          outOfScope: `Remediation of issues found during analysis. Upgrades to existing systems to meet requirements.`,
           hours: 20
         },
         {
           name: "Requirements Gathering",
           description: `Detailed requirements collection for ${technology}`,
+          serviceDescription: `This subservice focuses on gathering detailed functional and technical requirements for your ${technology} implementation through stakeholder interviews and workshop sessions.`,
+          keyAssumptions: `Key stakeholders will be identified and available for requirements sessions. Business processes are documented or can be articulated during sessions.`,
+          clientResponsibilities: `Identify and provide access to key stakeholders. Participate actively in requirements workshops. Provide timely feedback on documented requirements.`,
+          outOfScope: `Business process redesign beyond ${technology} implementation needs. Requirements for systems not directly integrated with ${technology}.`,
           hours: 20
         }
       ]
@@ -1705,16 +1734,28 @@ function getFallbackServices(technology: string): any[] {
       phase: "Implementation",
       service: `${technology} Core Implementation`,
       description: `Core implementation and configuration of ${technology}`,
+      serviceDescription: `This service delivers the core implementation and configuration of ${technology} according to your requirements and industry best practices. Our team will install, configure, and validate the system to ensure optimal performance and security.`,
+      keyAssumptions: `Requirements gathering phase has been completed and approved. Required infrastructure and prerequisites are in place. Network connectivity and security permissions are properly configured.`,
+      clientResponsibilities: `Provide timely access to target environments. Ensure prerequisites are met before implementation begins. Make appropriate staff available for testing and validation activities.`,
+      outOfScope: `Custom development beyond standard ${technology} configuration options. Training beyond standard knowledge transfer sessions. Ongoing support and maintenance after go-live.`,
       hours: 80,
       subservices: [
         {
           name: "Installation & Configuration",
           description: `Installation and basic configuration of ${technology}`,
+          serviceDescription: `This subservice provides expert installation and configuration of ${technology} components according to your requirements and security standards.`,
+          keyAssumptions: `Target environment meets all prerequisites and requirements. Network connectivity and security permissions are properly configured.`,
+          clientResponsibilities: `Provide access to target installation environment. Ensure all prerequisites are met. Make technical staff available for installation coordination.`,
+          outOfScope: `Infrastructure setup and hardware procurement. Custom development beyond standard configuration options.`,
           hours: 40
         },
         {
           name: "Testing & Validation",
           description: `System testing and validation`,
+          serviceDescription: `This subservice provides comprehensive testing and validation of the ${technology} implementation to ensure all requirements are met and the system performs optimally.`,
+          keyAssumptions: `Installation and configuration work has been completed. Test environments are available and properly configured.`,
+          clientResponsibilities: `Participate in user acceptance testing activities. Provide timely feedback on test results. Sign off on testing completion.`,
+          outOfScope: `Automated test script development. Performance testing beyond standard validation. Load testing with production-level data volumes.`,
           hours: 40
         }
       ]
