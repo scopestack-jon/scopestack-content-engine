@@ -11,7 +11,7 @@
  ✓ Starting...
  ✓ Ready in 1183ms
  ✓ Compiled /api/research in 403ms (410 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
  POST /api/research 400 in 505ms
 🔍 Starting research for: test openrouter api key
 🔍 Performing Perplexity-based active research for: test openrouter api key
@@ -39,7 +39,7 @@ API call attempt 3 failed: HTTP 404: Not Found
  POST /api/research 200 in 26769ms
  ✓ Compiled in 110ms (134 modules)
  ✓ Compiled in 62ms (134 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: test perplexity model fix
 🔍 Performing Perplexity-based active research for: test perplexity model fix
 API call attempt 1 failed: HTTP 400: Bad Request
@@ -76,7 +76,7 @@ Failed to parse AI services: SyntaxError: Unexpected token 'I', "I apologiz"... 
  POST /api/research 200 in 18741ms
  ✓ Compiled in 10ms
  ✓ Compiled /api/research in 95ms (134 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: Salesforce implementation for healthcare with 200 users
 🔍 Performing Perplexity-based active research for: Salesforce implementation for healthcare with 200 users
 🔍 Perplexity research response received, parsing...
@@ -118,7 +118,7 @@ Checking if should render ContentOutput. generatedContent: null
  GET / 200 in 1393ms
  ✓ Compiled in 209ms (401 modules)
  ✓ Compiled /api/research in 81ms (546 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: Apple MDM Solution for a corporate environment 
 🔍 Performing Perplexity-based active research for: Apple MDM Solution for a corporate environment 
 🔍 Perplexity research response received, parsing...
@@ -161,7 +161,7 @@ Checking if should render ContentOutput. generatedContent: null
 <w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/1.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/1.pack.gz'
 <w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/server-development/12.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/server-development/12.pack.gz'
  ✓ Compiled /api/research in 45ms (546 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: Cisco Firepower Firewall implantation, migrating from a Palo Alto firewall with 100 ACL's, and support for 10 remote sites and 100 vpn users.
 🔍 Performing Perplexity-based active research for: Cisco Firepower Firewall implantation, migrating from a Palo Alto firewall with 100 ACL's, and support for 10 remote sites and 100 vpn users.
 🔍 Perplexity research response received, parsing...
@@ -205,7 +205,7 @@ OPENROUTER_API_KEY: [REDACTED_API_KEY]
  ✓ Compiled in 136ms (927 modules)
  GET / 200 in 51ms
  ✓ Compiled /api/research in 37ms (546 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: Cisco Wireless Survey and Implementation for 5ghz in a warehouse
 🔍 Performing Perplexity-based active research for: Cisco Wireless Survey and Implementation for 5ghz in a warehouse
 🔍 Perplexity research response received, parsing...
@@ -452,3 +452,447 @@ API call attempt 3 failed: HTTP 401: Unauthorized
   185 |         
   186 |         const data = await response.json()
  POST /api/research 200 in 4923ms
+ ✓ Compiled in 72ms (401 modules)
+ GET / 200 in 29ms
+ ✓ Compiled /_not-found in 117ms (917 modules)
+ GET /_next/static/webpack/d1547d6afed5207a.webpack.hot-update.json 404 in 230ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+Checking if should render ContentOutput. generatedContent: null
+ GET / 200 in 76ms
+ ✓ Compiled in 65ms (404 modules)
+ GET / 200 in 10ms
+ ✓ Compiled in 73ms (401 modules)
+ GET / 200 in 8ms
+   Reload env: .env.local
+ ✓ Compiled in 85ms (913 modules)
+ GET / 200 in 62ms
+Checking if should render ContentOutput. generatedContent: null
+ GET / 200 in 117ms
+ ✓ Compiled /api/research in 40ms (553 modules)
+🔍 Starting research for: Nutanix hyperconverged infrastructure install to support E Clinical Works EMR Build - supporting redundancy across 2 data centers.
+🔍 Performing Perplexity-based active research for: Nutanix hyperconverged infrastructure install to support E Clinical Works EMR Build - supporting redundancy across 2 data centers.
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 3116
+📝 First 500 chars: ```json
+{
+  "sources": [
+    {
+      "title": "The Definitive Guide to Hyperconverged Infrastructure",
+      "url": "https://www.exclusive-networks.com/uk/wp-content/uploads/sites/28/2020/12/ebook-hyperconverged-infrastructure.pdf",
+      "summary": "This guide provides an overview of hyperconverged infrastructure, focusing on Nutanix solutions. It discusses how HCI combines servers, storage, and virtualization to simplify datacenter management and improve scalability.",
+      "credibility": "hi
+📝 Last 200 chars: ction features like erasure coding and distributed consistency algorithms.",
+    "Consider integrating with cloud services for disaster recovery and capacity bursting."
+  ],
+  "confidence": 0.85
+}
+```
+🧹 Cleaned response length: 3104
+🧹 Cleaned first 300 chars: {
+  "sources": [
+    {
+      "title": "The Definitive Guide to Hyperconverged Infrastructure",
+      "url": "https://www.exclusive-networks.com/uk/wp-content/uploads/sites/28/2020/12/ebook-hyperconverged-infrastructure.pdf",
+      "summary": "This guide provides an overview of hyperconverged infrast
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 4
+✅ Found 4 sources from Perplexity research
+🔗 Source titles: [
+  'The Definitive Guide to Hyperconverged Infrastructure',
+  'Nutanix Cloud Infrastructure',
+  'Cisco Compute Hyperconverged with Nutanix Support Guidelines',
+  'What is Hyperconverged Infrastructure (HCI) - FAQs'
+]
+API call attempt 1
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+✅ Generated 4 AI-driven services based on research
+✅ Generated 7 calculations mapped to actual questions
+ POST /api/research 200 in 54204ms
+ ✓ Compiled in 89ms (401 modules)
+ GET / 200 in 64ms
+   Reload env: .env.local
+ ✓ Compiled in 80ms (913 modules)
+ GET / 200 in 96ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+ ✓ Compiled in 124ms (401 modules)
+   Reload env: .env.local
+ ✓ Compiled in 134ms (913 modules)
+ GET / 200 in 174ms
+ GET / 200 in 6ms
+ ✓ Compiled /api/research in 44ms (553 modules)
+🔍 Starting research for: test question format
+🔍 Performing Perplexity-based active research for: test question format
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 3997
+📝 First 500 chars: ```json
+{
+  "sources": [    {
+      "title": "How to write better test questions for any assessment - Testportal",
+      "url": "https://www.testportal.net/en/guides/questions/how-to-write-test-questions/",
+      "summary": "Provides detailed best practices for writing effective test questions, focusing on clarity, consistency, and avoiding common pitfalls in question design. Covers stem construction, alternative phrasing, and the importance of not misleading test-takers. Offers practical exampl
+📝 Last 200 chars: requires avoiding formats with high guessing probability (e.g., true/false) and ensuring all students are assessed on the same content for fairness and reliability[4]."
+  ],
+  "confidence": 0.85
+}
+```
+🧹 Cleaned response length: 3985
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "How to write better test questions for any assessment - Testportal",
+      "url": "https://www.testportal.net/en/guides/questions/how-to-write-test-questions/",
+      "summary": "Provides detailed best practices for writing effective test questions, focusing on 
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 4
+✅ Found 4 sources from Perplexity research
+🔗 Source titles: [
+  'How to write better test questions for any assessment - Testportal',
+  'Designing Effective Exams & Test Questions',
+  'Best Practices for Creating Multiple-Choice Questions',
+  'Writing Effective Test Questions | School of Medicine Faculty Development'
+]
+API call attempt 1
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+✅ Generated 4 AI-driven services based on research
+✅ Generated 7 calculations mapped to actual questions
+ POST /api/research 200 in 67138ms
+ ✓ Compiled in 188ms (927 modules)
+ GET / 200 in 88ms
+ ✓ Compiled /api/research in 155ms (553 modules)
+🔍 Starting research for: test debug question fields
+🔍 Performing Perplexity-based active research for: test debug question fields
+ GET / 200 in 32ms
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 2728
+📝 First 500 chars: ```json
+{
+  "sources": [
+    {
+      "title": "Debugging Best Practices",
+      "url": "https://www.meegle.com/en_us/topics/debugging/debugging-best-practices",
+      "summary": "Provides a step-by-step guide to effective debugging, including reproducing issues, using debugging tools, and documenting findings. It also discusses avoiding common pitfalls and leveraging automation.",
+      "credibility": "high",
+      "relevance": 0.80,
+      "sourceType": "guide"
+    },
+    {
+      "title": "Best 
+📝 Last 200 chars:  "Ensure thorough testing across different environments and dependencies.",
+    "Leverage advanced debugging tools for efficient variable inspection and code stepping."
+  ],
+  "confidence": 0.85
+}
+```
+🧹 Cleaned response length: 2716
+🧹 Cleaned first 300 chars: {
+  "sources": [
+    {
+      "title": "Debugging Best Practices",
+      "url": "https://www.meegle.com/en_us/topics/debugging/debugging-best-practices",
+      "summary": "Provides a step-by-step guide to effective debugging, including reproducing issues, using debugging tools, and documenting findin
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 4
+✅ Found 4 sources from Perplexity research
+🔗 Source titles: [
+  'Debugging Best Practices',
+  'Best Practices for Debugging During the QA Testing Phase',
+  "The '20 Questions' Method of Debugging",
+  'Debugging: Its Strategies And Tools With Best Practices'
+]
+API call attempt 1
+Question 1 formatted: {
+  text: 'What level of automated testing coverage currently exists for the debug fields?',
+  question: 'What level of automated testing coverage currently exists for the debug fields?',
+  slug: 'what_level_of_automated_testing_coverage_currently',
+  hasOptions: true
+}
+Question 2 formatted: {
+  text: 'How many distinct environments need debugging support implementation?',
+  question: 'How many distinct environments need debugging support implementation?',
+  slug: 'how_many_distinct_environments_need_debugging_supp',
+  hasOptions: true
+}
+Question 3 formatted: {
+  text: 'What is the current state of debugging documentation?',
+  question: 'What is the current state of debugging documentation?',
+  slug: 'what_is_the_current_state_of_debugging_documentati',
+  hasOptions: true
+}
+Question 4 formatted: {
+  text: 'What debugging tools are currently implemented in the development workflow?',
+  question: 'What debugging tools are currently implemented in the development workflow?',
+  slug: 'what_debugging_tools_are_currently_implemented_in_',
+  hasOptions: true
+}
+Question 5 formatted: {
+  text: 'How complex are the dependencies affecting the debug fields?',
+  question: 'How complex are the dependencies affecting the debug fields?',
+  slug: 'how_complex_are_the_dependencies_affecting_the_deb',
+  hasOptions: true
+}
+Question 6 formatted: {
+  text: 'What is the desired time frame for implementing the debug field improvements?',
+  question: 'What is the desired time frame for implementing the debug field improvements?',
+  slug: 'what_is_the_desired_time_frame_for_implementing_th',
+  hasOptions: true
+}
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+✅ Generated 4 AI-driven services based on research
+✅ Generated 7 calculations mapped to actual questions
+ POST /api/research 200 in 53525ms
+ ✓ Compiled in 136ms (927 modules)
+ GET / 200 in 72ms
+ ✓ Compiled /api/research in 47ms (553 modules)
+🔍 Starting research for: test question validation fix
+🔍 Performing Perplexity-based active research for: test question validation fix
+ GET / 200 in 64ms
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 3620
+📝 First 500 chars: ```json
+{
+  "sources": [
+    {
+      "title": "Why Validation Testing Is Key to Reliable Systems and Accurate Data",
+      "url": "https://www.acceldata.io/blog/why-validation-testing-is-key-to-reliable-systems-and-accurate-data",
+      "summary": "This source emphasizes the importance of validation testing in ensuring system reliability and data accuracy. It highlights best practices such as integrating validation into CI/CD pipelines, automating repetitive tests, maintaining comprehensive logs
+📝 Last 200 chars: sting methods, including manual and automated testing, for comprehensive coverage.",
+    "Prioritize critical functions and sensitive data during validation processes."
+  ],
+  "confidence": 0.85
+}
+```
+🧹 Cleaned response length: 3608
+🧹 Cleaned first 300 chars: {
+  "sources": [
+    {
+      "title": "Why Validation Testing Is Key to Reliable Systems and Accurate Data",
+      "url": "https://www.acceldata.io/blog/why-validation-testing-is-key-to-reliable-systems-and-accurate-data",
+      "summary": "This source emphasizes the importance of validation testing
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  'Why Validation Testing Is Key to Reliable Systems and Accurate Data',
+  'Measuring test validity and reliability: A guide',
+  'Best Practices for Successful System Integration Testing & Validation',
+  'A brief introduction to: Test validation',
+  'Data Validation Testing: Techniques, Examples, & Tools'
+]
+API call attempt 1
+Question 1 formatted: {
+  text: 'What type of test validation framework is currently implemented in your CI/CD pipeline?',
+  question: 'What type of test validation framework is currently implemented in your CI/CD pipeline?',
+  slug: 'what_type_of_test_validation_framework_is_currentl',
+  hasOptions: true
+}
+Question 2 formatted: {
+  text: 'How many test cases need validation fixes based on your current assessment?',
+  question: 'How many test cases need validation fixes based on your current assessment?',
+  slug: 'how_many_test_cases_need_validation_fixes_based_on',
+  hasOptions: true
+}
+Question 3 formatted: {
+  text: 'What is the desired level of test automation coverage after implementation?',
+  question: 'What is the desired level of test automation coverage after implementation?',
+  slug: 'what_is_the_desired_level_of_test_automation_cover',
+  hasOptions: true
+}
+Question 4 formatted: {
+  text: 'What is the primary type of validation testing required for your system?',
+  question: 'What is the primary type of validation testing required for your system?',
+  slug: 'what_is_the_primary_type_of_validation_testing_req',
+  hasOptions: true
+}
+Question 5 formatted: {
+  text: 'What is your expected timeline for implementing the test validation fixes?',
+  question: 'What is your expected timeline for implementing the test validation fixes?',
+  slug: 'what_is_your_expected_timeline_for_implementing_th',
+  hasOptions: true
+}
+Question 6 formatted: {
+  text: 'How many environments require test validation implementation?',
+  question: 'How many environments require test validation implementation?',
+  slug: 'how_many_environments_require_test_validation_impl',
+  hasOptions: true
+}
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz'
+✅ Generated 4 AI-driven services based on research
+✅ Generated 7 calculations mapped to actual questions
+ POST /api/research 200 in 54519ms
+🔍 Starting research for: test question fields after fix
+🔍 Performing Perplexity-based active research for: test question fields after fix
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 3576
+📝 First 500 chars: ```json
+{
+  "sources": [
+    {
+      "title": "Test Question Best Practices",
+      "url": "https://success.appen.com/hc/en-us/articles/213078963-Test-Question-Best-Practices",
+      "summary": "This article provides guidelines on creating effective test questions, emphasizing that they should be indistinguishable from regular data and follow job instructions. It also discusses the importance of clear reasoning and accepting multiple correct answers for subjective questions.",
+      "credibility
+📝 Last 200 chars: ge, Act, Assert' pattern for unit tests to ensure clarity and readability.",
+    "Identify specific features, scenarios, and data for comprehensive test case creation."
+  ],
+  "confidence": 0.85
+}
+```
+🧹 Cleaned response length: 3564
+🧹 Cleaned first 300 chars: {
+  "sources": [
+    {
+      "title": "Test Question Best Practices",
+      "url": "https://success.appen.com/hc/en-us/articles/213078963-Test-Question-Best-Practices",
+      "summary": "This article provides guidelines on creating effective test questions, emphasizing that they should be indistingu
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  'Test Question Best Practices',
+  'Best Practices for Online Test & Quiz Creation',
+  'How to Write Effective Test Cases (With Templates)',
+  'Best Practices (Objects, Test cases, and Tasks)',
+  'Best practices for writing unit tests'
+]
+API call attempt 1
+Question 1 formatted: {
+  text: 'How many test question fields need to be validated after the fix?',
+  question: 'How many test question fields need to be validated after the fix?',
+  slug: 'how_many_test_question_fields_need_to_be_validated',
+  hasOptions: true
+}
+Question 2 formatted: {
+  text: 'What is the estimated effort required to implement randomization in the test question bank?',
+  question: 'What is the estimated effort required to implement randomization in the test question bank?',
+  slug: 'what_is_the_estimated_effort_required_to_implement',
+  hasOptions: true
+}
+Question 3 formatted: {
+  text: 'What level of test case documentation is needed for this project?',
+  question: 'What level of test case documentation is needed for this project?',
+  slug: 'what_level_of_test_case_documentation_is_needed_fo',
+  hasOptions: true
+}
+Question 4 formatted: {
+  text: 'How many unique test scenarios need to be created to validate the fix?',
+  question: 'How many unique test scenarios need to be created to validate the fix?',
+  slug: 'how_many_unique_test_scenarios_need_to_be_created_',
+  hasOptions: true
+}
+Question 5 formatted: {
+  text: 'What type of unit test framework will be used for the fix validation?',
+  question: 'What type of unit test framework will be used for the fix validation?',
+  slug: 'what_type_of_unit_test_framework_will_be_used_for_',
+  hasOptions: true
+}
+Question 6 formatted: {
+  text: 'What is the preferred approach for handling subjective test questions?',
+  question: 'What is the preferred approach for handling subjective test questions?',
+  slug: 'what_is_the_preferred_approach_for_handling_subjec',
+  hasOptions: true
+}
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+✅ Generated 4 AI-driven services based on research
+✅ Generated 7 calculations mapped to actual questions
+ POST /api/research 200 in 54857ms
+ ✓ Compiled in 70ms (401 modules)
+ GET / 200 in 10ms
+🔍 Starting research for: quick test
+🔍 Performing Perplexity-based active research for: quick test
+ ✓ Compiled in 57ms (401 modules)
+ GET / 200 in 10ms
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 3097
+📝 First 500 chars: ```json
+{
+  "sources": [
+    {
+      "title": "10 Proven Steps to Quickly Write a QA Test Plan",
+      "url": "https://www.softkraft.co/qa-test-plan/",
+      "summary": "Provides steps for creating a QA test plan, focusing on optimizing resources and meeting business goals through effective software testing.",
+      "credibility": "high",
+      "relevance": 0.80,
+      "sourceType": "guide"
+    },
+    {
+      "title": "Guide to Effective Test Software Development with TestStand",
+      "url": "h
+📝 Last 200 chars: omated testing where feasible to reduce manual effort and increase efficiency.",
+    "Regularly review and refine test plans to adapt to changing project requirements."
+  ],
+  "confidence": 0.85
+}
+```
+🧹 Cleaned response length: 3085
+🧹 Cleaned first 300 chars: {
+  "sources": [
+    {
+      "title": "10 Proven Steps to Quickly Write a QA Test Plan",
+      "url": "https://www.softkraft.co/qa-test-plan/",
+      "summary": "Provides steps for creating a QA test plan, focusing on optimizing resources and meeting business goals through effective software testing
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  '10 Proven Steps to Quickly Write a QA Test Plan',
+  'Guide to Effective Test Software Development with TestStand',
+  'What is Rapid Software Testing and How Can I Implement It?',
+  'Automated Software Testing Implementation Guide',
+  'Software Testing Quick Guide'
+]
+API call attempt 1
+Question 1 formatted: {
+  text: 'What is the estimated size of the test suite that needs to be developed (number of test cases)?',
+  question: 'What is the estimated size of the test suite that needs to be developed (number of test cases)?',
+  slug: 'what_is_the_estimated_size_of_the_test_suite_that_',
+  hasOptions: true
+}
+Question 2 formatted: {
+  text: 'Which type of automated testing tools are currently in use within your organization?',
+  question: 'Which type of automated testing tools are currently in use within your organization?',
+  slug: 'which_type_of_automated_testing_tools_are_currentl',
+  hasOptions: true
+}
+Question 3 formatted: {
+  text: 'What is your target automation coverage percentage for the test suite?',
+  question: 'What is your target automation coverage percentage for the test suite?',
+  slug: 'what_is_your_target_automation_coverage_percentage',
+  hasOptions: true
+}
+Question 4 formatted: {
+  text: 'How frequently do you anticipate running the test suite?',
+  question: 'How frequently do you anticipate running the test suite?',
+  slug: 'how_frequently_do_you_anticipate_running_the_test_',
+  hasOptions: true
+}
+Question 5 formatted: {
+  text: 'What level of testing documentation is required for your organization?',
+  question: 'What level of testing documentation is required for your organization?',
+  slug: 'what_level_of_testing_documentation_is_required_fo',
+  hasOptions: true
+}
+Question 6 formatted: {
+  text: 'What is the desired timeline for implementing the quick test strategy?',
+  question: 'What is the desired timeline for implementing the quick test strategy?',
+  slug: 'what_is_the_desired_timeline_for_implementing_the_',
+  hasOptions: true
+}
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+✅ Generated 4 AI-driven services based on research
+✅ Generated 7 calculations mapped to actual questions
+ POST /api/research 200 in 85530ms
+ ✓ Compiled in 65ms (401 modules)
+ GET / 200 in 9ms

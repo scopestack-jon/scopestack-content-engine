@@ -128,12 +128,24 @@ export class ContentValidator {
   // Sanitization methods
 
   private sanitizeQuestion(question: any): Question {
+    const questionText = String(question.text || question.question || 'Question').trim();
+    const slug = question.slug || questionText.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, '_')
+      .substring(0, 50);
+
     return {
-      text: String(question.text || question.question || 'Question').trim(),
+      id: question.id || `q${Date.now()}`,
+      text: questionText,
+      question: questionText, // Frontend compatibility
+      slug: slug, // Frontend compatibility
       type: this.isValidQuestionType(question.type) ? question.type : 'multiple_choice',
-      options: Array.isArray(question.options) ? question.options : ['Yes', 'No'],
+      options: Array.isArray(question.options) ? question.options : [
+        { key: "Yes", value: 1, default: true },
+        { key: "No", value: 0, default: false }
+      ],
       required: question.required !== false // Default to true
-    };
+    } as any; // Use any to accommodate both interfaces
   }
 
   private sanitizeService(service: any): Service {

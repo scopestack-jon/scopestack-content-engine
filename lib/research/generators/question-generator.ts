@@ -78,13 +78,45 @@ NO markdown, NO explanations, ONLY the JSON array.`;
 
       // Validate the structure
       if (Array.isArray(questions) && questions.length > 0) {
-        // Ensure all questions have required fields
-        const validatedQuestions: Question[] = questions.map((q: any, index: number) => ({
-          text: q.text || q.question || `Question ${index + 1}`,
-          type: q.type || 'multiple_choice',
-          options: Array.isArray(q.options) ? q.options : ["Yes", "No"],
-          required: q.required !== false // Default to true
-        }));
+        // Ensure all questions have required fields in frontend-compatible format
+        const validatedQuestions: Question[] = questions.map((q: any, index: number) => {
+          const questionText = q.text || q.question || `Question ${index + 1}`;
+          const slug = questionText.toLowerCase()
+            .replace(/[^a-z0-9\s]/g, '')
+            .replace(/\s+/g, '_')
+            .substring(0, 50);
+
+          // Convert options to frontend format
+          const formattedOptions = Array.isArray(q.options) 
+            ? q.options.map((opt: string, optIndex: number) => ({
+                key: opt,
+                value: optIndex + 1,
+                default: optIndex === 0 // First option is default
+              }))
+            : [
+                { key: "Yes", value: 1, default: true },
+                { key: "No", value: 0, default: false }
+              ];
+
+          const finalQuestion = {
+            id: `q${index + 1}`,
+            slug: slug,
+            question: questionText, // Frontend expects "question" not "text"
+            options: formattedOptions,
+            text: questionText,
+            type: q.type || 'multiple_choice',
+            required: q.required !== false
+          };
+          
+          console.log(`Question ${index + 1} formatted:`, {
+            text: finalQuestion.text,
+            question: finalQuestion.question,
+            slug: finalQuestion.slug,
+            hasOptions: finalQuestion.options.length > 0
+          });
+          
+          return finalQuestion as any; // Use any to accommodate both interfaces
+        });
 
         console.log(`✅ Generated ${validatedQuestions.length} AI-driven questions based on research`);
         return validatedQuestions.slice(0, 8); // Limit to 8 questions max
@@ -102,41 +134,59 @@ NO markdown, NO explanations, ONLY the JSON array.`;
    * Fallback questions when AI generation fails
    */
   private getFallbackQuestions(technology: string): Question[] {
-    return [
+    const fallbackQuestions = [
       {
         text: `What is the primary scope of your ${technology} project?`,
-        type: 'multiple_choice',
         options: [
           "New implementation",
           "Upgrade/migration", 
           "Configuration changes",
           "Troubleshooting"
-        ],
-        required: true
+        ]
       },
       {
         text: "What is the size of your environment?",
-        type: 'multiple_choice',
         options: [
           "Small (1-50 users)",
           "Medium (51-500 users)",
           "Large (501-2000 users)",
           "Enterprise (2000+ users)"
-        ],
-        required: true
+        ]
       },
       {
         text: "What is your target timeline for completion?",
-        type: 'multiple_choice',
         options: [
           "1-2 weeks",
           "1-2 months",
           "3-6 months",
           "6+ months"
-        ],
-        required: true
+        ]
       }
     ];
+
+    // Format fallback questions to match frontend expectations
+    return fallbackQuestions.map((q: any, index: number) => {
+      const slug = q.text.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, '_')
+        .substring(0, 50);
+
+      const formattedOptions = q.options.map((opt: string, optIndex: number) => ({
+        key: opt,
+        value: optIndex + 1,
+        default: optIndex === 0 // First option is default
+      }));
+
+      return {
+        id: `q${index + 1}`,
+        slug: slug,
+        question: q.text, // Frontend expects "question" not "text"
+        options: formattedOptions,
+        text: q.text,
+        type: 'multiple_choice',
+        required: true
+      } as any; // Use any to accommodate both interfaces
+    });
   }
 }
 

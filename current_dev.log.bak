@@ -15,7 +15,7 @@ Checking if should render ContentOutput. generatedContent: null
  GET / 200 in 1317ms
  ✓ Compiled in 240ms (401 modules)
  ✓ Compiled /api/research in 173ms (933 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: test firewall
 🔍 Performing Perplexity-based active research for: test firewall
  POST /api/research 200 in 30001ms
@@ -24,7 +24,7 @@ Checking if should render ContentOutput. generatedContent: null
  ✓ Compiled /_not-found in 163ms (917 modules)
  GET /.well-known/appspecific/com.chrome.devtools.json 404 in 254ms
  ✓ Compiled /api/research in 94ms (547 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: Cisco Call Manager, Unity Connection, IM&P, plus SRST router for 10 sites in a corporate environment
 🔍 Performing Perplexity-based active research for: Cisco Call Manager, Unity Connection, IM&P, plus SRST router for 10 sites in a corporate environment
 🔍 Perplexity research response received, parsing...
@@ -105,7 +105,7 @@ Firewall implementation requires careful planning, configuration, and ongoing ma
  ✓ Compiled in 107ms (401 modules)
  GET / 200 in 13ms
  ✓ Compiled /api/research in 74ms (546 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: quick test firewall
 🔍 Performing Perplexity-based active research for: quick test firewall
  GET / 200 in 24ms
@@ -146,7 +146,7 @@ Checking if should render ContentOutput. generatedContent: null
  GET / 200 in 100ms
  ✓ Compiled /_not-found in 87ms (937 modules)
  GET /.well-known/appspecific/com.chrome.devtools.json 404 in 182ms
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: Palo Alto firewall upgrade from a previous Cisco firewall implementation, including migration of all rules
 🔍 Performing Perplexity-based active research for: Palo Alto firewall upgrade from a previous Cisco firewall implementation, including migration of all rules
 🔍 Perplexity research response received, parsing...
@@ -187,7 +187,7 @@ OPENROUTER_API_KEY: [REDACTED_API_KEY]
  ✓ Compiled in 79ms (401 modules)
  GET / 200 in 7ms
  ✓ Compiled /api/research in 108ms (546 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: Palo Alto firewall migration from Cisco ASA
 🔍 Performing Perplexity-based active research for: Palo Alto firewall migration from Cisco ASA
  GET / 200 in 90ms
@@ -228,7 +228,7 @@ Checking if should render ContentOutput. generatedContent: null
  ✓ Compiled /_not-found in 174ms (917 modules)
  GET /.well-known/appspecific/com.chrome.devtools.json 404 in 280ms
  ✓ Compiled /api/research in 77ms (547 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
 🔍 Performing Perplexity-based active research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
 🔍 Perplexity research response received, parsing...
@@ -275,7 +275,7 @@ This JSON output provides a research-grade, actionable resource list for hospita
  ✓ Compiled in 69ms (401 modules)
  GET / 200 in 7ms
  ✓ Compiled /api/research in 78ms (546 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: Salesforce CRM implementation for healthcare organization with 500 users
 🔍 Performing Perplexity-based active research for: Salesforce CRM implementation for healthcare organization with 500 users
  GET / 200 in 104ms
@@ -362,7 +362,7 @@ OPENROUTER_API_KEY: [REDACTED_API_KEY]
  ✓ Compiled in 73ms (401 modules)
  GET / 200 in 9ms
  ✓ Compiled /api/research in 65ms (546 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: AWS cloud migration for financial services company with compliance requirements
 🔍 Performing Perplexity-based active research for: AWS cloud migration for financial services company with compliance requirements
  GET / 200 in 30ms
@@ -408,7 +408,7 @@ Checking if should render ContentOutput. generatedContent: null
  ✓ Compiled /_not-found in 212ms (917 modules)
  GET /.well-known/appspecific/com.chrome.devtools.json 404 in 332ms
  ✓ Compiled /api/research in 70ms (547 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
 🔍 Performing Perplexity-based active research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
 🔍 Perplexity research response received, parsing...
@@ -450,7 +450,7 @@ OPENROUTER_API_KEY: [REDACTED_API_KEY]
 Checking if should render ContentOutput. generatedContent: null
  GET / 200 in 177ms
  ✓ Compiled /api/research in 35ms (546 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: Simple network router configuration for small office
 🔍 Performing Perplexity-based active research for: Simple network router configuration for small office
 API call attempt 1 failed: HTTP 401: Unauthorized
@@ -479,7 +479,7 @@ Checking if should render ContentOutput. generatedContent: null
  GET / 200 in 120ms
  ✓ Compiled /_not-found in 102ms (937 modules)
  GET /.well-known/appspecific/com.chrome.devtools.json 404 in 184ms
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
 🔍 Performing Perplexity-based active research for: Microsoft Email Migration to Office 365 for a Hospital with 1000 users
 API call attempt 1 failed: HTTP 401: Unauthorized
@@ -509,7 +509,7 @@ Failed to generate AI services, using fallback
  ✓ Compiled in 78ms (401 modules)
  GET / 200 in 7ms
  ✓ Compiled /api/research in 101ms (546 modules)
-OPENROUTER_API_KEY: [REDACTED_API_KEY]
+OPENROUTER_API_KEY: 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
 🔍 Starting research for: test network setup
 🔍 Performing Perplexity-based active research for: test network setup
  GET / 200 in 96ms
@@ -719,3 +719,25 @@ API call attempt 3 failed: HTTP 401: Unauthorized
  POST /api/research 200 in 4601ms
 Checking if should render ContentOutput. generatedContent: null
  GET / 200 in 145ms
+ ✓ Compiled in 81ms (642 modules)
+ ✓ Compiled in 73ms (642 modules)
+ ✓ Compiled in 54ms (642 modules)
+   Reload env: .env.local
+ ✓ Compiled in 94ms (1200 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+ ✓ Compiled in 108ms (642 modules)
+   Reload env: .env.local
+ ✓ Compiled in 89ms (1200 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: incorrect data check
+ ✓ Compiled in 125ms (642 modules)
+   Reload env: .env.local
+ ✓ Compiled in 80ms (1200 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/2.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/2.pack.gz'
+ ✓ Compiled in 116ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/3.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/3.pack.gz'
+ ✓ Compiled in 79ms (642 modules)
+ ✓ Compiled in 74ms (642 modules)
+ ✓ Compiled in 61ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 69ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz'
