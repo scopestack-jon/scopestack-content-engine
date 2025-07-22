@@ -211,8 +211,8 @@ export class ContentValidator {
   private sanitizeQuestion(question: any): Question {
     const questionText = String(question.text || question.question || 'Question').trim();
     
-    // Generate shorter, more readable slug (15 chars max)
-    const slug = question.slug || this.generateQuestionSlug(questionText);
+    // Always generate shorter, more readable slug (15 chars max) - override AI-generated slugs
+    const slug = this.generateQuestionSlug(questionText);
     
     // Determine if this is a numerical question
     const isNumericalQuestion = this.isNumericalQuestion(questionText);

@@ -36,14 +36,24 @@ Generate questions that are:
 1. Specific to the technology and use case mentioned
 2. Based on the actual research findings above
 3. Practical for professional services scoping
-4. Include multiple choice options with realistic values/hours/complexities
+4. Mix of multiple choice questions AND numerical quantity questions
+5. Use "How many" for quantity questions (users, mailboxes, servers, storage amounts)
+
+QUESTION TYPES:
+- Multiple choice: For decisions, preferences, complexity levels
+- Numerical: For quantities like "How many users need to be migrated?", "How much storage data?", "What is the project budget?"
 
 Return ONLY a JSON array of questions in this exact format:
 [
   {
-    "text": "Question text here?",
-    "type": "multiple_choice",
-    "options": ["Option 1", "Option 2", "Option 3"],
+    "text": "How many users need to be migrated?",
+    "type": "number",
+    "required": true
+  },
+  {
+    "text": "What is the complexity level of current email integrations?",
+    "type": "multiple_choice", 
+    "options": ["Simple (basic email only)", "Moderate (some integrations)", "Complex (many integrations)"],
     "required": true
   }
 ]
