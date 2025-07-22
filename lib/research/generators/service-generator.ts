@@ -1,5 +1,6 @@
 import { OpenRouterClient } from '../api/openrouter-client';
 import { extractTechnologyName } from '../utils/response-processor';
+import { SERVICE_GENERATION_TIMEOUT } from '../config/constants';
 import type { Service } from '../types/interfaces';
 
 export class ServiceGenerator {
@@ -20,82 +21,47 @@ export class ServiceGenerator {
         userRequest: userRequest
       };
       
-      // Create a comprehensive prompt for AI to generate research-driven services
-      const prompt = `Based on this research about "${userRequest}", generate professional services with comprehensive phase coverage and sufficient content depth.
+      // Create a streamlined prompt for faster service generation
+      const prompt = `Generate 4-5 professional services based on "${userRequest}" research.
 
-Research Context:
-- User Request: ${userRequest}
-- Research Summary: ${researchContext.summary}
-- Key Insights: ${researchContext.insights.join(', ')}
-- Source Topics: ${researchContext.sources.map((s: any) => s.title).slice(0, 5).join(', ')}
+Research: ${researchContext.summary}
+Key Insights: ${researchContext.insights.slice(0, 3).join(', ')}
 
-REQUIRED SERVICE STRUCTURE - Generate services aligned with PMBOK phases:
+REQUIREMENTS:
+- 4-5 services aligned with PMBOK phases: Initiation, Planning, Execution, Monitoring & Controlling, Closing
+- Each service has 4+ subservices (minimum 16 total subservices)
+- Based on research findings for ${technology}
 
-PMBOK PHASES TO USE:
-- Initiation: Project charter, stakeholder identification, initial requirements
-- Planning: Detailed planning, design, architecture, risk assessment  
-- Execution: Implementation, development, configuration, deployment
-- Monitoring & Controlling: Testing, quality assurance, progress tracking
-- Closing: Training, knowledge transfer, handover, documentation
-
-Generate EXACTLY this pattern:
-4-5 specialized services, each focused on a specific PMBOK phase with 4+ subservices each
-
-This should result in:
-- Total of 4-5 services (one for each PMBOK phase)
-- Each service dedicated to ONE specific PMBOK phase: Initiation, Planning, Execution, Monitoring & Controlling, or Closing
-- Each service must have 4+ detailed subservices (16-25 total subservices across all services)
-- All PMBOK phases covered with proper methodology
-- Target: 20+ subservices across all services (minimum acceptable: 12+ subservices)
-
-IMPORTANT: Generate MORE subservices rather than fewer. Each service should be comprehensive with detailed breakdowns.
-
-Generate services that are:
-1. Specific to the technology and use case mentioned in the research
-2. Based on actual implementation patterns found in the research
-3. Realistic hour estimates for professional services (80-200 hours per service)
-4. Include 4-6 detailed subservices per service with specific tasks (15-40 hours per subservice)
-5. Include comprehensive scope language for professional services
-6. Cover the full project lifecycle from planning through training
-7. CRITICAL: Each service must have AT LEAST 4 subservices - generate comprehensive detailed breakdowns
-
-Return ONLY a JSON array of services in this exact format with PMBOK-aligned phases:
+JSON FORMAT (NO markdown, explanations, or code blocks):
 [
   {
     "name": "Service Name",
-    "description": "Brief service description",
-    "serviceDescription": "Detailed 2-3 sentence description of what this service provides, based on research findings",
-    "keyAssumptions": "Key assumptions for this service based on typical project requirements found in research",
-    "clientResponsibilities": "What the client needs to provide or do for this service to be successful",
-    "outOfScope": "What is specifically not included in this service scope",
-    "hours": 40,
-    "phase": "MUST be one of: Initiation, Planning, Execution, Monitoring & Controlling, or Closing",
+    "description": "Brief description",
+    "serviceDescription": "Detailed description based on research",
+    "keyAssumptions": "Service assumptions",
+    "clientResponsibilities": "Client responsibilities", 
+    "outOfScope": "What's excluded",
+    "hours": 80,
+    "phase": "One of: Initiation, Planning, Execution, Monitoring & Controlling, Closing",
     "subservices": [
       {
-        "name": "Subservice Name aligned with PMBOK activities", 
-        "description": "Subservice description that clearly fits the PMBOK phase",
-        "serviceDescription": "Detailed description of this subservice based on research best practices and PMBOK methodology",
-        "keyAssumptions": "Assumptions specific to this subservice",
-        "clientResponsibilities": "Client responsibilities for this subservice",
-        "outOfScope": "What's not included in this subservice",
-        "hours": 15
+        "name": "Subservice Name",
+        "description": "Subservice description", 
+        "serviceDescription": "Detailed subservice description",
+        "keyAssumptions": "Subservice assumptions",
+        "clientResponsibilities": "Client responsibilities",
+        "outOfScope": "Exclusions",
+        "hours": 20
       }
     ]
   }
-]
+]`;
 
-CRITICAL: Each service must map to ONE specific PMBOK phase:
-- Use ONLY these exact phase names: "Initiation", "Planning", "Execution", "Monitoring & Controlling", "Closing"
-- NO "All Phases" or "Complete Project Lifecycle" services
-- Each service focuses exclusively on activities within its assigned PMBOK phase
-- Generate 4-5 services to cover all PMBOK phases comprehensively
-
-NO markdown, NO explanations, ONLY the JSON array.`;
-
-      // Call OpenRouter API to generate research-driven services
+      // Call OpenRouter API to generate research-driven services with extended timeout
       const aiContent = await this.client.generateWithRetry(
         'anthropic/claude-3.5-sonnet',
-        prompt
+        prompt,
+        SERVICE_GENERATION_TIMEOUT
       );
 
       if (!aiContent) {

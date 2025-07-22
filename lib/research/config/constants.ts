@@ -30,6 +30,7 @@ RESPOND WITH PURE JSON ONLY.
 `;
 
 export const API_TIMEOUT = 60000; // 60 seconds
+export const SERVICE_GENERATION_TIMEOUT = 120000; // 2 minutes for complex service generation
 export const MAX_RETRY_ATTEMPTS = 3;
 export const INITIAL_RETRY_DELAY = 1000; // 1 second
 export const MAX_RETRY_DELAY = 5000; // 5 seconds

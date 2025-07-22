@@ -1743,3 +1743,60 @@ SSE controller closed, cannot send data: TypeError: Invalid state: Controller is
   37 |             console.log('SSE controller closed, cannot send data:', error); {
   code: 'ERR_INVALID_STATE'
 }
+ ✓ Compiled in 235ms (927 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/2.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/2.pack.gz'
+ ✓ Compiled in 68ms (401 modules)
+ ⨯ SyntaxError: Unexpected end of JSON input
+    at JSON.parse (<anonymous>) {
+  page: '/'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 651ms (1243 modules)
+ GET / 500 in 982ms
+ GET / 200 in 50ms
+ GET / 200 in 6ms
+Checking if should render ContentOutput. generatedContent: null
+ GET / 200 in 101ms
+ ✓ Compiled in 117ms (642 modules)
+ ✓ Compiled in 77ms (642 modules)
+ ✓ Compiled in 73ms (642 modules)
+ ✓ Compiled in 80ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/1.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/1.pack.gz'
+ ✓ Compiled in 78ms (642 modules)
+ ✓ Compiled in 75ms (642 modules)
+ ✓ Compiled in 70ms (642 modules)
+ ✓ Compiled in 61ms (642 modules)
+ ✓ Compiled in 67ms (642 modules)
+ ✓ Compiled in 83ms (642 modules)
+ ✓ Compiled in 58ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 90ms (642 modules)
+ ✓ Compiled in 71ms (642 modules)
+ ✓ Compiled in 66ms (642 modules)
+ ✓ Compiled in 79ms (642 modules)
+ ✓ Compiled in 67ms (642 modules)
+ ✓ Compiled in 71ms (642 modules)
+ ✓ Compiled in 72ms (642 modules)
+ ✓ Compiled in 60ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/2.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/2.pack.gz'
+ ✓ Compiled in 74ms (642 modules)
+ ✓ Compiled in 77ms (642 modules)
+ ✓ Compiled in 93ms (642 modules)
+ ✓ Compiled in 64ms (642 modules)
+ ✓ Compiled in 94ms (642 modules)
+ ✓ Compiled in 93ms (642 modules)
+ ✓ Compiled in 63ms (642 modules)
+ ✓ Compiled in 66ms (642 modules)
+ ✓ Compiled in 119ms (642 modules)
+ ✓ Compiled in 75ms (642 modules)
+ ✓ Compiled in 66ms (642 modules)
+ ✓ Compiled in 82ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 73ms (642 modules)
+ ✓ Compiled in 69ms (642 modules)
+ ✓ Compiled in 70ms (642 modules)
+ ✓ Compiled in 62ms (642 modules)
+ ✓ Compiled in 61ms (642 modules)
+ ✓ Compiled in 90ms (642 modules)
+ ✓ Compiled in 66ms (642 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz'

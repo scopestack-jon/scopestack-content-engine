@@ -4,6 +4,15 @@
 import { GeneratedContent, Question, Service, Calculation, ResearchSource } from '../types/interfaces';
 
 export class ContentValidator {
+  private idCounter = 0;
+
+  /**
+   * Generate a unique ID
+   */
+  private generateUniqueId(prefix: string): string {
+    this.idCounter++;
+    return `${prefix}_${Date.now()}_${this.idCounter}`;
+  }
 
   /**
    * Validates and sanitizes generated content
@@ -139,7 +148,7 @@ export class ContentValidator {
       .substring(0, 50);
 
     return {
-      id: question.id || `q${Date.now()}`,
+      id: question.id || this.generateUniqueId('q'),
       text: questionText,
       question: questionText, // Frontend compatibility
       slug: slug, // Frontend compatibility
@@ -182,10 +191,14 @@ export class ContentValidator {
 
   private sanitizeCalculation(calculation: any): Calculation {
     return {
+      id: calculation.id || this.generateUniqueId('calc'),
       name: String(calculation.name || 'Calculation').trim(),
       value: calculation.value || '1.0',
+      formula: calculation.formula || null,
       unit: String(calculation.unit || 'multiplier').trim(),
-      source: String(calculation.source || 'Generated calculation').trim()
+      source: String(calculation.source || 'Generated calculation').trim(),
+      mappedQuestions: Array.isArray(calculation.mappedQuestions) ? calculation.mappedQuestions : [],
+      mappedServices: Array.isArray(calculation.mappedServices) ? calculation.mappedServices : []
     };
   }
 

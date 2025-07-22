@@ -1,130 +1,339 @@
-// Calculation Generation
-// Maps questions to project calculations and complexity factors
+// Dynamic Quantity-Based Calculation Generation
+// Creates actual calculations that compute quantities and map to service hours
 
-import { Question, Calculation } from '../types/interfaces';
+import { Question, Calculation, Service } from '../types/interfaces';
 
 export class CalculationGenerator {
+  private idCounter = 0;
 
   /**
-   * Generates calculations dynamically based on questions
+   * Generate a unique ID for calculations
    */
-  generateCalculationsFromQuestions(questions: Question[]): Calculation[] {
-    // Generate calculations dynamically based on the actual questions generated
-    const calculations = questions.map((question: Question, index: number) => {
-      // Determine the type of calculation based on question content
-      let value: number | string = "1.0";
-      let unit = "multiplier";
-      let source = `Derived from: ${question.text}`;
-      
-      // Analyze the question to determine the best calculation value
-      const questionText = question.text.toLowerCase();
-      
-      if (questionText.includes('timeline') || 
-          questionText.includes('deadline') ||
-          questionText.includes('rush') ||
-          questionText.includes('urgent')) {
-        value = "1.3";
-        unit = "multiplier";
-        source = `Timeline pressure factor - adjusts hours based on urgency requirements`;
-      } else if (questionText.includes('compliance') || 
-                 questionText.includes('regulation') ||
-                 questionText.includes('audit') ||
-                 questionText.includes('security')) {
-        value = "40";
-        unit = "hours";
-        source = `Compliance overhead - adds additional hours for regulatory requirements`;
-      } else if (questionText.includes('size') || 
-                 questionText.includes('users') ||
-                 questionText.includes('scale') ||
-                 questionText.includes('environment')) {
-        value = "1.5";
-        unit = "multiplier";
-        source = `Scale factor - adjusts hours based on project size and scope`;
-      } else if (questionText.includes('complexity') || 
-                 questionText.includes('rules') ||
-                 questionText.includes('migration') ||
-                 questionText.includes('integration')) {
-        value = "1.4";
-        unit = "multiplier";
-        source = `Complexity factor - adjusts hours based on technical complexity`;
-      } else if (questionText.includes('experience') ||
-                 questionText.includes('expertise') ||
-                 questionText.includes('knowledge')) {
-        value = "1.2";
-        unit = "multiplier";
-        source = `Experience factor - adjusts hours based on team experience level`;
-      } else {
-        value = "1.1";
-        unit = "multiplier";
-        source = `General project factor based on: ${question.text.replace('?', '')}`;
+  private generateUniqueId(prefix: string): string {
+    this.idCounter++;
+    return `${prefix}_${Date.now()}_${this.idCounter}`;
+  }
+
+  /**
+   * Generates dynamic quantity-based calculations that map question inputs to service hours
+   */
+  generateCalculationsFromQuestions(questions: Question[], services: Service[]): Calculation[] {
+    const calculations: Calculation[] = [];
+    
+    console.log(`📊 Generating calculations from ${questions.length} questions and ${services.length} services`);
+    
+    // Step 1: Create question-based calculations that map to services
+    const quantityQuestions = this.identifyQuantityQuestions(questions);
+    console.log(`📊 Found ${quantityQuestions.length} quantity questions`);
+    
+    quantityQuestions.forEach(question => {
+      const relatedServices = this.findServicesForQuestion(question, services);
+      const calculation = this.createQuestionToServiceCalculation(question, relatedServices);
+      if (calculation) {
+        calculations.push(calculation);
+        console.log(`📊 Created calculation: ${calculation.name}`);
       }
-
-      return {
-        name: `${question.text.replace('?', '')} Factor`,
-        value: value,
-        unit: unit,
-        source: source
-      };
     });
-
-    // Add base calculations if we don't have many questions
-    if (calculations.length < 3) {
-      calculations.push({
-        name: "Base Implementation Complexity",
-        value: "1.2",
-        unit: "multiplier",
-        source: "Standard complexity factor for implementation projects - accounts for unforeseen challenges and integration complexities"
-      });
-    }
-
-    // Add a project coordination factor
+    
+    // Step 2: Create service-specific calculations that reference actual subservices
+    services.forEach(service => {
+      const serviceCalculations = this.createServiceSpecificCalculations(service, questions);
+      calculations.push(...serviceCalculations);
+      console.log(`📊 Created ${serviceCalculations.length} calculations for ${service.name}`);
+    });
+    
+    // Step 3: Add overhead calculation that applies to all services
     calculations.push({
-      name: "Project Coordination Overhead",
+      id: this.generateUniqueId('calc_overhead'),
+      name: "Project Management Overhead",
       value: "0.15",
+      formula: "total_hours × 0.15",
       unit: "percentage",
-      source: "Standard project management and coordination overhead - includes meetings, documentation, and communication"
+      source: "Standard 15% PM overhead applied to total project hours",
+      mappedQuestions: [], // Applies to all
+      mappedServices: services.map(s => s.name) // References all services
     });
-
-    console.log(`✅ Generated ${calculations.length} calculations mapped to actual questions`);
+    
+    console.log(`📊 Generated ${calculations.length} total calculations`);
     return calculations;
   }
 
   /**
-   * Calculates total project hours based on services and calculations
+   * Identify questions that represent quantities (users, mailboxes, servers, etc.)
    */
-  calculateTotalHours(services: any[], calculations: Calculation[]): number {
-    let baseHours = services.reduce((total, service) => total + (service.hours || 0), 0);
+  private identifyQuantityQuestions(questions: Question[]): Question[] {
+    const quantityKeywords = [
+      'how many', 'number of', 'quantity', 'count', 'total',
+      'users', 'mailboxes', 'servers', 'licenses', 'devices',
+      'endpoints', 'workstations', 'sites', 'locations',
+      'gigabytes', 'terabytes', 'gb', 'tb', 'storage',
+      'hours', 'days', 'weeks', 'months'
+    ];
     
-    // Apply multiplier calculations
-    calculations.forEach(calc => {
-      if (calc.unit === "multiplier" && typeof calc.value === "string") {
-        const multiplier = parseFloat(calc.value);
-        if (!isNaN(multiplier)) {
-          baseHours *= multiplier;
-        }
-      } else if (calc.unit === "hours" && typeof calc.value === "string") {
-        const additionalHours = parseFloat(calc.value);
-        if (!isNaN(additionalHours)) {
-          baseHours += additionalHours;
-        }
-      } else if (calc.unit === "percentage" && typeof calc.value === "string") {
-        const percentage = parseFloat(calc.value);
-        if (!isNaN(percentage)) {
-          baseHours *= (1 + percentage);
-        }
+    return questions.filter(question => {
+      const text = question.text.toLowerCase();
+      return quantityKeywords.some(keyword => text.includes(keyword));
+    });
+  }
+
+  /**
+   * Create effort mappings based on common service patterns
+   */
+  private createEffortMappings(questions: Question[], services: Service[]): Map<string, number> {
+    const mappings = new Map<string, number>();
+    
+    // Standard effort rates (hours per unit)
+    mappings.set('mailbox_migration', 0.5);  // 0.5 hours per mailbox
+    mappings.set('user_training', 2.0);      // 2 hours per user
+    mappings.set('server_setup', 8.0);       // 8 hours per server
+    mappings.set('workstation_config', 1.5); // 1.5 hours per workstation
+    mappings.set('site_deployment', 16.0);   // 16 hours per site
+    mappings.set('license_provisioning', 0.25); // 0.25 hours per license
+    mappings.set('data_migration_gb', 0.1);   // 0.1 hours per GB
+    mappings.set('security_review', 4.0);     // 4 hours per endpoint
+    
+    return mappings;
+  }
+
+  /**
+   * Find services that relate to a specific question
+   */
+  private findServicesForQuestion(question: Question, services: Service[]): Service[] {
+    const text = question.text.toLowerCase();
+    const relatedServices: Service[] = [];
+    
+    services.forEach(service => {
+      const serviceName = service.name.toLowerCase();
+      const serviceDesc = service.description.toLowerCase();
+      
+      // Check if question relates to service activities
+      if (text.includes('mailbox') && (serviceName.includes('migration') || serviceDesc.includes('migration'))) {
+        relatedServices.push(service);
+      } else if (text.includes('user') && (serviceName.includes('training') || serviceDesc.includes('training'))) {
+        relatedServices.push(service);
+      } else if (text.includes('server') && (serviceName.includes('execution') || serviceName.includes('implementation'))) {
+        relatedServices.push(service);
+      } else if (text.includes('test') && (serviceName.includes('monitoring') || serviceName.includes('testing'))) {
+        relatedServices.push(service);
       }
     });
+    
+    return relatedServices;
+  }
 
-    return Math.round(baseHours);
+  /**
+   * Create a calculation that maps a question to specific services
+   */
+  private createQuestionToServiceCalculation(question: Question, relatedServices: Service[]): Calculation | null {
+    const text = question.text.toLowerCase();
+    const questionSlug = question.slug || this.generateSlug(question.text);
+    const serviceNames = relatedServices.map(s => s.name);
+    
+    if (relatedServices.length === 0) {
+      return null; // Skip if no related services found
+    }
+    
+    // Map question types to calculation formulas with service references
+    if (text.includes('mailbox') && text.includes('how many')) {
+      return {
+        id: this.generateUniqueId('calc_mailbox'),
+        name: `${question.text} → Affects ${serviceNames.join(', ')}`,
+        value: "0.5",
+        formula: "mailbox_count × 0.5",
+        unit: "hours per mailbox",
+        source: `This question scales effort for: ${serviceNames.join(', ')}`,
+        mappedQuestions: [questionSlug],
+        mappedServices: serviceNames
+      };
+    }
+    
+    if (text.includes('user') && (text.includes('how many') || text.includes('number'))) {
+      return {
+        id: this.generateUniqueId('calc_user'),
+        name: `${question.text} → Affects ${serviceNames.join(', ')}`,
+        value: "2.0",
+        formula: "user_count × 2.0",
+        unit: "hours per user", 
+        source: `This question scales effort for: ${serviceNames.join(', ')}`,
+        mappedQuestions: [questionSlug],
+        mappedServices: serviceNames
+      };
+    }
+    
+    if (text.includes('server') && text.includes('how many')) {
+      return {
+        id: this.generateUniqueId('calc_server'),
+        name: `${question.text} → Affects ${serviceNames.join(', ')}`,
+        value: "8.0",
+        formula: "server_count × 8.0",
+        unit: "hours per server",
+        source: `This question scales effort for: ${serviceNames.join(', ')}`,
+        mappedQuestions: [questionSlug],
+        mappedServices: serviceNames
+      };
+    }
+    
+    if (text.includes('storage') || text.includes('gb') || text.includes('terabyte')) {
+      return {
+        id: this.generateUniqueId('calc_storage'),
+        name: `${question.text} → Affects ${serviceNames.join(', ')}`,
+        value: "0.1",
+        formula: "storage_gb × 0.1",
+        unit: "hours per GB",
+        source: `This question scales effort for: ${serviceNames.join(', ')}`,
+        mappedQuestions: [questionSlug],
+        mappedServices: serviceNames
+      };
+    }
+    
+    if (text.includes('site') || text.includes('location')) {
+      return {
+        id: this.generateUniqueId('calc_site'),
+        name: `${question.text} → Site Deployment Hours`,
+        value: "16.0",
+        formula: "site_count × 16.0",
+        unit: "hours",
+        source: `Calculation: Number of sites × 16.0 hours per site deployment`,
+        mappedQuestions: [questionSlug]
+      };
+    }
+    
+    if (text.includes('workstation') || text.includes('endpoint')) {
+      return {
+        id: this.generateUniqueId('calc_workstation'),
+        name: `${question.text} → Workstation Configuration Hours`,
+        value: "1.5",
+        formula: "workstation_count × 1.5",
+        unit: "hours",
+        source: `Calculation: Number of workstations × 1.5 hours per workstation configuration`,
+        mappedQuestions: [questionSlug]
+      };
+    }
+    
+    // Fallback: create a generic calculation for any quantity question that doesn't match specific patterns
+    if (relatedServices.length > 0 && (text.includes('how many') || text.includes('number of'))) {
+      return {
+        id: this.generateUniqueId('calc_generic'),
+        name: `${question.text} → Affects ${serviceNames.join(', ')}`,
+        value: "1.0",
+        formula: "quantity × 1.0",
+        unit: "hours per unit",
+        source: `Generic scaling calculation for: ${serviceNames.join(', ')}`,
+        mappedQuestions: [questionSlug],
+        mappedServices: serviceNames
+      };
+    }
+    
+    return null;
+  }
+
+  /**
+   * Create service-specific calculations that reference actual subservices
+   */
+  private createServiceSpecificCalculations(service: Service, questions: Question[]): Calculation[] {
+    const calculations: Calculation[] = [];
+    
+    if (!service.subservices || service.subservices.length === 0) {
+      return calculations;
+    }
+    
+    // Look for subservices that would benefit from quantity calculations
+    service.subservices.forEach(subservice => {
+      const subName = subservice.name.toLowerCase();
+      const subDesc = subservice.description.toLowerCase();
+      
+      // Data migration subservice
+      if ((subName.includes('data') || subName.includes('migration')) && 
+          (subName.includes('migrate') || subDesc.includes('migrate'))) {
+        calculations.push({
+          id: this.generateUniqueId('calc_data_migration'),
+          name: `${service.name}: ${subservice.name} Scaling`,
+          value: "0.1",
+          formula: "data_volume × migration_rate + ${subservice.hours}",
+          unit: "hours",
+          source: `Scales ${subservice.name} (base: ${subservice.hours}h) based on data volume`,
+          mappedQuestions: this.findRelatedQuestions(questions, ['storage', 'data', 'gb', 'migration']),
+          mappedServices: [service.name]
+        });
+      }
+      
+      // User training subservice
+      if (subName.includes('training') || subName.includes('knowledge transfer')) {
+        calculations.push({
+          id: this.generateUniqueId('calc_user_training'),
+          name: `${service.name}: ${subservice.name} Scaling`,
+          value: "2.0",
+          formula: "user_count × 2.0 + ${subservice.hours}",
+          unit: "hours", 
+          source: `Scales ${subservice.name} (base: ${subservice.hours}h) based on user count`,
+          mappedQuestions: this.findRelatedQuestions(questions, ['user', 'people', 'employee']),
+          mappedServices: [service.name]
+        });
+      }
+      
+      // Testing subservice
+      if (subName.includes('test') || subName.includes('validation')) {
+        calculations.push({
+          id: this.generateUniqueId('calc_testing'),
+          name: `${service.name}: ${subservice.name} Scaling`,
+          value: "0.5",
+          formula: "test_cases × 0.5 + ${subservice.hours}",
+          unit: "hours",
+          source: `Scales ${subservice.name} (base: ${subservice.hours}h) based on test scope`,
+          mappedQuestions: this.findRelatedQuestions(questions, ['test', 'environment', 'system']),
+          mappedServices: [service.name]
+        });
+      }
+    });
+    
+    return calculations;
+  }
+
+  /**
+   * Calculate total project hours including all dynamic calculations
+   */
+  calculateTotalHours(services: Service[], calculations: Calculation[]): number {
+    // Sum base service hours
+    let totalHours = services.reduce((total, service) => {
+      const serviceHours = service.subservices.reduce((subTotal, sub) => subTotal + (sub.hours || 0), 0);
+      return total + serviceHours;
+    }, 0);
+    
+    // Apply overhead
+    const overheadCalc = calculations.find(c => c.name.includes('Overhead'));
+    if (overheadCalc && overheadCalc.unit === 'percentage') {
+      const overheadRate = parseFloat(overheadCalc.value) || 0.15;
+      totalHours = totalHours * (1 + overheadRate);
+    }
+    
+    return Math.round(totalHours);
+  }
+
+  /**
+   * Generate a slug from question text
+   */
+  private generateSlug(text: string): string {
+    return text.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, '_')
+      .substring(0, 50);
+  }
+
+  /**
+   * Find related questions based on keywords
+   */
+  private findRelatedQuestions(questions: Question[], keywords: string[]): string[] {
+    return questions
+      .filter(question => {
+        const text = question.text.toLowerCase();
+        return keywords.some(keyword => text.includes(keyword));
+      })
+      .map(question => question.slug || this.generateSlug(question.text))
+      .slice(0, 3); // Limit to 3 related questions
   }
 }
 
-// Singleton instance
-let calculationGeneratorInstance: CalculationGenerator | null = null;
-
-export function getCalculationGenerator(): CalculationGenerator {
-  if (!calculationGeneratorInstance) {
-    calculationGeneratorInstance = new CalculationGenerator();
-  }
-  return calculationGeneratorInstance;
+// Export singleton instance
+export function getCalculationGenerator() {
+  return new CalculationGenerator();
 }

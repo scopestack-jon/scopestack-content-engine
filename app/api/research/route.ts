@@ -28,13 +28,19 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         const encoder = new TextEncoder();
         
+        let controllerClosed = false;
+        
         const sendSSE = (data: any) => {
+          if (controllerClosed) {
+            return false;
+          }
           try {
             const message = `data: ${JSON.stringify(data)}\n\n`;
             controller.enqueue(encoder.encode(message));
             return true;
           } catch (error) {
             console.log('SSE controller closed, cannot send data:', error);
+            controllerClosed = true;
             return false;
           }
         };
@@ -50,6 +56,30 @@ export async function POST(request: NextRequest) {
                 status: event.status,
                 progress: event.progress,
                 model: "perplexity/sonar"
+              });
+            } else if (event.type === 'step' && event.stepId === 'questions') {
+              sendSSE({
+                type: "step",
+                stepId: "questions",
+                status: event.status, 
+                progress: event.progress,
+                model: "claude-3.5-sonnet"
+              });
+            } else if (event.type === 'step' && event.stepId === 'services') {
+              sendSSE({
+                type: "step",
+                stepId: "services",
+                status: event.status, 
+                progress: event.progress,
+                model: "claude-3.5-sonnet"
+              });
+            } else if (event.type === 'step' && event.stepId === 'calculations') {
+              sendSSE({
+                type: "step",
+                stepId: "calculations",
+                status: event.status, 
+                progress: event.progress,
+                model: "local"
               });
             } else if (event.type === 'step' && event.stepId === 'content') {
               sendSSE({
@@ -88,6 +118,7 @@ export async function POST(request: NextRequest) {
             }
           });
           
+          controllerClosed = true;
           controller.close();
           
         } catch (error) {
@@ -109,6 +140,7 @@ export async function POST(request: NextRequest) {
             type: "error",
             error: errorMessage
           });
+          controllerClosed = true;
           controller.close();
         }
       }

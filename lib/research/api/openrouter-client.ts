@@ -61,6 +61,7 @@ export class OpenRouterClient {
   async generateWithRetry(
     model: string,
     prompt: string,
+    timeout: number = API_TIMEOUT,
     maxRetries: number = MAX_RETRY_ATTEMPTS
   ): Promise<string> {
     let lastError: Error | null = null;
@@ -69,7 +70,7 @@ export class OpenRouterClient {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`API call attempt ${attempt}${attempt > 1 ? ` (retry)` : ''}`);
-        return await this.generateTextWithTimeout(model, prompt);
+        return await this.generateTextWithTimeout(model, prompt, timeout);
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         console.log(`API call attempt ${attempt} failed: ${lastError.message}`);

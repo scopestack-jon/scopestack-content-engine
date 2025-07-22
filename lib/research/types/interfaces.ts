@@ -39,17 +39,24 @@ export interface ResearchData {
 }
 
 export interface Question {
+  id?: string;
   text: string;
+  question?: string; // Frontend compatibility
+  slug?: string; // Frontend compatibility
   type: 'multiple_choice' | 'text' | 'number' | 'boolean';
   options?: string[];
   required: boolean;
 }
 
 export interface Calculation {
+  id?: string;
   name: string;
   value: number | string;
+  formula?: string;
   unit: string;
   source: string;
+  mappedQuestions?: string[]; // Array of question slugs
+  mappedServices?: string[]; // Array of service names this calculation applies to
 }
 
 export interface GeneratedContent {

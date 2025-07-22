@@ -48,30 +48,62 @@ export class ResearchOrchestrator {
         progress: 40
       });
 
-      // Generate questions based on research
+      // Step 1: Generate questions based on research
+      onProgress?.({
+        type: 'step',
+        stepId: 'questions',
+        status: 'in-progress',
+        progress: 50
+      });
+
       const questions = await this.questionGenerator.generateQuestionsFromResearch(
         researchData,
         userRequest
       );
 
       onProgress?.({
-        type: 'progress',
+        type: 'step',
+        stepId: 'questions',
+        status: 'completed',
         progress: 60
       });
 
-      // Generate services based on research
+      // Step 2: Generate services based on research
+      onProgress?.({
+        type: 'step',
+        stepId: 'services',
+        status: 'in-progress',
+        progress: 65
+      });
+
       const services = await this.serviceGenerator.generateServicesFromResearch(
         researchData,
         userRequest
       );
 
       onProgress?.({
-        type: 'progress',
+        type: 'step',
+        stepId: 'services', 
+        status: 'completed',
         progress: 80
       });
 
-      // Generate calculations based on questions
-      const calculations = this.calculationGenerator.generateCalculationsFromQuestions(questions);
+      // Step 3: Generate calculations that reference actual questions and services
+      onProgress?.({
+        type: 'step',
+        stepId: 'calculations',
+        status: 'in-progress',
+        progress: 85
+      });
+
+      const calculations = this.calculationGenerator.generateCalculationsFromQuestions(questions, services);
+
+      onProgress?.({
+        type: 'step',
+        stepId: 'calculations',
+        status: 'completed',
+        progress: 90
+      });
 
       // Calculate total hours
       const totalHours = this.calculationGenerator.calculateTotalHours(services, calculations);
