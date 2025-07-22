@@ -896,3 +896,124 @@ API call attempt 1
  POST /api/research 200 in 85530ms
  ✓ Compiled in 65ms (401 modules)
  GET / 200 in 9ms
+ ✓ Compiled in 211ms (927 modules)
+ GET / 200 in 87ms
+ ✓ Compiled in 62ms (401 modules)
+ GET / 200 in 10ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/2.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/2.pack.gz'
+ ✓ Compiled in 113ms (401 modules)
+ GET / 200 in 14ms
+ ✓ Compiled in 56ms (401 modules)
+ GET / 200 in 10ms
+ ✓ Compiled in 79ms (401 modules)
+ GET / 200 in 44ms
+ ✓ Compiled in 57ms (401 modules)
+ GET / 200 in 8ms
+ ✓ Compiled in 91ms (401 modules)
+ GET / 200 in 56ms
+ ✓ Compiled in 62ms (401 modules)
+ GET / 200 in 10ms
+ ⚠ ./lib/research/orchestrator/research-orchestrator.ts
+Attempted import error: 'getServiceGenerator' is not exported from '../generators/service-generator' (imported as 'getServiceGenerator').
+
+Import trace for requested module:
+./lib/research/orchestrator/research-orchestrator.ts
+./app/api/research/route.ts
+🔍 Starting research for: test error handling
+❌ Route error: TypeError: (0 , _generators_service_generator__WEBPACK_IMPORTED_MODULE_2__.getServiceGenerator) is not a function
+    at new ResearchOrchestrator (lib/research/orchestrator/research-orchestrator.ts:15:48)
+    at getResearchOrchestrator (lib/research/orchestrator/research-orchestrator.ts:176:27)
+    at POST (app/api/research/route.ts:18:48)
+  13 |   private perplexityEngine = getPerplexityEngine();
+  14 |   private questionGenerator = getQuestionGenerator();
+> 15 |   private serviceGenerator = getServiceGenerator();
+     |                                                ^
+  16 |   private calculationGenerator = getCalculationGenerator();
+  17 |   private validator = getContentValidator();
+  18 |
+ POST /api/research 500 in 225ms
+ GET / 200 in 155ms
+ ○ Compiling /api/research ...
+ ✓ Compiled /api/research in 106ms (954 modules)
+ GET / 200 in 56ms
+🔍 Starting research for: test api fix
+🔍 Performing Perplexity-based active research for: test api fix
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 5517
+📝 First 500 chars: {
+  "sources": [    {
+      "title": "Top 10 API Testing Best Practices",
+      "url": "https://www.pynt.io/learning-hub/api-testing-guide/top-10-api-testing-best-practices",
+      "summary": "This source outlines essential best practices for API testing, including understanding API requirements, automating tests, and selecting appropriate testing tools. It emphasizes the importance of clear requirements to focus testing efforts and the use of automation to increase efficiency and regression cov
+📝 Last 200 chars: rformance and error rates post-fix helps maintain long-term reliability",
+    "Reusable and maintainable test scripts reduce overhead and improve test coverage consistency"
+  ],
+  "confidence": 0.85
+}
+🧹 Cleaned response length: 5517
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "Top 10 API Testing Best Practices",
+      "url": "https://www.pynt.io/learning-hub/api-testing-guide/top-10-api-testing-best-practices",
+      "summary": "This source outlines essential best practices for API testing, including understanding API requirements, au
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 6
+✅ Found 6 sources from Perplexity research
+🔗 Source titles: [
+  'Top 10 API Testing Best Practices',
+  'Ultimate Guide to Mastering API Testing in 2024',
+  'End-to-End API Testing Guide and Best Practices',
+  'API Testing Checklist and Best Practices: A Complete Guide',
+  'API Testing Tools and Techniques for Effective Fixes'
+]
+API call attempt 1
+Question 1 formatted: {
+  text: 'What is the current test automation coverage percentage for your API endpoints that needs improvement?',
+  question: 'What is the current test automation coverage percentage for your API endpoints that needs improvement?',
+  slug: 'what_is_the_current_test_automation_coverage_perce',
+  hasOptions: true
+}
+Question 2 formatted: {
+  text: 'Which CI/CD pipeline integration level is required for the API test automation framework?',
+  question: 'Which CI/CD pipeline integration level is required for the API test automation framework?',
+  slug: 'which_cicd_pipeline_integration_level_is_required_',
+  hasOptions: true
+}
+Question 3 formatted: {
+  text: 'What is the estimated number of API endpoints that require security testing implementation?',
+  question: 'What is the estimated number of API endpoints that require security testing implementation?',
+  slug: 'what_is_the_estimated_number_of_api_endpoints_that',
+  hasOptions: true
+}
+Question 4 formatted: {
+  text: 'Which authentication mechanism needs to be implemented in the API test framework?',
+  question: 'Which authentication mechanism needs to be implemented in the API test framework?',
+  slug: 'which_authentication_mechanism_needs_to_be_impleme',
+  hasOptions: true
+}
+Question 5 formatted: {
+  text: 'What is your preferred API testing tool for the automation framework?',
+  question: 'What is your preferred API testing tool for the automation framework?',
+  slug: 'what_is_your_preferred_api_testing_tool_for_the_au',
+  hasOptions: true
+}
+Question 6 formatted: {
+  text: 'How many environments require test configuration and standardization?',
+  question: 'How many environments require test configuration and standardization?',
+  slug: 'how_many_environments_require_test_configuration_a',
+  hasOptions: true
+}
+Question 7 formatted: {
+  text: 'What level of API performance monitoring is needed post-fix implementation?',
+  question: 'What level of API performance monitoring is needed post-fix implementation?',
+  slug: 'what_level_of_api_performance_monitoring_is_needed',
+  hasOptions: true
+}
+✅ Generated 7 AI-driven questions based on research
+API call attempt 1
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/2.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/2.pack.gz'
+📊 Service volume check: 4 services, 15 total subservices
+✅ Generated 4 research-driven services with 15 total subservices
+✅ Generated 8 calculations mapped to actual questions
+ POST /api/research 200 in 74673ms

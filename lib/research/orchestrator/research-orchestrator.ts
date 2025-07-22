@@ -116,15 +116,8 @@ export class ResearchOrchestrator {
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       });
 
-      // Return minimal fallback content
-      return this.validator.validateContent({
-        technology: extractTechnologyName(userRequest),
-        questions: [],
-        services: [],
-        calculations: [],
-        sources: [],
-        totalHours: 40
-      });
+      // Re-throw error instead of providing empty fallback
+      throw new Error(`Research-driven content generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

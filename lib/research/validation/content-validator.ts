@@ -44,17 +44,21 @@ export class ContentValidator {
   }
 
   /**
-   * Validates services array
+   * Validates services array - NO fallbacks, research-driven only
    */
   private validateServices(services: any[]): Service[] {
     if (!Array.isArray(services)) {
-      return this.getDefaultServices();
+      throw new Error('Services must be an array generated from research');
     }
 
     const validServices = services.filter(s => this.isValidService(s))
       .map(s => this.sanitizeService(s));
 
-    return validServices.length > 0 ? validServices : this.getDefaultServices();
+    if (validServices.length === 0) {
+      throw new Error('No valid services generated from research');
+    }
+
+    return validServices;
   }
 
   /**

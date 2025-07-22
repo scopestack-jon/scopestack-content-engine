@@ -92,9 +92,22 @@ export async function POST(request: NextRequest) {
           
         } catch (error) {
           console.error('❌ Streaming error:', error);
+          
+          // Provide specific error messages for common issues
+          let errorMessage = 'Unknown error occurred';
+          if (error instanceof Error) {
+            if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+              errorMessage = 'API key is invalid or expired. Please check your OpenRouter API key configuration.';
+            } else if (error.message.includes('Research-driven content generation failed')) {
+              errorMessage = error.message;
+            } else {
+              errorMessage = error.message;
+            }
+          }
+          
           sendSSE({
             type: "error",
-            error: error instanceof Error ? error.message : 'Unknown error occurred'
+            error: errorMessage
           });
           controller.close();
         }

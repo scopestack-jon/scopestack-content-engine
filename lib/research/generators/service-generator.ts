@@ -1,17 +1,14 @@
-// AI-driven Service Generation
-// Generates professional services based on research findings
-
-import { getOpenRouterClient } from '../api/openrouter-client';
-import { ResearchData, Service } from '../types/interfaces';
+import { OpenRouterClient } from '../api/openrouter-client';
 import { extractTechnologyName } from '../utils/response-processor';
+import type { Service } from '../types/interfaces';
 
 export class ServiceGenerator {
-  private client = getOpenRouterClient();
+  constructor(private client: OpenRouterClient) {}
 
   /**
-   * Generates research-driven professional services for project scoping
+   * Generate services based on research data - NO fallbacks, purely research-driven
    */
-  async generateServicesFromResearch(researchData: ResearchData, userRequest: string): Promise<Service[]> {
+  async generateServicesFromResearch(researchData: any, userRequest: string): Promise<Service[]> {
     const technology = extractTechnologyName(userRequest);
     
     try {
@@ -23,8 +20,8 @@ export class ServiceGenerator {
         userRequest: userRequest
       };
       
-      // Create a prompt for AI to generate contextual services based on research
-      const prompt = `Based on this research about "${userRequest}", generate 4-6 professional services phases with specific subservices that would be needed for this project.
+      // Create a comprehensive prompt for AI to generate research-driven services
+      const prompt = `Based on this research about "${userRequest}", generate professional services with comprehensive phase coverage and sufficient content depth.
 
 Research Context:
 - User Request: ${userRequest}
@@ -32,12 +29,23 @@ Research Context:
 - Key Insights: ${researchContext.insights.join(', ')}
 - Source Topics: ${researchContext.sources.map((s: any) => s.title).slice(0, 5).join(', ')}
 
+REQUIRED SERVICE STRUCTURE - Generate EXACTLY this pattern:
+1. ONE comprehensive service that covers ALL project phases (Planning, Design, Implementation, Testing, Training) with 3+ subservices each
+2. THREE additional detailed implementation-focused services, each with 3+ subservices
+
+This should result in:
+- Total of 4 services minimum
+- First service covers full project lifecycle (5 phases × 3 subservices = 15+ subservices)
+- Three implementation services with 3+ subservices each (9+ more subservices)
+- Total 24+ subservices across all services
+
 Generate services that are:
 1. Specific to the technology and use case mentioned in the research
 2. Based on actual implementation patterns found in the research
-3. Realistic hour estimates for professional services
-4. Include detailed subservices with specific tasks
+3. Realistic hour estimates for professional services (40-120 hours per service)
+4. Include detailed subservices with specific tasks (15-40 hours per subservice)
 5. Include comprehensive scope language for professional services
+6. Cover the full project lifecycle from planning through training
 
 Return ONLY a JSON array of services in this exact format:
 [
@@ -73,8 +81,8 @@ NO markdown, NO explanations, ONLY the JSON array.`;
       );
 
       if (!aiContent) {
-        console.warn('No AI response content for services, using fallback');
-        return this.getFallbackServices(technology);
+        console.error('❌ No AI response content for services - research failed');
+        throw new Error('Failed to generate research-driven services');
       }
 
       // Parse the AI-generated services
@@ -88,150 +96,65 @@ NO markdown, NO explanations, ONLY the JSON array.`;
           services = JSON.parse(aiContent);
         }
       } catch (parseError) {
-        console.warn('Failed to parse AI services:', parseError);
-        return this.getFallbackServices(technology);
+        console.error('❌ Failed to parse AI services - invalid JSON:', parseError);
+        throw new Error('Failed to parse research-driven services');
       }
 
-      // Validate the structure
+      // Validate the structure and ensure minimum content requirements
       if (Array.isArray(services) && services.length > 0) {
         // Ensure all services have required fields
         const validatedServices: Service[] = services.map((s: any, index: number) => ({
-          name: s.name || s.service || `${technology} Service ${index + 1}`,
-          description: s.description || `Service description for ${technology}`,
-          serviceDescription: s.serviceDescription || `This service provides comprehensive ${s.name || 'implementation'} for ${technology} based on industry best practices and research findings.`,
-          keyAssumptions: s.keyAssumptions || `Client will provide timely access to required systems and stakeholders. Existing infrastructure meets minimum requirements for ${technology}.`,
-          clientResponsibilities: s.clientResponsibilities || `Provide access to systems and stakeholders. Make technical staff available for consultation. Provide existing documentation and requirements.`,
-          outOfScope: s.outOfScope || `Hardware procurement and infrastructure setup are not included. Training beyond standard knowledge transfer is excluded. Support for third-party integrations not directly related to ${technology}.`,
-          hours: typeof s.hours === 'number' ? s.hours : 40,
+          name: s.name || `Research-Based Service ${index + 1}`,
+          description: s.description || `Service based on research findings`,
+          serviceDescription: s.serviceDescription || `This service is based on research findings for ${technology} implementation.`,
+          keyAssumptions: s.keyAssumptions || `Key assumptions derived from research analysis.`,
+          clientResponsibilities: s.clientResponsibilities || `Client responsibilities based on industry best practices found in research.`,
+          outOfScope: s.outOfScope || `Exclusions based on standard project boundaries identified in research.`,
+          hours: typeof s.hours === 'number' ? s.hours : 60,
           phase: s.phase || `Phase ${index + 1}`,
-          subservices: Array.isArray(s.subservices) ? s.subservices.map((sub: any) => ({
-            name: sub.name || 'Subservice',
-            description: sub.description || 'Subservice description',
-            serviceDescription: sub.serviceDescription || `This subservice provides essential ${sub.name || 'implementation'} activities for ${technology} according to industry best practices.`,
-            keyAssumptions: sub.keyAssumptions || `Required access and documentation will be provided. Work will be performed during standard business hours unless otherwise specified.`,
-            clientResponsibilities: sub.clientResponsibilities || `Provide timely access to required systems. Make appropriate staff available for meetings and testing.`,
-            outOfScope: sub.outOfScope || `Custom development beyond standard configuration. Hardware procurement and setup.`,
-            hours: typeof sub.hours === 'number' ? sub.hours : 10
+          subservices: Array.isArray(s.subservices) ? s.subservices.map((sub: any, subIndex: number) => ({
+            name: sub.name || `Subservice ${subIndex + 1}`,
+            description: sub.description || 'Research-based subservice',
+            serviceDescription: sub.serviceDescription || `This subservice is based on ${technology} best practices identified in research.`,
+            keyAssumptions: sub.keyAssumptions || `Assumptions based on research analysis.`,
+            clientResponsibilities: sub.clientResponsibilities || `Client responsibilities for this activity.`,
+            outOfScope: sub.outOfScope || `Standard exclusions for this type of work.`,
+            hours: typeof sub.hours === 'number' ? sub.hours : 20
           })) : []
         }));
 
-        console.log(`✅ Generated ${validatedServices.length} AI-driven services based on research`);
-        return validatedServices.slice(0, 6); // Limit to 6 services max
+        // Validate content volume - ensure we have sufficient services and subservices
+        const totalSubservices = validatedServices.reduce((count, service) => count + service.subservices.length, 0);
+        
+        console.log(`📊 Service volume check: ${validatedServices.length} services, ${totalSubservices} total subservices`);
+        
+        // If we don't meet minimum requirements, fail rather than use fallbacks
+        if (validatedServices.length < 4) {
+          console.error(`❌ Insufficient services generated: ${validatedServices.length} (need 4+)`);
+          throw new Error(`Research-driven generation failed - only ${validatedServices.length} services generated, need 4+`);
+        }
+        
+        if (totalSubservices < 15) {
+          console.error(`❌ Insufficient subservices generated: ${totalSubservices} (need 15+)`);
+          throw new Error(`Research-driven generation failed - only ${totalSubservices} subservices generated, need 15+`);
+        }
+
+        console.log(`✅ Generated ${validatedServices.length} research-driven services with ${totalSubservices} total subservices`);
+        return validatedServices;
+      } else {
+        console.error('❌ No valid services generated from research');
+        throw new Error('Research-driven service generation returned no valid services');
       }
 
     } catch (error) {
-      console.warn('Error generating research-driven services:', error);
+      console.error('❌ Research-driven service generation failed:', error);
+      throw error; // Re-throw to fail rather than use fallbacks
     }
-
-    // Fallback to basic services if AI generation fails
-    return this.getFallbackServices(technology);
-  }
-
-  /**
-   * Fallback services when AI generation fails
-   */
-  private getFallbackServices(technology: string): Service[] {
-    return [
-      {
-        name: `${technology} Requirements Assessment`,
-        description: `Assessment of current environment and ${technology} requirements`,
-        serviceDescription: `This service provides a comprehensive assessment of your current environment and detailed requirements gathering for ${technology} implementation. Our team will conduct stakeholder interviews, document existing systems, and identify key success factors for your project.`,
-        keyAssumptions: `Client stakeholders will be available for requirements gathering sessions. Existing system documentation will be provided where available. Current infrastructure meets minimum requirements for ${technology} implementation.`,
-        clientResponsibilities: `Provide access to key stakeholders and subject matter experts. Share existing documentation, network diagrams, and system configurations. Make technical staff available for interviews and system access.`,
-        outOfScope: `Hardware procurement and infrastructure upgrades are not included. Business process reengineering beyond ${technology} implementation scope. Integration with systems not directly related to ${technology}.`,
-        hours: 40,
-        phase: "Assessment",
-        subservices: [
-          {
-            name: "Current State Analysis",
-            description: `Analysis of existing infrastructure and systems`,
-            serviceDescription: `This subservice provides detailed analysis of your current infrastructure, identifying integration points, potential challenges, and baseline configurations for ${technology} implementation.`,
-            keyAssumptions: `Access to current systems and documentation will be provided. Technical staff will be available for system reviews and questions.`,
-            clientResponsibilities: `Provide access to existing systems and environments. Make technical documentation available. Ensure appropriate staff are available for consultation.`,
-            outOfScope: `Remediation of issues found during analysis. Upgrades to existing systems to meet requirements.`,
-            hours: 20
-          },
-          {
-            name: "Requirements Gathering",
-            description: `Detailed requirements gathering and documentation`,
-            serviceDescription: `This subservice focuses on gathering detailed functional and technical requirements through stakeholder interviews, workshops, and documentation review.`,
-            keyAssumptions: `Key stakeholders will be available for requirements sessions. Business requirements are generally understood by client stakeholders.`,
-            clientResponsibilities: `Make stakeholders available for requirements gathering sessions. Provide existing requirements documentation if available.`,
-            outOfScope: `Business process design beyond ${technology} implementation requirements.`,
-            hours: 20
-          }
-        ]
-      },
-      {
-        name: `${technology} Implementation`,
-        description: `Core implementation and configuration of ${technology}`,
-        serviceDescription: `This service provides the core implementation and configuration of ${technology} according to gathered requirements and industry best practices. Includes system setup, configuration, and initial testing.`,
-        keyAssumptions: `Required infrastructure and access will be provided. Configuration requirements are clearly defined. Test environments are available.`,
-        clientResponsibilities: `Provide required infrastructure and system access. Make technical staff available for configuration validation. Participate in testing activities.`,
-        outOfScope: `Custom development beyond standard configuration. Integration with third-party systems not directly related to core ${technology} functionality.`,
-        hours: 80,
-        phase: "Implementation",
-        subservices: [
-          {
-            name: "System Installation and Setup",
-            description: `Installation and initial setup of ${technology}`,
-            serviceDescription: `This subservice covers the installation and initial configuration of ${technology} components according to requirements and best practices.`,
-            keyAssumptions: `Infrastructure meets requirements. Required access and credentials will be provided.`,
-            clientResponsibilities: `Provide system access and credentials. Ensure infrastructure readiness.`,
-            outOfScope: `Infrastructure provisioning and hardware setup.`,
-            hours: 40
-          },
-          {
-            name: "Configuration and Testing",
-            description: `Detailed configuration and initial testing`,
-            serviceDescription: `This subservice provides detailed configuration of ${technology} features and comprehensive testing to ensure proper functionality.`,
-            keyAssumptions: `Test scenarios and acceptance criteria are defined. Test data is available.`,
-            clientResponsibilities: `Provide test data and scenarios. Participate in testing validation.`,
-            outOfScope: `Performance testing beyond basic functionality validation.`,
-            hours: 40
-          }
-        ]
-      },
-      {
-        name: `${technology} Knowledge Transfer`,
-        description: `Knowledge transfer and documentation for ${technology}`,
-        serviceDescription: `This service provides comprehensive knowledge transfer to client staff including documentation, training materials, and hands-on sessions to ensure successful ongoing management of ${technology}.`,
-        keyAssumptions: `Client staff will be available for knowledge transfer sessions. Basic technical competency exists within client team.`,
-        clientResponsibilities: `Make appropriate technical staff available for training sessions. Provide feedback on documentation and training materials.`,
-        outOfScope: `Formal training courses beyond knowledge transfer sessions. Long-term support and maintenance.`,
-        hours: 24,
-        phase: "Knowledge Transfer",
-        subservices: [
-          {
-            name: "Documentation Creation",
-            description: `Creation of system documentation and runbooks`,
-            serviceDescription: `This subservice creates comprehensive documentation including system configuration, operational procedures, and troubleshooting guides.`,
-            keyAssumptions: `Documentation standards and templates will be provided if required. System access for documentation validation.`,
-            clientResponsibilities: `Review and provide feedback on documentation. Provide documentation standards if required.`,
-            outOfScope: `Translation of documentation into multiple languages. Video training materials.`,
-            hours: 12
-          },
-          {
-            name: "Staff Training",
-            description: `Hands-on training for client staff`,
-            serviceDescription: `This subservice provides hands-on training sessions for client staff covering system operation, maintenance, and troubleshooting procedures.`,
-            keyAssumptions: `Appropriate staff will be available for training sessions. Training environment is available for hands-on practice.`,
-            clientResponsibilities: `Make technical staff available for training sessions. Provide training environment access.`,
-            outOfScope: `Certification training programs. Advanced troubleshooting beyond standard operational procedures.`,
-            hours: 12
-          }
-        ]
-      }
-    ];
   }
 }
 
-// Singleton instance
-let serviceGeneratorInstance: ServiceGenerator | null = null;
-
-export function getServiceGenerator(): ServiceGenerator {
-  if (!serviceGeneratorInstance) {
-    serviceGeneratorInstance = new ServiceGenerator();
-  }
-  return serviceGeneratorInstance;
+// Export function to get ServiceGenerator instance
+export function getServiceGenerator() {
+  const { OpenRouterClient } = require('../api/openrouter-client');
+  return new ServiceGenerator(new OpenRouterClient());
 }
