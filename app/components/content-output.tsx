@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, Download, Clock, Hash, Link2, Calculator } from "lucide-react"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { FileText, Download, Clock, Hash, Link2, Calculator, ChevronRight, ChevronDown, Layers, Users, Settings, Target, CheckCircle, AlertCircle, Info, ArrowRight, Briefcase, Calendar, DollarSign, TrendingUp, Filter, Table, Eye } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { useState } from "react"
 
@@ -67,6 +69,40 @@ interface ContentOutputProps {
 export function ContentOutput({ content, setContent }: ContentOutputProps) {
   const [activeTab, setActiveTab] = useState("services")
   const [isRegenerating, setIsRegenerating] = useState(false)
+  const [expandedServices, setExpandedServices] = useState<Set<number>>(new Set()) // Collapsed by default
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set())
+  const [expandedCalculations, setExpandedCalculations] = useState<Set<number>>(new Set())
+  const [selectedLanguageField, setSelectedLanguageField] = useState<string>("overview")
+
+  const toggleServiceExpanded = (index: number) => {
+    const newExpanded = new Set(expandedServices)
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index)
+    } else {
+      newExpanded.add(index)
+    }
+    setExpandedServices(newExpanded)
+  }
+
+  const toggleQuestionExpanded = (index: number) => {
+    const newExpanded = new Set(expandedQuestions)
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index)
+    } else {
+      newExpanded.add(index)
+    }
+    setExpandedQuestions(newExpanded)
+  }
+
+  const toggleCalculationExpanded = (index: number) => {
+    const newExpanded = new Set(expandedCalculations)
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index)
+    } else {
+      newExpanded.add(index)
+    }
+    setExpandedCalculations(newExpanded)
+  }
 
   // Debug logging
   console.log("ContentOutput received content:", {
@@ -795,323 +831,492 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Generated Content: {getTechnologyName(content.technology)}
-          </CardTitle>
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {content.totalHours || 0} hours
-            </Badge>
-            <Button onClick={exportToScopeStack} variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export JSON
-            </Button>
-            <Button onClick={pushToScopeStack} className="bg-green-600 hover:bg-green-700">
-              <Link2 className="h-4 w-4 mr-2" />
-              Push to ScopeStack
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="questions" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="questions">Discovery Questions ({content.questions?.length || 0})</TabsTrigger>
-            <TabsTrigger value="calculations">Calculations ({content.calculations?.length || 0})</TabsTrigger>
-            <TabsTrigger value="services">Service Structure ({content.services?.length || 0})</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="questions" className="space-y-4">
-            <div className="text-sm text-gray-600 mb-4">
-              Research-generated questions with numerical values for calculations and subservice mapping
-            </div>
-            {content.questions && Array.isArray(content.questions) && content.questions.length > 0 ? (
-              content.questions.map((question, index) => (
-                <Card key={question.id || index} className="border-l-4 border-l-blue-500">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="font-medium">
-                        {index + 1}. {question.question || "Question text not available"}
-                      </div>
-                      <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                        <Hash className="h-3 w-3" />
-                        {question.slug || "no-slug"}
-                      </Badge>
-                    </div>
-                    <div className="space-y-2">
-                      {question.options && Array.isArray(question.options) && question.options.length > 0 ? (
-                        question.options.map((option, optIndex) => (
-                          <div
-                            key={optIndex}
-                            className={`p-3 rounded border ${
-                              option.default ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-200"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="font-medium">
-                                {getOptionDisplayText(option)}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="secondary" className="text-xs">
-                                  Value: {getOptionNumericalValue(option, optIndex)}
-                                </Badge>
-                                {option.default && (
-                                  <Badge variant="default" className="text-xs">
-                                    Default
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center text-gray-500 py-2">
-                          <div className="text-sm">No options available</div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <div className="text-center text-gray-500 py-4">
-                <div className="text-sm">No questions generated</div>
+    <div className="space-y-6">
+      {/* Enhanced Header */}
+      <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <CardTitle className="flex items-center gap-3 text-xl">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <FileText className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <div className="text-green-800">Generated Content</div>
+                  <div className="text-base font-normal text-green-600">
+                    {getTechnologyName(content.technology)}
+                  </div>
+                </div>
+              </CardTitle>
+              <div className="flex items-center gap-4 text-sm">
+                <Badge variant="outline" className="flex items-center gap-1 bg-white/50">
+                  <Clock className="h-3 w-3" />
+                  {content.totalHours || 0} total hours
+                </Badge>
+                <Badge variant="outline" className="flex items-center gap-1 bg-white/50">
+                  <Users className="h-3 w-3" />
+                  {content.questions?.length || 0} questions
+                </Badge>
+                <Badge variant="outline" className="flex items-center gap-1 bg-white/50">
+                  <Layers className="h-3 w-3" />
+                  {content.services?.length || 0} services
+                </Badge>
+                <Badge variant="outline" className="flex items-center gap-1 bg-white/50">
+                  <Calculator className="h-3 w-3" />
+                  {content.calculations?.length || 0} calculations
+                </Badge>
               </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="calculations" className="space-y-4">
-            <div className="text-sm text-gray-600 mb-4">
-              Dynamic calculations that combine question values to determine subservice hour adjustments
             </div>
-            {content.calculations && Array.isArray(content.calculations) && content.calculations.length > 0 ? (
-              content.calculations.map((calculation, index) => (
-                <Card key={calculation.id || index} className="border-l-4 border-l-orange-500">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <div className="font-medium mb-1">
-                          {getCalculationName(calculation).replace(/\[object Object\]/g, getTechnologyName(content.technology))}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {getCalculationDescription(calculation)}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                          <Hash className="h-3 w-3" />
-                          {calculation.slug || "no-slug"}
-                        </Badge>
-                        <Badge className={`text-xs ${getCalculationTypeColor(calculation.resultType || "")}`}>
-                          {calculation.resultType || "unknown"}
-                        </Badge>
-                      </div>
-                    </div>
+            <div className="flex items-center gap-3">
+              <Button 
+                onClick={() => {
+                  setExpandedServices(new Set())
+                  setExpandedQuestions(new Set())
+                  setExpandedCalculations(new Set())
+                }} 
+                variant="outline" 
+                size="sm"
+                className="bg-white/70 hover:bg-white"
+              >
+                Collapse All
+              </Button>
+              <Button 
+                onClick={() => {
+                  setExpandedServices(new Set(content.services?.map((_, i) => i) || []))
+                  setExpandedQuestions(new Set(content.questions?.map((_, i) => i) || []))
+                  setExpandedCalculations(new Set(content.calculations?.map((_, i) => i) || []))
+                }} 
+                variant="outline" 
+                size="sm"
+                className="bg-white/70 hover:bg-white"
+              >
+                Expand All
+              </Button>
+              <Button onClick={exportToScopeStack} variant="outline" className="bg-white/70 hover:bg-white">
+                <Download className="h-4 w-4 mr-2" />
+                Export JSON
+              </Button>
+              <Button onClick={pushToScopeStack} className="bg-green-600 hover:bg-green-700">
+                <Link2 className="h-4 w-4 mr-2" />
+                Push to ScopeStack
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
 
-                    <div className="bg-gray-50 p-3 rounded border mb-3">
-                      <div className="text-sm font-medium mb-1">Formula:</div>
-                      <code className="text-sm bg-white px-2 py-1 rounded border">{getCalculationFormula(calculation)}</code>
-                    </div>
+      {/* Content Tabs */}
+      <Card>
+        <CardContent className="p-0">
+          <Tabs defaultValue="questions" className="w-full">
+            <div className="p-6 pb-0">
+              <TabsList className="grid w-full grid-cols-3 bg-gray-100">
+                <TabsTrigger value="questions" className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Questions ({content.questions?.length || 0})
+                </TabsTrigger>
+                <TabsTrigger value="calculations" className="flex items-center gap-2">
+                  <Calculator className="h-4 w-4" />
+                  Calculations ({content.calculations?.length || 0})
+                </TabsTrigger>
+                <TabsTrigger value="services" className="flex items-center gap-2">
+                  <Layers className="h-4 w-4" />
+                  Services ({content.services?.length || 0})
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span className="text-sm text-gray-500">Uses questions:</span>
-                      {calculation.mappedQuestions && Array.isArray(calculation.mappedQuestions) && calculation.mappedQuestions.length > 0 ? (
-                        calculation.mappedQuestions.map((questionSlug, qIndex) => (
-                          <Badge key={qIndex} variant="secondary" className="text-xs">
-                            {questionSlug || "unknown"}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-sm text-gray-400">No questions mapped</span>
-                      )}
+          <TabsContent value="questions" className="p-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Discovery Questions</h3>
+                  <p className="text-sm text-gray-600">Research-generated questions with numerical values for calculations</p>
+                </div>
+              </div>
+              
+              {content.questions && Array.isArray(content.questions) && content.questions.length > 0 ? (
+                <div className="space-y-3">
+                  {content.questions.map((question, index) => (
+                    <Collapsible 
+                      key={question.id || index}
+                      open={expandedQuestions.has(index)}
+                      onOpenChange={() => toggleQuestionExpanded(index)}
+                    >
+                      <Card className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
+                        <CollapsibleTrigger className="w-full">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="flex-shrink-0">
+                                  {expandedQuestions.has(index) ? 
+                                    <ChevronDown className="h-4 w-4 text-blue-600" /> : 
+                                    <ChevronRight className="h-4 w-4 text-blue-600" />
+                                  }
+                                </div>
+                                <div className="text-left">
+                                  <div className="font-medium text-gray-900">
+                                    {index + 1}. {question.question || "Question text not available"}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {question.options?.length || 0} options available
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                                  <Hash className="h-3 w-3" />
+                                  {question.slug || "no-slug"}
+                                </Badge>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </CollapsibleTrigger>
+                        
+                        <CollapsibleContent>
+                          <div className="px-4 pb-4">
+                            <div className="border-t pt-4">
+                              {question.options && Array.isArray(question.options) && question.options.length > 0 ? (
+                                <div className="grid gap-3">
+                                  {question.options.map((option, optIndex) => (
+                                    <div
+                                      key={optIndex}
+                                      className={`p-4 rounded-lg border transition-colors hover:shadow-sm ${
+                                        option.default 
+                                          ? "bg-blue-50 border-blue-200 shadow-sm" 
+                                          : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-medium text-gray-900">
+                                          {getOptionDisplayText(option)}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                          <Badge variant="secondary" className="text-xs">
+                                            Value: {getOptionNumericalValue(option, optIndex)}
+                                          </Badge>
+                                          {option.default && (
+                                            <Badge variant="default" className="text-xs">
+                                              Default
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center text-gray-500 py-6">
+                                  <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                  <div className="text-sm">No options available</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </CollapsibleContent>
+                      </Card>
+                    </Collapsible>
+                  ))}
+                </div>
+              ) : (
+                <Card className="border-l-4 border-l-gray-300">
+                  <CardContent className="p-8">
+                    <div className="text-center text-gray-500">
+                      <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <div className="font-medium text-lg mb-2">No Questions Generated</div>
+                      <div className="text-sm">Questions will appear here after content generation</div>
                     </div>
                   </CardContent>
                 </Card>
-              ))
-            ) : (
-              <Card className="border-l-4 border-l-gray-300">
-                <CardContent className="p-4">
-                  <div className="text-center text-gray-500">
-                    <Calculator className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <div className="font-medium">No calculations generated</div>
-                    <div className="text-sm">
-                      Calculations are created when subservices have multiple mapped questions
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+              )}
+            </div>
           </TabsContent>
 
-          <TabsContent value="services" className="space-y-4">
-            <div className="text-sm text-gray-600 mb-4">
-              Professional services structure with question mapping and calculations for dynamic hour adjustments
-            </div>
-            {content.services && Array.isArray(content.services) && content.services.length > 0 ? (
-              sortServicesByPhase(content.services).map((service, index) => (
-                <Card key={index} className="border-l-4 border-l-green-500">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <Badge
-                          className={
-                            phaseColors[getStandardizedPhaseName(getServicePhase(service)) as keyof typeof phaseColors] || "bg-gray-100 text-gray-800"
-                          }
-                        >
-                          {getServicePhase(service)}
-                        </Badge>
-                        <span className="font-medium">
-                          {getServiceName(service)}
-                        </span>
-                      </div>
-                      <Badge variant="outline" className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {typeof service.hours === 'number' ? `${service.hours}h` : 'Hours not specified'}
-                      </Badge>
-                    </div>
-
-                    <p className="text-gray-600 mb-4">{getServiceDescription(service)}</p>
-
-                    {/* New language fields for the service */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <div className="font-semibold text-xs text-gray-700 mb-1">Service Description</div>
-                        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded border">
-                          {service.serviceDescription || "Not specified"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-xs text-gray-700 mb-1">Key Assumptions</div>
-                        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded border">
-                          {service.keyAssumptions || "Not specified"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-xs text-gray-700 mb-1">Client Responsibilities</div>
-                        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded border">
-                          {service.clientResponsibilities || "Not specified"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-xs text-gray-700 mb-1">Out of Scope</div>
-                        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded border">
-                          {service.outOfScope || "Not specified"}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="font-medium text-sm">Subservices:</div>
-                      {getSubservices(service).length > 0 ? (
-                        getSubservices(service).map((sub: any, subIndex: number) => (
-                          <div key={subIndex} className="bg-gray-50 p-3 rounded border">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium text-sm">{sub.name || `Subservice ${subIndex+1}`}</span>
+          <TabsContent value="calculations" className="p-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Dynamic Calculations</h3>
+                  <p className="text-sm text-gray-600">Question-driven formulas that adjust service hours</p>
+                </div>
+              </div>
+              
+              {content.calculations && Array.isArray(content.calculations) && content.calculations.length > 0 ? (
+                <div className="space-y-3">
+                  {content.calculations.map((calculation, index) => (
+                    <Collapsible 
+                      key={calculation.id || index}
+                      open={expandedCalculations.has(index)}
+                      onOpenChange={() => toggleCalculationExpanded(index)}
+                    >
+                      <Card className="border-l-4 border-l-orange-500 hover:shadow-md transition-shadow">
+                        <CollapsibleTrigger className="w-full">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="flex-shrink-0">
+                                  {expandedCalculations.has(index) ? 
+                                    <ChevronDown className="h-4 w-4 text-orange-600" /> : 
+                                    <ChevronRight className="h-4 w-4 text-orange-600" />
+                                  }
+                                </div>
+                                <div className="text-left">
+                                  <div className="font-medium text-gray-900">
+                                    {getCalculationName(calculation).replace(/\[object Object\]/g, getTechnologyName(content.technology))}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {calculation.mappedQuestions?.length || 0} questions mapped
+                                  </div>
+                                </div>
+                              </div>
                               <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-xs">
-                                  {typeof sub.hours === 'number' ? `${sub.hours}h base` : 'Hours not specified'}
+                                <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                                  <Hash className="h-3 w-3" />
+                                  {calculation.slug || "no-slug"}
                                 </Badge>
-                                {sub.calculationSlug && (
-                                  <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                                    <Calculator className="h-3 w-3" />
-                                    {sub.calculationSlug}
-                                  </Badge>
+                                <Badge className={`text-xs ${getCalculationTypeColor(calculation.resultType || "")}`}>
+                                  {calculation.resultType || "unknown"}
+                                </Badge>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </CollapsibleTrigger>
+                        
+                        <CollapsibleContent>
+                          <div className="px-4 pb-4">
+                            <div className="border-t pt-4 space-y-4">
+                              <div className="text-sm text-gray-600">
+                                {getCalculationDescription(calculation)}
+                              </div>
+
+                              <div className="bg-gradient-to-r from-orange-50 to-yellow-50 p-4 rounded-lg border border-orange-200">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Calculator className="h-4 w-4 text-orange-600" />
+                                  <div className="text-sm font-semibold text-orange-800">Formula</div>
+                                </div>
+                                <code className="text-sm bg-white px-3 py-2 rounded border block font-mono">
+                                  {getCalculationFormula(calculation)}
+                                </code>
+                              </div>
+
+                              <div>
+                                <div className="text-sm font-medium text-gray-700 mb-2">Mapped Questions:</div>
+                                {calculation.mappedQuestions && Array.isArray(calculation.mappedQuestions) && calculation.mappedQuestions.length > 0 ? (
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {calculation.mappedQuestions.map((questionSlug, qIndex) => (
+                                      <Badge key={qIndex} variant="secondary" className="text-xs">
+                                        {questionSlug || "unknown"}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-sm text-gray-400 py-2">No questions mapped</div>
                                 )}
                               </div>
                             </div>
-                            <p className="text-xs text-gray-600 mb-2">{sub.description || 'No description available'}</p>
-
-
-                            {/* Scope Language */}
-                            {sub.serviceDescription && (
-                              <div className="space-y-4 mt-4">
-                                <div className="flex items-center justify-between">
-                                  <h4 className="text-sm font-medium text-gray-900">Scope Language</h4>
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="h-7 px-2 text-xs"
-                                    onClick={() => regenerateScopeLanguage(index, subIndex)}
-                                    disabled={isRegenerating}
-                                  >
-                                    {isRegenerating ? "Regenerating..." : "Regenerate"}
-                                  </Button>
-                                </div>
-                                <div className="grid grid-cols-1 gap-3 text-sm">
-                                  <div>
-                                    <div className="font-medium text-gray-700">Service Description</div>
-                                    <div className="mt-1 text-gray-600">{sub.serviceDescription}</div>
-                                  </div>
-                                  <div>
-                                    <div className="font-medium text-gray-700">Key Assumptions</div>
-                                    <div className="mt-1 text-gray-600">{sub.keyAssumptions}</div>
-                                  </div>
-                                  <div>
-                                    <div className="font-medium text-gray-700">Client Responsibilities</div>
-                                    <div className="mt-1 text-gray-600">{sub.clientResponsibilities}</div>
-                                  </div>
-                                  <div>
-                                    <div className="font-medium text-gray-700">Out of Scope</div>
-                                    <div className="mt-1 text-gray-600">{sub.outOfScope}</div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {sub.mappedQuestions && Array.isArray(sub.mappedQuestions) && sub.mappedQuestions.length > 0 ? (
-                              <div className="flex items-center gap-1 flex-wrap mb-2">
-                                <span className="text-xs text-gray-500">
-                                  {sub.calculationSlug ? "Calculation uses:" : "Mapped to:"}
-                                </span>
-                                {sub.mappedQuestions.map((questionSlug: string, qIndex: number) => (
-                                  <Badge key={qIndex} variant="secondary" className="text-xs">
-                                    {questionSlug || "unknown"}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-xs text-gray-400 mb-2">
-                                {sub.calculationSlug ? "No questions mapped to calculation" : "No questions mapped"}
-                              </div>
-                            )}
-
-                            {sub.calculationSlug && (
-                              <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                Final hours = base hours × calculation result
-                              </div>
-                            )}
                           </div>
-                        ))
-                      ) : (
-                        <div className="text-center text-gray-500 py-4">
-                          <div className="text-sm">No subservices defined</div>
-                        </div>
-                      )}
+                        </CollapsibleContent>
+                      </Card>
+                    </Collapsible>
+                  ))}
+                </div>
+              ) : (
+                <Card className="border-l-4 border-l-gray-300">
+                  <CardContent className="p-8">
+                    <div className="text-center text-gray-500">
+                      <Calculator className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <div className="font-medium text-lg mb-2">No Calculations Generated</div>
+                      <div className="text-sm">
+                        Calculations are created when subservices have multiple mapped questions
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
-              ))
-            ) : (
-              <Card className="border-l-4 border-l-gray-300">
-                <CardContent className="p-4">
-                  <div className="text-center text-gray-500">
-                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <div className="font-medium">No services generated</div>
-                    <div className="text-sm">
-                      Services will appear here after content generation
-                    </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="services" className="p-6">
+            <div className="space-y-6">
+              {/* Header with Language Field Filter */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Services & Components</h3>
+                  <p className="text-sm text-gray-600">Click services to expand details</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-gray-600" />
+                    <Select value={selectedLanguageField} onValueChange={setSelectedLanguageField}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="overview">Overview</SelectItem>
+                        <SelectItem value="serviceDescription">Service Description</SelectItem>
+                        <SelectItem value="keyAssumptions">Key Assumptions</SelectItem>
+                        <SelectItem value="clientResponsibilities">Client Responsibilities</SelectItem>
+                        <SelectItem value="outOfScope">Out of Scope</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              </div>
+
+              {content.services && Array.isArray(content.services) && content.services.length > 0 ? (
+                <div className="space-y-2">
+                  {sortServicesByPhase(content.services).map((service, serviceIndex) => (
+                    <Collapsible 
+                      key={serviceIndex}
+                      open={expandedServices.has(serviceIndex)}
+                      onOpenChange={() => toggleServiceExpanded(serviceIndex)}
+                    >
+                      <CollapsibleTrigger className="w-full">
+                        <Card className="border hover:shadow-sm transition-shadow hover:bg-gray-50">
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="flex-shrink-0">
+                                {expandedServices.has(serviceIndex) ? 
+                                  <ChevronDown className="h-4 w-4 text-gray-600" /> : 
+                                  <ChevronRight className="h-4 w-4 text-gray-600" />
+                                }
+                              </div>
+                              <Badge
+                                className={
+                                  phaseColors[getStandardizedPhaseName(getServicePhase(service)) as keyof typeof phaseColors] || "bg-gray-100 text-gray-800"
+                                }
+                                size="sm"
+                              >
+                                {getServicePhase(service)}
+                              </Badge>
+                              <span className="font-medium text-gray-900 flex-1 text-left">
+                                {getServiceName(service)}
+                              </span>
+                              <div className="flex items-center gap-2 text-sm text-gray-500">
+                                <span>{getSubservices(service).length} components</span>
+                                <Badge variant="outline" size="sm">
+                                  {typeof service.hours === 'number' ? `${service.hours}h` : 'TBD'}
+                                </Badge>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </CollapsibleTrigger>
+                      
+                      <CollapsibleContent>
+                        <div className="ml-6 mt-2">
+                          {selectedLanguageField === "overview" ? (
+                            // Overview mode - show table of subservices
+                            <Card className="bg-gray-50 border-gray-200">
+                              <CardContent className="p-0">
+                                <div className="overflow-x-auto">
+                                  <table className="w-full">
+                                    <thead className="bg-gray-100 border-b">
+                                      <tr>
+                                        <th className="text-left p-3 text-sm font-medium text-gray-700">Component</th>
+                                        <th className="text-left p-3 text-sm font-medium text-gray-700">Description</th>
+                                        <th className="text-center p-3 text-sm font-medium text-gray-700">Hours</th>
+                                        <th className="text-center p-3 text-sm font-medium text-gray-700">Mapping</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {getSubservices(service).map((sub: any, subIndex: number) => (
+                                        <tr key={subIndex} className="border-b border-gray-200 hover:bg-white">
+                                          <td className="p-3">
+                                            <div className="font-medium text-gray-900 text-sm">
+                                              {sub.name || `Component ${subIndex + 1}`}
+                                            </div>
+                                          </td>
+                                          <td className="p-3">
+                                            <div className="text-sm text-gray-600 max-w-md">
+                                              {sub.description || 'No description available'}
+                                            </div>
+                                          </td>
+                                          <td className="p-3 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                              <Badge variant="outline" size="sm">
+                                                {typeof sub.hours === 'number' ? `${sub.hours}h` : 'TBD'}
+                                              </Badge>
+                                              {sub.calculationSlug && (
+                                                <Badge variant="secondary" size="sm" className="text-xs">
+                                                  Dynamic
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          </td>
+                                          <td className="p-3 text-center">
+                                            {sub.mappedQuestions && sub.mappedQuestions.length > 0 ? (
+                                              <Badge variant="secondary" size="sm">
+                                                {sub.mappedQuestions.length} questions
+                                              </Badge>
+                                            ) : (
+                                              <span className="text-xs text-gray-400">None</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ) : (
+                            // Language field mode - show specific field content
+                            <Card className="bg-gray-50 border-gray-200">
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base capitalize">{selectedLanguageField.replace(/([A-Z])/g, ' $1')}</CardTitle>
+                              </CardHeader>
+                              <CardContent className="pt-0">
+                                <div className="space-y-4">
+                                  {getSubservices(service).map((sub: any, subIndex: number) => (
+                                    <div key={subIndex} className="border-l-4 border-blue-200 bg-white p-4 rounded-r">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                                          <span className="text-xs font-medium text-blue-700">{subIndex + 1}</span>
+                                        </div>
+                                        <span className="font-medium text-gray-900 text-sm">
+                                          {sub.name || `Component ${subIndex + 1}`}
+                                        </span>
+                                        {sub.serviceDescription && selectedLanguageField !== "overview" && (
+                                          <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-6 px-2 text-xs ml-auto"
+                                            onClick={() => regenerateScopeLanguage(serviceIndex, subIndex)}
+                                            disabled={isRegenerating}
+                                          >
+                                            {isRegenerating ? "..." : "Regenerate"}
+                                          </Button>
+                                        )}
+                                      </div>
+                                      <div className="text-sm text-gray-700 leading-relaxed">
+                                        {sub[selectedLanguageField] || `No ${selectedLanguageField.replace(/([A-Z])/g, ' $1').toLowerCase()} specified`}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          )}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ))}
+                </div>
+              ) : (
+                <Card className="border-gray-300">
+                  <CardContent className="p-8 text-center">
+                    <Table className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <div className="font-medium text-gray-900 mb-2">No Services Generated</div>
+                    <div className="text-sm text-gray-500">Services will appear here after content generation</div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

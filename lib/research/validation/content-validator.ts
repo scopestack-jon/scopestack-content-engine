@@ -15,38 +15,92 @@ export class ContentValidator {
   }
 
   /**
-   * Generate a short, readable question slug (15 chars max)
+   * Generate a unique, descriptive question slug based on question content
    */
   private generateQuestionSlug(questionText: string): string {
-    // Extract key words and create meaningful short slug
     const text = questionText.toLowerCase();
     
-    if (text.includes('how many')) {
-      if (text.includes('user')) return 'users_count';
-      if (text.includes('mailbox')) return 'mailbox_count';
-      if (text.includes('server')) return 'server_count';
-      if (text.includes('site') || text.includes('location')) return 'site_count';
-      if (text.includes('workstation') || text.includes('endpoint')) return 'endpoint_count';
-      return 'quantity';
+    // Extract key concepts and actions from the question
+    const concepts = this.extractKeyConcepts(text);
+    const action = this.extractActionType(text);
+    const entity = this.extractMainEntity(text);
+    
+    // Build slug from concepts: entity_action_concept
+    const slugParts = [entity, action, ...concepts].filter(Boolean);
+    
+    // Create unique slug and truncate to 15 chars
+    let slug = slugParts.join('_').substring(0, 15);
+    
+    // Ensure it ends cleanly (not cut off mid-word)
+    if (slug.length === 15 && slugParts.join('_').length > 15) {
+      const words = slug.split('_');
+      words.pop(); // Remove last potentially cut-off word
+      slug = words.join('_');
     }
     
-    if (text.includes('storage') || text.includes('gb') || text.includes('tb')) return 'storage_size';
-    if (text.includes('budget') || text.includes('cost')) return 'budget';
-    if (text.includes('timeline') || text.includes('deadline')) return 'timeline';
-    if (text.includes('priority')) return 'priority';
-    if (text.includes('existing') || text.includes('current')) return 'current_state';
-    if (text.includes('compliance') || text.includes('regulation')) return 'compliance';
+    return slug || this.generateFallbackSlug(questionText);
+  }
+
+  private extractMainEntity(text: string): string {
+    if (text.includes('user')) return 'user';
+    if (text.includes('mailbox')) return 'mailbox';
+    if (text.includes('server')) return 'server';
+    if (text.includes('site') || text.includes('location')) return 'site';
+    if (text.includes('workstation') || text.includes('endpoint')) return 'endpoint';
+    if (text.includes('storage') || text.includes('data')) return 'data';
+    if (text.includes('application') || text.includes('app')) return 'app';
+    if (text.includes('license')) return 'license';
+    if (text.includes('network')) return 'network';
     if (text.includes('security')) return 'security';
+    if (text.includes('backup')) return 'backup';
     if (text.includes('integration')) return 'integration';
-    if (text.includes('training')) return 'training_need';
-    if (text.includes('support')) return 'support_level';
+    if (text.includes('training')) return 'training';
+    if (text.includes('support')) return 'support';
+    if (text.includes('budget') || text.includes('cost')) return 'budget';
+    if (text.includes('timeline') || text.includes('schedule')) return 'timeline';
+    return '';
+  }
+
+  private extractActionType(text: string): string {
+    if (text.includes('how many') || text.includes('count') || text.includes('number')) return 'qty';
+    if (text.includes('migration') || text.includes('migrate')) return 'migrate';
+    if (text.includes('size') || text.includes('amount')) return 'size';
+    if (text.includes('complexity') || text.includes('complex')) return 'complex';
+    if (text.includes('priority')) return 'priority';
+    if (text.includes('existing') || text.includes('current')) return 'current';
+    if (text.includes('required') || text.includes('need')) return 'req';
+    if (text.includes('level')) return 'level';
+    if (text.includes('type')) return 'type';
+    if (text.includes('what') || text.includes('which')) return 'what';
+    return '';
+  }
+
+  private extractKeyConcepts(text: string): string[] {
+    const concepts: string[] = [];
     
-    // Fallback: create slug from first meaningful words
+    if (text.includes('scope')) concepts.push('scope');
+    if (text.includes('cloud')) concepts.push('cloud');
+    if (text.includes('on-premises') || text.includes('onprem')) concepts.push('onprem');
+    if (text.includes('compliance')) concepts.push('comply');
+    if (text.includes('regulation')) concepts.push('reg');
+    if (text.includes('deadline')) concepts.push('deadline');
+    if (text.includes('critical')) concepts.push('crit');
+    if (text.includes('legacy')) concepts.push('legacy');
+    if (text.includes('modern')) concepts.push('modern');
+    if (text.includes('integration')) concepts.push('integ');
+    if (text.includes('customization')) concepts.push('custom');
+    if (text.includes('automation')) concepts.push('auto');
+    
+    return concepts.slice(0, 2); // Limit to 2 concepts max
+  }
+
+  private generateFallbackSlug(questionText: string): string {
+    // Clean fallback from meaningful words
     return questionText.toLowerCase()
       .replace(/[^a-z0-9\s]/g, '')
       .split(' ')
-      .filter(word => word.length > 2)
-      .slice(0, 2)
+      .filter(word => word.length > 2 && !['how', 'many', 'what', 'which', 'the', 'are', 'for', 'this'].includes(word))
+      .slice(0, 3)
       .join('_')
       .substring(0, 15);
   }

@@ -20,29 +20,26 @@ export class CalculationGenerator {
   generateCalculationsFromQuestions(questions: Question[], services: Service[]): Calculation[] {
     const calculations: Calculation[] = [];
     
-    console.log(`📊 Generating calculations from ${questions.length} questions and ${services.length} services`);
-    
-    // Step 1: Create question-based calculations that map to services
+    // Step 1: Create optimized lookups for performance
     const quantityQuestions = this.identifyQuantityQuestions(questions);
-    console.log(`📊 Found ${quantityQuestions.length} quantity questions`);
+    const serviceMap = this.createServiceLookupMap(services);
     
-    quantityQuestions.forEach(question => {
-      const relatedServices = this.findServicesForQuestion(question, services);
+    // Step 2: Create question-based calculations with optimized service lookup
+    for (const question of quantityQuestions) {
+      const relatedServices = this.findServicesForQuestionOptimized(question, serviceMap);
       const calculation = this.createQuestionToServiceCalculation(question, relatedServices);
       if (calculation) {
         calculations.push(calculation);
-        console.log(`📊 Created calculation: ${calculation.name}`);
       }
-    });
+    }
     
-    // Step 2: Create service-specific calculations that reference actual subservices
-    services.forEach(service => {
+    // Step 3: Create service-specific calculations
+    for (const service of services) {
       const serviceCalculations = this.createServiceSpecificCalculations(service, questions);
       calculations.push(...serviceCalculations);
-      console.log(`📊 Created ${serviceCalculations.length} calculations for ${service.name}`);
-    });
+    }
     
-    // Step 3: Add overhead calculation that applies to all services
+    // Step 4: Add overhead calculation
     calculations.push({
       id: this.generateUniqueId('calc_overhead'),
       name: "Project Management Overhead",
@@ -50,11 +47,10 @@ export class CalculationGenerator {
       formula: "total_hours × 0.15",
       unit: "percentage",
       source: "Standard 15% PM overhead applied to total project hours",
-      mappedQuestions: [], // Applies to all
-      mappedServices: services.map(s => s.name) // References all services
+      mappedQuestions: [],
+      mappedServices: services.map(s => s.name)
     });
     
-    console.log(`📊 Generated ${calculations.length} total calculations`);
     return calculations;
   }
 
@@ -96,7 +92,51 @@ export class CalculationGenerator {
   }
 
   /**
-   * Find services that relate to a specific question
+   * Create optimized service lookup map for performance
+   */
+  private createServiceLookupMap(services: Service[]): Map<string, Service[]> {
+    const lookupMap = new Map<string, Service[]>();
+    const keywords = ['migration', 'training', 'execution', 'implementation', 'monitoring', 'testing'];
+    
+    for (const keyword of keywords) {
+      const matchingServices = services.filter(service => 
+        service.name.toLowerCase().includes(keyword) || 
+        service.description.toLowerCase().includes(keyword)
+      );
+      lookupMap.set(keyword, matchingServices);
+    }
+    
+    return lookupMap;
+  }
+
+  /**
+   * Optimized service lookup using pre-built map
+   */
+  private findServicesForQuestionOptimized(question: Question, serviceMap: Map<string, Service[]>): Service[] {
+    const text = question.text.toLowerCase();
+    const relatedServices: Service[] = [];
+    
+    if (text.includes('mailbox')) {
+      relatedServices.push(...(serviceMap.get('migration') || []));
+    }
+    if (text.includes('user')) {
+      relatedServices.push(...(serviceMap.get('training') || []));
+    }
+    if (text.includes('server')) {
+      relatedServices.push(...(serviceMap.get('execution') || []));
+      relatedServices.push(...(serviceMap.get('implementation') || []));
+    }
+    if (text.includes('test')) {
+      relatedServices.push(...(serviceMap.get('monitoring') || []));
+      relatedServices.push(...(serviceMap.get('testing') || []));
+    }
+    
+    // Remove duplicates
+    return [...new Set(relatedServices)];
+  }
+
+  /**
+   * Find services that relate to a specific question (legacy method)
    */
   private findServicesForQuestion(question: Question, services: Service[]): Service[] {
     const text = question.text.toLowerCase();

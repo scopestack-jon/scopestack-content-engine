@@ -48,42 +48,22 @@ export class ResearchOrchestrator {
         progress: 40
       });
 
-      // Step 1: Generate questions based on research
+      // Step 1: Generate questions and services in parallel for better performance
       onProgress?.({
         type: 'step',
-        stepId: 'questions',
+        stepId: 'content',
         status: 'in-progress',
         progress: 50
       });
 
-      const questions = await this.questionGenerator.generateQuestionsFromResearch(
-        researchData,
-        userRequest
-      );
+      const [questions, services] = await Promise.all([
+        this.questionGenerator.generateQuestionsFromResearch(researchData, userRequest),
+        this.serviceGenerator.generateServicesFromResearch(researchData, userRequest)
+      ]);
 
       onProgress?.({
         type: 'step',
-        stepId: 'questions',
-        status: 'completed',
-        progress: 60
-      });
-
-      // Step 2: Generate services based on research
-      onProgress?.({
-        type: 'step',
-        stepId: 'services',
-        status: 'in-progress',
-        progress: 65
-      });
-
-      const services = await this.serviceGenerator.generateServicesFromResearch(
-        researchData,
-        userRequest
-      );
-
-      onProgress?.({
-        type: 'step',
-        stepId: 'services', 
+        stepId: 'content',
         status: 'completed',
         progress: 80
       });

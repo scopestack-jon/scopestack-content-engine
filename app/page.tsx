@@ -20,6 +20,8 @@ interface ResearchStep {
   status: "pending" | "active" | "completed" | "error"
   model?: string
   sources?: string[]
+  startTime?: number
+  estimatedDuration?: number
 }
 
 interface GeneratedContent {
@@ -173,10 +175,22 @@ export default function ScopeStackContentEngine() {
     setGeneratedContent(null)
     setIsResearchCollapsed(false)
 
-    // Initialize research steps
+    // Initialize research steps with time estimates
     const steps: ResearchStep[] = [
-      { id: "research", title: "Conducting Live Web Research", status: "pending" },
-      { id: "content", title: "Generating Content Structure", status: "pending" },
+      { 
+        id: "research", 
+        title: "Conducting Live Web Research", 
+        status: "pending",
+        estimatedDuration: 45000, // 45 seconds
+        startTime: undefined
+      },
+      { 
+        id: "content", 
+        title: "Generating Content Structure", 
+        status: "pending",
+        estimatedDuration: 90000, // 90 seconds
+        startTime: undefined
+      },
     ]
     setResearchSteps(steps)
 
@@ -251,7 +265,13 @@ export default function ScopeStackContentEngine() {
                   setResearchSteps((prev) =>
                     prev.map((step) =>
                       step.id === data.stepId
-                        ? { ...step, status: data.status, model: data.model, sources: data.sources }
+                        ? { 
+                            ...step, 
+                            status: data.status, 
+                            model: data.model, 
+                            sources: data.sources,
+                            startTime: data.status === "active" && !step.startTime ? Date.now() : step.startTime
+                          }
                         : step,
                     ),
                   )

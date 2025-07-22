@@ -37,3 +37,8 @@ export const MAX_RETRY_DELAY = 5000; // 5 seconds
 
 export const PERPLEXITY_MODEL = "perplexity/sonar";
 export const DEFAULT_CONTENT_MODEL = "anthropic/claude-3.5-sonnet";
+
+// Performance optimization constants
+export const PERFORMANCE_MONITORING = process.env.ENABLE_PERFORMANCE_MONITORING === 'true';
+export const BATCH_SIZE_CALCULATIONS = 10; // Process calculations in batches
+export const MAX_CONCURRENT_API_CALLS = 2; // Limit concurrent API calls
