@@ -1017,3 +1017,729 @@ API call attempt 1
 ✅ Generated 4 research-driven services with 15 total subservices
 ✅ Generated 8 calculations mapped to actual questions
  POST /api/research 200 in 74673ms
+ ✓ Compiled in 235ms (927 modules)
+ GET / 200 in 79ms
+ ✓ Compiled in 69ms (401 modules)
+ GET / 200 in 8ms
+ ✓ Compiled in 66ms (401 modules)
+ GET / 200 in 59ms
+ ✓ Compiled in 55ms (401 modules)
+ GET / 200 in 9ms
+ ✓ Compiled in 53ms (401 modules)
+ GET / 200 in 17ms
+ ✓ Compiled in 54ms (401 modules)
+ GET / 200 in 15ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/server-development/4.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/server-development/4.pack.gz'
+ ✓ Compiled /api/research in 46ms (553 modules)
+🔍 Starting research for: Salesforce CRM implementation for manufacturing
+🔍 Performing Perplexity-based active research for: Salesforce CRM implementation for manufacturing
+ GET / 200 in 34ms
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 5273
+📝 First 500 chars: {
+  "sources": [    {
+      "title": "Salesforce Manufacturing Cloud Implementation Guide",
+      "url": "https://www.sfapps.info/salesforce-manufacturing-implementation/",
+      "summary": "This 2025 guide provides a detailed step-by-step approach to implementing Salesforce Manufacturing Cloud, emphasizing preparation and planning, process audits, strategic objective setting, and assembling cross-functional teams. It highlights how the platform optimizes inventory, forecasting, and collaboratio
+📝 Last 200 chars: ion complexity, requiring phased rollouts",
+    "Security considerations include configuring user permissions and access controls to safeguard sensitive manufacturing data"
+  ],
+  "confidence": 0.85
+}
+🧹 Cleaned response length: 5273
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "Salesforce Manufacturing Cloud Implementation Guide",
+      "url": "https://www.sfapps.info/salesforce-manufacturing-implementation/",
+      "summary": "This 2025 guide provides a detailed step-by-step approach to implementing Salesforce Manufacturing Cloud, emp
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  'Salesforce Manufacturing Cloud Implementation Guide',
+  'The Definitive Guide to Salesforce Manufacturing Cloud',
+  'Salesforce Manufacturing Cloud Implementation Guide 2024',
+  'Salesforce Manufacturing Cloud Implementation Guide',
+  'Manufacturing Cloud'
+]
+API call attempt 1
+Question 1 formatted: {
+  text: 'How many ERP/MES systems need to be integrated with Salesforce Manufacturing Cloud?',
+  question: 'How many ERP/MES systems need to be integrated with Salesforce Manufacturing Cloud?',
+  slug: 'how_many_erpmes_systems_need_to_be_integrated_with',
+  hasOptions: true
+}
+Question 2 formatted: {
+  text: 'What is the estimated volume of historical manufacturing data to be migrated (in GB)?',
+  question: 'What is the estimated volume of historical manufacturing data to be migrated (in GB)?',
+  slug: 'what_is_the_estimated_volume_of_historical_manufac',
+  hasOptions: true
+}
+Question 3 formatted: {
+  text: 'How many custom manufacturing-specific objects will need to be created in Salesforce?',
+  question: 'How many custom manufacturing-specific objects will need to be created in Salesforce?',
+  slug: 'how_many_custom_manufacturingspecific_objects_will',
+  hasOptions: true
+}
+Question 4 formatted: {
+  text: 'What level of workflow automation is required using Flow Builder/OmniStudio?',
+  question: 'What level of workflow automation is required using Flow Builder/OmniStudio?',
+  slug: 'what_level_of_workflow_automation_is_required_usin',
+  hasOptions: true
+}
+Question 5 formatted: {
+  text: 'How many users will require training on the new Salesforce Manufacturing Cloud implementation?',
+  question: 'How many users will require training on the new Salesforce Manufacturing Cloud implementation?',
+  slug: 'how_many_users_will_require_training_on_the_new_sa',
+  hasOptions: true
+}
+Question 6 formatted: {
+  text: 'What is the desired timeline for the complete implementation rollout?',
+  question: 'What is the desired timeline for the complete implementation rollout?',
+  slug: 'what_is_the_desired_timeline_for_the_complete_impl',
+  hasOptions: true
+}
+Question 7 formatted: {
+  text: 'What type of sales agreement and forecasting functionality is needed?',
+  question: 'What type of sales agreement and forecasting functionality is needed?',
+  slug: 'what_type_of_sales_agreement_and_forecasting_funct',
+  hasOptions: true
+}
+✅ Generated 7 AI-driven questions based on research
+API call attempt 1
+📊 Service volume check: 4 services, 14 total subservices
+📊 PMBOK phase coverage: 100% (5/5 phases)
+❌ Insufficient subservices generated: 14 (need 15+)
+❌ Research-driven service generation failed: Error: Research-driven generation failed - only 14 subservices generated, need 15+
+    at ServiceGenerator.generateServicesFromResearch (lib/research/generators/service-generator.ts:155:16)
+    at async ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:63:23)
+    at async Object.start (app/api/research/route.ts:44:26)
+  153 |         if (totalSubservices < 15) {
+  154 |           console.error(`❌ Insufficient subservices generated: ${totalSubservices} (need 15+)`);
+> 155 |           throw new Error(`Research-driven generation failed - only ${totalSubservices} subservices generated, need 15+`);
+      |                ^
+  156 |         }
+  157 |         
+  158 |         if (phaseAlignment.coveragePercentage < 80) {
+❌ Research orchestration failed: Error: Research-driven generation failed - only 14 subservices generated, need 15+
+    at ServiceGenerator.generateServicesFromResearch (lib/research/generators/service-generator.ts:155:16)
+    at async ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:63:23)
+    at async Object.start (app/api/research/route.ts:44:26)
+  153 |         if (totalSubservices < 15) {
+  154 |           console.error(`❌ Insufficient subservices generated: ${totalSubservices} (need 15+)`);
+> 155 |           throw new Error(`Research-driven generation failed - only ${totalSubservices} subservices generated, need 15+`);
+      |                ^
+  156 |         }
+  157 |         
+  158 |         if (phaseAlignment.coveragePercentage < 80) {
+❌ Streaming error: Error: Research-driven content generation failed: Research-driven generation failed - only 14 subservices generated, need 15+
+    at ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:120:12)
+    at async Object.start (app/api/research/route.ts:44:26)
+  118 |
+  119 |       // Re-throw error instead of providing empty fallback
+> 120 |       throw new Error(`Research-driven content generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      |            ^
+  121 |     }
+  122 |   }
+  123 |
+ POST /api/research 200 in 80181ms
+🔍 Starting research for: test PMBOK phases
+🔍 Performing Perplexity-based active research for: test PMBOK phases
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 5702
+📝 First 500 chars: {
+  "sources": [    {
+      "title": "An Overview of the PMBOK® Guide",
+      "url": "https://sebokwiki.org/wiki/An_Overview_of_the_PMBOK%C2%AE_Guide",
+      "summary": "This source provides a detailed breakdown of the PMBOK® Guide's process groups: Initiating, Planning, Executing, Monitoring and Controlling, and Closing. It describes the key processes within each phase, such as developing project management plans, executing tasks, quality assurance, and project closure activities. It emphasizes
+📝 Last 200 chars: ptability.",
+    "Implementation must consider resource sizing, stakeholder engagement, and compliance with organizational standards to achieve successful project closure."
+  ],
+  "confidence": 0.90
+}
+🧹 Cleaned response length: 5702
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "An Overview of the PMBOK® Guide",
+      "url": "https://sebokwiki.org/wiki/An_Overview_of_the_PMBOK%C2%AE_Guide",
+      "summary": "This source provides a detailed breakdown of the PMBOK® Guide's process groups: Initiating, Planning, Executing, Monitoring and Co
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  'An Overview of the PMBOK® Guide',
+  "The PMBOK's Five Project Phases",
+  'Choosing Right Project Approach for Your Project | PMI',
+  'Understand the 5 Phases of Project Management',
+  'PMBOK® Guide – Sixth Edition'
+]
+API call attempt 1
+Question 1 formatted: {
+  text: 'What is your expected timeline for completing all project phases from initiation to closure?',
+  question: 'What is your expected timeline for completing all project phases from initiation to closure?',
+  slug: 'what_is_your_expected_timeline_for_completing_all_',
+  hasOptions: true
+}
+Question 2 formatted: {
+  text: 'How many stakeholder departments will need to be actively involved in project planning and execution?',
+  question: 'How many stakeholder departments will need to be actively involved in project planning and execution?',
+  slug: 'how_many_stakeholder_departments_will_need_to_be_a',
+  hasOptions: true
+}
+Question 3 formatted: {
+  text: 'What level of testing complexity do you anticipate for this project?',
+  question: 'What level of testing complexity do you anticipate for this project?',
+  slug: 'what_level_of_testing_complexity_do_you_anticipate',
+  hasOptions: true
+}
+Question 4 formatted: {
+  text: 'How frequently would you like project performance monitoring and status reporting?',
+  question: 'How frequently would you like project performance monitoring and status reporting?',
+  slug: 'how_frequently_would_you_like_project_performance_',
+  hasOptions: true
+}
+Question 5 formatted: {
+  text: 'What is your preferred change management process complexity?',
+  question: 'What is your preferred change management process complexity?',
+  slug: 'what_is_your_preferred_change_management_process_c',
+  hasOptions: true
+}
+Question 6 formatted: {
+  text: 'How many dedicated project team members do you expect to allocate?',
+  question: 'How many dedicated project team members do you expect to allocate?',
+  slug: 'how_many_dedicated_project_team_members_do_you_exp',
+  hasOptions: true
+}
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+📊 Service volume check: 4 services, 14 total subservices
+📊 PMBOK phase coverage: 100% (5/5 phases)
+❌ Insufficient subservices generated: 14 (need 15+)
+❌ Research-driven service generation failed: Error: Research-driven generation failed - only 14 subservices generated, need 15+
+    at ServiceGenerator.generateServicesFromResearch (lib/research/generators/service-generator.ts:155:16)
+    at async ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:63:23)
+    at async Object.start (app/api/research/route.ts:44:26)
+  153 |         if (totalSubservices < 15) {
+  154 |           console.error(`❌ Insufficient subservices generated: ${totalSubservices} (need 15+)`);
+> 155 |           throw new Error(`Research-driven generation failed - only ${totalSubservices} subservices generated, need 15+`);
+      |                ^
+  156 |         }
+  157 |         
+  158 |         if (phaseAlignment.coveragePercentage < 80) {
+❌ Research orchestration failed: Error: Research-driven generation failed - only 14 subservices generated, need 15+
+    at ServiceGenerator.generateServicesFromResearch (lib/research/generators/service-generator.ts:155:16)
+    at async ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:63:23)
+    at async Object.start (app/api/research/route.ts:44:26)
+  153 |         if (totalSubservices < 15) {
+  154 |           console.error(`❌ Insufficient subservices generated: ${totalSubservices} (need 15+)`);
+> 155 |           throw new Error(`Research-driven generation failed - only ${totalSubservices} subservices generated, need 15+`);
+      |                ^
+  156 |         }
+  157 |         
+  158 |         if (phaseAlignment.coveragePercentage < 80) {
+❌ Streaming error: Error: Research-driven content generation failed: Research-driven generation failed - only 14 subservices generated, need 15+
+    at ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:120:12)
+    at async Object.start (app/api/research/route.ts:44:26)
+  118 |
+  119 |       // Re-throw error instead of providing empty fallback
+> 120 |       throw new Error(`Research-driven content generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      |            ^
+  121 |     }
+  122 |   }
+  123 |
+ POST /api/research 200 in 51263ms
+🔍 Starting research for: quick PMBOK test
+🔍 Performing Perplexity-based active research for: quick PMBOK test
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 4722
+📝 First 500 chars: {
+  "sources": [    {
+      "title": "PMBOK® Guide 7th Edition and PMP Exam Prep",
+      "url": "https://projectmanagementacademy.net/resources/blog/pmbok-guide-and-the-pmp-exam/",
+      "summary": "This source outlines the structure and content of the PMBOK Guide 6th and 7th editions, detailing the five process groups, ten knowledge areas, and 49 processes essential for project management. It highlights the interconnectedness of process groups and knowledge areas, providing a foundational frame
+📝 Last 200 chars: ning platforms for accessibility and scalability.",
+    "Compliance with PMI standards ensures relevance for PMP exam preparation and professional certification alignment."
+  ],
+  "confidence": 0.85
+}
+🧹 Cleaned response length: 4722
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "PMBOK® Guide 7th Edition and PMP Exam Prep",
+      "url": "https://projectmanagementacademy.net/resources/blog/pmbok-guide-and-the-pmp-exam/",
+      "summary": "This source outlines the structure and content of the PMBOK Guide 6th and 7th editions, detailing the
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  'PMBOK® Guide 7th Edition and PMP Exam Prep',
+  'PMBOK Guide: What is it, Purpose, and Importance',
+  'A Guide to the Project Management Body of Knowledge (PMBOK® Guide) 7th Edition',
+  'Which PMBOK® Guide Should I Study for the PMP® Exam?',
+  'PMBOK Guide and PMP Exam Preparation Strategies'
+]
+API call attempt 1
+Question 1 formatted: {
+  text: 'What is the expected timeline for completing all project deliverables based on the complexity and scope?',
+  question: 'What is the expected timeline for completing all project deliverables based on the complexity and scope?',
+  slug: 'what_is_the_expected_timeline_for_completing_all_p',
+  hasOptions: true
+}
+Question 2 formatted: {
+  text: 'Which project management methodology is most appropriate given the stakeholder requirements and delivery timeline?',
+  question: 'Which project management methodology is most appropriate given the stakeholder requirements and delivery timeline?',
+  slug: 'which_project_management_methodology_is_most_appro',
+  hasOptions: true
+}
+Question 3 formatted: {
+  text: 'What level of project management documentation and governance is required?',
+  question: 'What level of project management documentation and governance is required?',
+  slug: 'what_level_of_project_management_documentation_and',
+  hasOptions: true
+}
+Question 4 formatted: {
+  text: 'How many dedicated team members will be required for successful project execution?',
+  question: 'How many dedicated team members will be required for successful project execution?',
+  slug: 'how_many_dedicated_team_members_will_be_required_f',
+  hasOptions: true
+}
+Question 5 formatted: {
+  text: 'What is the anticipated level of stakeholder engagement and communication needed?',
+  question: 'What is the anticipated level of stakeholder engagement and communication needed?',
+  slug: 'what_is_the_anticipated_level_of_stakeholder_engag',
+  hasOptions: true
+}
+Question 6 formatted: {
+  text: 'What is the estimated complexity level of risk management for this project?',
+  question: 'What is the estimated complexity level of risk management for this project?',
+  slug: 'what_is_the_estimated_complexity_level_of_risk_man',
+  hasOptions: true
+}
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+📊 Service volume check: 4 services, 14 total subservices
+📊 PMBOK phase coverage: 100% (5/5 phases)
+❌ Insufficient subservices generated: 14 (need 15+)
+❌ Research-driven service generation failed: Error: Research-driven generation failed - only 14 subservices generated, need 15+
+    at ServiceGenerator.generateServicesFromResearch (lib/research/generators/service-generator.ts:155:16)
+    at async ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:63:23)
+    at async Object.start (app/api/research/route.ts:44:26)
+  153 |         if (totalSubservices < 15) {
+  154 |           console.error(`❌ Insufficient subservices generated: ${totalSubservices} (need 15+)`);
+> 155 |           throw new Error(`Research-driven generation failed - only ${totalSubservices} subservices generated, need 15+`);
+      |                ^
+  156 |         }
+  157 |         
+  158 |         if (phaseAlignment.coveragePercentage < 80) {
+❌ Research orchestration failed: Error: Research-driven generation failed - only 14 subservices generated, need 15+
+    at ServiceGenerator.generateServicesFromResearch (lib/research/generators/service-generator.ts:155:16)
+    at async ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:63:23)
+    at async Object.start (app/api/research/route.ts:44:26)
+  153 |         if (totalSubservices < 15) {
+  154 |           console.error(`❌ Insufficient subservices generated: ${totalSubservices} (need 15+)`);
+> 155 |           throw new Error(`Research-driven generation failed - only ${totalSubservices} subservices generated, need 15+`);
+      |                ^
+  156 |         }
+  157 |         
+  158 |         if (phaseAlignment.coveragePercentage < 80) {
+❌ Streaming error: Error: Research-driven content generation failed: Research-driven generation failed - only 14 subservices generated, need 15+
+    at ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:120:12)
+    at async Object.start (app/api/research/route.ts:44:26)
+  118 |
+  119 |       // Re-throw error instead of providing empty fallback
+> 120 |       throw new Error(`Research-driven content generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      |            ^
+  121 |     }
+  122 |   }
+  123 |
+ POST /api/research 200 in 51133ms
+ ✓ Compiled in 127ms (927 modules)
+ GET / 200 in 96ms
+ ✓ Compiled in 63ms (401 modules)
+ GET / 200 in 10ms
+ ✓ Compiled in 72ms (401 modules)
+ GET / 200 in 27ms
+ ✓ Compiled /api/research in 41ms (553 modules)
+🔍 Starting research for: test improved subservice generation
+🔍 Performing Perplexity-based active research for: test improved subservice generation
+ GET / 200 in 32ms
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 3095
+📝 First 500 chars: ```json
+{
+  "sources": [
+    {
+      "title": "Subservice Organization Management—IT Controls for Peace of Mind",
+      "url": "https://www.isaca.org/resources/isaca-journal/issues/2023/volume-4/subservice-organization-management-it-controls-for-peace-of-mind",
+      "summary": "This article emphasizes the importance of change management, penetration testing, and network assessments in managing subservice organizations. It highlights key questions to ask subservice providers regarding operationa
+📝 Last 200 chars: and frameworks.",
+    "Evaluate the security posture of subservice providers thoroughly.",
+    "Consider cost implications of security testing and compliance measures."
+  ],
+  "confidence": 0.80
+}
+```
+🧹 Cleaned response length: 3083
+🧹 Cleaned first 300 chars: {
+  "sources": [
+    {
+      "title": "Subservice Organization Management—IT Controls for Peace of Mind",
+      "url": "https://www.isaca.org/resources/isaca-journal/issues/2023/volume-4/subservice-organization-management-it-controls-for-peace-of-mind",
+      "summary": "This article emphasizes the 
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 4
+✅ Found 4 sources from Perplexity research
+🔗 Source titles: [
+  'Subservice Organization Management—IT Controls for Peace of Mind',
+  'CIP-002-5 Implementation Guide',
+  'DoD Instruction 5000.82',
+  'JSIG - Joint SAP Implementation Guide'
+]
+API call attempt 1
+Question 1 formatted: {
+  text: 'What level of security testing is required for your subservice implementation?',
+  question: 'What level of security testing is required for your subservice implementation?',
+  slug: 'what_level_of_security_testing_is_required_for_you',
+  hasOptions: true
+}
+Question 2 formatted: {
+  text: 'Which compliance frameworks must the subservice implementation adhere to?',
+  question: 'Which compliance frameworks must the subservice implementation adhere to?',
+  slug: 'which_compliance_frameworks_must_the_subservice_im',
+  hasOptions: true
+}
+Question 3 formatted: {
+  text: 'What is your desired frequency for ongoing security assessments of the subservice?',
+  question: 'What is your desired frequency for ongoing security assessments of the subservice?',
+  slug: 'what_is_your_desired_frequency_for_ongoing_securit',
+  hasOptions: true
+}
+Question 4 formatted: {
+  text: 'What level of change management process documentation is needed?',
+  question: 'What level of change management process documentation is needed?',
+  slug: 'what_level_of_change_management_process_documentat',
+  hasOptions: true
+}
+Question 5 formatted: {
+  text: 'How many subservice providers need to be evaluated for security posture?',
+  question: 'How many subservice providers need to be evaluated for security posture?',
+  slug: 'how_many_subservice_providers_need_to_be_evaluated',
+  hasOptions: true
+}
+Question 6 formatted: {
+  text: 'What type of integration testing is required for the subservice implementation?',
+  question: 'What type of integration testing is required for the subservice implementation?',
+  slug: 'what_type_of_integration_testing_is_required_for_t',
+  hasOptions: true
+}
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+📊 Service volume check: 4 services, 17 total subservices
+📊 PMBOK phase coverage: 100% (5/5 phases)
+✅ Generated 4 research-driven services with 17 total subservices
+✅ Generated 7 calculations mapped to actual questions
+ POST /api/research 200 in 48356ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 156ms (927 modules)
+ GET / 200 in 78ms
+ ✓ Compiled in 52ms (401 modules)
+ GET / 200 in 10ms
+ ✓ Compiled in 73ms (401 modules)
+ GET / 200 in 33ms
+ ✓ Compiled in 94ms (401 modules)
+ GET / 200 in 11ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/jon/scopestack-content-engine/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled /api/research in 53ms (553 modules)
+🔍 Starting research for: test pure PMBOK phases
+🔍 Performing Perplexity-based active research for: test pure PMBOK phases
+ GET / 200 in 38ms
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 5541
+📝 First 500 chars: {
+  "sources": [    {
+      "title": "The PMBOK's Five Project Phases",
+      "url": "https://www.projectengineer.net/the-pmboks-five-project-phases/",
+      "summary": "This source details the five distinct phases of the PMBOK project lifecycle: Initiating, Planning, Execution, Monitoring and Controlling, and Closing. It explains the purpose and activities of each phase, emphasizing that while phases are typically sequential, they can be revisited as project changes occur. It also highlights ke
+📝 Last 200 chars: for stakeholder complexity and iterative planning needs",
+    "Compliance with organizational governance and project management standards is required throughout all phases"
+  ],
+  "confidence": 0.85
+}
+🧹 Cleaned response length: 5541
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "The PMBOK's Five Project Phases",
+      "url": "https://www.projectengineer.net/the-pmboks-five-project-phases/",
+      "summary": "This source details the five distinct phases of the PMBOK project lifecycle: Initiating, Planning, Execution, Monitoring and Contr
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  "The PMBOK's Five Project Phases",
+  '5 Phases of Project Management – A Complete Breakdown',
+  'PMBOK: The Project Management Body of Knowledge - A Quick Guide',
+  'The 10 Knowledge Areas of Project Management',
+  '5 Phases of Project Management Life Cycle | Complete Guide'
+]
+API call attempt 1
+Question 1 formatted: {
+  text: 'What level of stakeholder complexity do you anticipate for this project?',
+  question: 'What level of stakeholder complexity do you anticipate for this project?',
+  slug: 'what_level_of_stakeholder_complexity_do_you_antici',
+  hasOptions: true
+}
+Question 2 formatted: {
+  text: 'How frequently will formal project documentation updates and reporting be required?',
+  question: 'How frequently will formal project documentation updates and reporting be required?',
+  slug: 'how_frequently_will_formal_project_documentation_u',
+  hasOptions: true
+}
+Question 3 formatted: {
+  text: 'What level of change control process will be needed?',
+  question: 'What level of change control process will be needed?',
+  slug: 'what_level_of_change_control_process_will_be_neede',
+  hasOptions: true
+}
+Question 4 formatted: {
+  text: 'How many iterative planning cycles do you expect will be needed?',
+  question: 'How many iterative planning cycles do you expect will be needed?',
+  slug: 'how_many_iterative_planning_cycles_do_you_expect_w',
+  hasOptions: true
+}
+Question 5 formatted: {
+  text: 'What level of earned value management (EVM) tracking will be required?',
+  question: 'What level of earned value management (EVM) tracking will be required?',
+  slug: 'what_level_of_earned_value_management_evm_tracking',
+  hasOptions: true
+}
+Question 6 formatted: {
+  text: 'How complex are the project deliverables?',
+  question: 'How complex are the project deliverables?',
+  slug: 'how_complex_are_the_project_deliverables',
+  hasOptions: true
+}
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+📊 Service volume check: 5 services, 21 total subservices
+📊 PMBOK phase coverage: 100% (5/5 phases)
+✅ Generated 5 research-driven services with 21 total subservices
+✅ Generated 7 calculations mapped to actual questions
+ POST /api/research 200 in 78142ms
+🔍 Starting research for: test pmbok only
+🔍 Performing Perplexity-based active research for: test pmbok only
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 5699
+📝 First 500 chars: {
+  "sources": [    {
+      "title": "PMBOK: The Project Management Body of Knowledge Explained",
+      "url": "https://www.projectmanager.com/blog/project-management-body-of-knowledge-pmbok-a-quick-guide",
+      "summary": "This source provides an overview of PMBOK's key components relevant to project management implementation, including scope statement, risk register, change log, stakeholder register, and issue log. It details how these documents and processes support project governance, risk 
+📝 Last 200 chars: e transfer and governance.",
+    "Sizing and architecture considerations depend on project complexity, requiring scalable frameworks and tools for effective implementation."
+  ],
+  "confidence": 0.9
+}
+🧹 Cleaned response length: 5699
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "PMBOK: The Project Management Body of Knowledge Explained",
+      "url": "https://www.projectmanager.com/blog/project-management-body-of-knowledge-pmbok-a-quick-guide",
+      "summary": "This source provides an overview of PMBOK's key components relevant to proj
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  'PMBOK: The Project Management Body of Knowledge Explained',
+  'A Guide to the Project Management Body of Knowledge (PMBOK® Guide) – Sixth Edition',
+  'A Guide to the Project Management Body of Knowledge - iBIM One (Seventh Edition)',
+  "The PMBOK's Five Project Phases - ProjectEngineer",
+  'PMBOK® Guide and Agile Practice Guide – Integration'
+]
+API call attempt 1
+Question 1 formatted: {
+  text: 'What is the expected project duration based on the identified PMBOK phases (Initiating, Planning, Execution, Monitoring & Controlling, and Closing)?',
+  question: 'What is the expected project duration based on the identified PMBOK phases (Initiating, Planning, Execution, Monitoring & Controlling, and Closing)?',
+  slug: 'what_is_the_expected_project_duration_based_on_the',
+  hasOptions: true
+}
+Question 2 formatted: {
+  text: 'Which project management methodology blend will be primarily used for implementation?',
+  question: 'Which project management methodology blend will be primarily used for implementation?',
+  slug: 'which_project_management_methodology_blend_will_be',
+  hasOptions: true
+}
+Question 3 formatted: {
+  text: 'What level of change control governance is required for this project?',
+  question: 'What level of change control governance is required for this project?',
+  slug: 'what_level_of_change_control_governance_is_require',
+  hasOptions: true
+}
+Question 4 formatted: {
+  text: 'How many key stakeholders will require regular engagement and communication?',
+  question: 'How many key stakeholders will require regular engagement and communication?',
+  slug: 'how_many_key_stakeholders_will_require_regular_eng',
+  hasOptions: true
+}
+Question 5 formatted: {
+  text: 'What level of risk management documentation and monitoring is needed?',
+  question: 'What level of risk management documentation and monitoring is needed?',
+  slug: 'what_level_of_risk_management_documentation_and_mo',
+  hasOptions: true
+}
+Question 6 formatted: {
+  text: 'How many team members will need PMBOK framework training?',
+  question: 'How many team members will need PMBOK framework training?',
+  slug: 'how_many_team_members_will_need_pmbok_framework_tr',
+  hasOptions: true
+}
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+📊 Service volume check: 5 services, 20 total subservices
+📊 PMBOK phase coverage: 100% (5/5 phases)
+✅ Generated 5 research-driven services with 20 total subservices
+✅ Generated 7 calculations mapped to actual questions
+ POST /api/research 200 in 90605ms
+🔍 Starting research for: Salesforce CRM implementation
+🔍 Performing Perplexity-based active research for: Salesforce CRM implementation
+🔍 Perplexity research response received, parsing...
+📝 Raw response length: 5247
+📝 First 500 chars: {
+  "sources": [    {
+      "title": "Salesforce Implementation: The Complete Guide [2025]",
+      "url": "https://www.codleo.com/blog/salesforce-implementation-complete-guide-2025",
+      "summary": "This guide outlines a detailed Salesforce CRM implementation process involving strategy development, project setup, team building, prototype creation, and data analysis. It emphasizes the importance of assembling a cross-functional team, conducting thorough data cleansing and enrichment before migr
+📝 Last 200 chars: before going live to identify and resolve issues",
+    "Maintain ongoing evaluation and customization post-implementation to ensure the CRM continues to meet business goals"
+  ],
+  "confidence": 0.9
+}
+🧹 Cleaned response length: 5247
+🧹 Cleaned first 300 chars: {
+  "sources": [    {
+      "title": "Salesforce Implementation: The Complete Guide [2025]",
+      "url": "https://www.codleo.com/blog/salesforce-implementation-complete-guide-2025",
+      "summary": "This guide outlines a detailed Salesforce CRM implementation process involving strategy development
+✅ JSON parsing successful
+📊 Parsed object keys: [ 'sources', 'researchSummary', 'keyInsights', 'confidence' ]
+📊 Sources array length: 5
+✅ Found 5 sources from Perplexity research
+🔗 Source titles: [
+  'Salesforce Implementation: The Complete Guide [2025]',
+  'Mastering Salesforce Implementation in 2025: A Complete Guide',
+  'Ultimate Guide to a Salesforce Implementation - Crm.Folio3.Com',
+  'CRM Implementation: A Comprehensive 9 Step Guide - Salesforce',
+  'Get Started with Sales Cloud Implementation Guide - Salesforce'
+]
+API call attempt 1
+Question 1 formatted: {
+  text: 'How many total users will need to be migrated and trained on the Salesforce platform?',
+  question: 'How many total users will need to be migrated and trained on the Salesforce platform?',
+  slug: 'how_many_total_users_will_need_to_be_migrated_and_',
+  hasOptions: true
+}
+Question 2 formatted: {
+  text: 'What is the estimated volume of data records to be migrated to Salesforce?',
+  question: 'What is the estimated volume of data records to be migrated to Salesforce?',
+  slug: 'what_is_the_estimated_volume_of_data_records_to_be',
+  hasOptions: true
+}
+Question 3 formatted: {
+  text: 'Which implementation methodology do you prefer for this project?',
+  question: 'Which implementation methodology do you prefer for this project?',
+  slug: 'which_implementation_methodology_do_you_prefer_for',
+  hasOptions: true
+}
+Question 4 formatted: {
+  text: 'How many third-party system integrations will be required?',
+  question: 'How many third-party system integrations will be required?',
+  slug: 'how_many_thirdparty_system_integrations_will_be_re',
+  hasOptions: true
+}
+Question 5 formatted: {
+  text: 'What level of data cleansing and preparation is needed before migration?',
+  question: 'What level of data cleansing and preparation is needed before migration?',
+  slug: 'what_level_of_data_cleansing_and_preparation_is_ne',
+  hasOptions: true
+}
+Question 6 formatted: {
+  text: 'What type of user training delivery method would you prefer?',
+  question: 'What type of user training delivery method would you prefer?',
+  slug: 'what_type_of_user_training_delivery_method_would_y',
+  hasOptions: true
+}
+✅ Generated 6 AI-driven questions based on research
+API call attempt 1
+API call attempt 1 failed: Request timeout after 60000ms
+Retrying after 1294.4ms...
+API call attempt 2 (retry)
+ POST /api/research 200 in 120066ms
+API call attempt 2 failed: Request timeout after 60000ms
+Retrying after 2470.6ms...
+API call attempt 3 (retry)
+API call attempt 3 failed: Request timeout after 60000ms
+❌ Research-driven service generation failed: Error: Failed after 3 attempts: Request timeout after 60000ms
+    at OpenRouterClient.generateWithRetry (lib/research/api/openrouter-client.ts:91:10)
+    at async ServiceGenerator.generateServicesFromResearch (lib/research/generators/service-generator.ts:96:24)
+    at async ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:63:23)
+    at async Object.start (app/api/research/route.ts:44:26)
+  89 |     }
+  90 |
+> 91 |     throw new Error(`Failed after ${maxRetries} attempts: ${lastError?.message}`);
+     |          ^
+  92 |   }
+  93 |
+  94 |   /**
+❌ Research orchestration failed: Error: Failed after 3 attempts: Request timeout after 60000ms
+    at OpenRouterClient.generateWithRetry (lib/research/api/openrouter-client.ts:91:10)
+    at async ServiceGenerator.generateServicesFromResearch (lib/research/generators/service-generator.ts:96:24)
+    at async ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:63:23)
+    at async Object.start (app/api/research/route.ts:44:26)
+  89 |     }
+  90 |
+> 91 |     throw new Error(`Failed after ${maxRetries} attempts: ${lastError?.message}`);
+     |          ^
+  92 |   }
+  93 |
+  94 |   /**
+SSE controller closed, cannot send data: TypeError: Invalid state: Controller is already closed
+    at sendSSE (app/api/research/route.ts:34:23)
+    at eval (app/api/research/route.ts:84:14)
+    at ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:114:19)
+    at async Object.start (app/api/research/route.ts:44:26)
+  32 |           try {
+  33 |             const message = `data: ${JSON.stringify(data)}\n\n`;
+> 34 |             controller.enqueue(encoder.encode(message));
+     |                       ^
+  35 |             return true;
+  36 |           } catch (error) {
+  37 |             console.log('SSE controller closed, cannot send data:', error); {
+  code: 'ERR_INVALID_STATE'
+}
+❌ Streaming error: Error: Research-driven content generation failed: Failed after 3 attempts: Request timeout after 60000ms
+    at ResearchOrchestrator.generateContent (lib/research/orchestrator/research-orchestrator.ts:120:12)
+    at async Object.start (app/api/research/route.ts:44:26)
+  118 |
+  119 |       // Re-throw error instead of providing empty fallback
+> 120 |       throw new Error(`Research-driven content generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      |            ^
+  121 |     }
+  122 |   }
+  123 |
+SSE controller closed, cannot send data: TypeError: Invalid state: Controller is already closed
+    at sendSSE (app/api/research/route.ts:34:23)
+    at Object.start (app/api/research/route.ts:108:10)
+  32 |           try {
+  33 |             const message = `data: ${JSON.stringify(data)}\n\n`;
+> 34 |             controller.enqueue(encoder.encode(message));
+     |                       ^
+  35 |             return true;
+  36 |           } catch (error) {
+  37 |             console.log('SSE controller closed, cannot send data:', error); {
+  code: 'ERR_INVALID_STATE'
+}
