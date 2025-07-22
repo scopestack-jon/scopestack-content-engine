@@ -21,36 +21,43 @@ export class ServiceGenerator {
         userRequest: userRequest
       };
       
-      // Create a streamlined prompt for faster service generation
-      const prompt = `Generate 4-5 professional services based on "${userRequest}" research.
+      // Create a streamlined prompt for faster service generation with enhanced scope language
+      const prompt = `Generate 4-5 professional services based on "${userRequest}" research with high-quality scope language.
 
 Research: ${researchContext.summary}
 Key Insights: ${researchContext.insights.slice(0, 3).join(', ')}
 
 REQUIREMENTS:
-- 4-5 services aligned with PMBOK phases: Initiation, Planning, Execution, Monitoring & Controlling, Closing
+- 4-5 services aligned with PMBOK phases: Initiation, Planning, Execution, Monitoring & Controlling, Closing  
 - Each service has 4+ subservices (minimum 16 total subservices)
 - Based on research findings for ${technology}
+- Professional consulting scope language throughout
+
+SCOPE LANGUAGE QUALITY GUIDELINES:
+- serviceDescription: Clear business value and outcomes (2-3 sentences)
+- keyAssumptions: Specific technical and business assumptions that affect scope
+- clientResponsibilities: Concrete deliverables/actions required from client
+- outOfScope: Specific exclusions to prevent scope creep
 
 JSON FORMAT (NO markdown, explanations, or code blocks):
 [
   {
     "name": "Service Name",
     "description": "Brief description",
-    "serviceDescription": "Detailed description based on research",
-    "keyAssumptions": "Service assumptions",
-    "clientResponsibilities": "Client responsibilities", 
-    "outOfScope": "What's excluded",
+    "serviceDescription": "Professional description highlighting business value, technical approach, and key deliverables that directly address the ${technology} implementation challenges identified in research.",
+    "keyAssumptions": "Client provides necessary access credentials and technical documentation. Existing infrastructure meets minimum requirements identified in ${technology} specifications. Key stakeholders will be available for requirements validation sessions.",
+    "clientResponsibilities": "Client will provide dedicated technical resources for knowledge transfer sessions. Client responsible for coordinating internal approvals and change management communications. Client will validate all configurations in test environment before production deployment.",
+    "outOfScope": "Hardware procurement and infrastructure setup excluded. Third-party integrations beyond standard APIs require separate engagement. End-user training beyond administrative handover sessions not included.",
     "hours": 80,
     "phase": "One of: Initiation, Planning, Execution, Monitoring & Controlling, Closing",
     "subservices": [
       {
         "name": "Subservice Name",
         "description": "Subservice description", 
-        "serviceDescription": "Detailed subservice description",
-        "keyAssumptions": "Subservice assumptions",
-        "clientResponsibilities": "Client responsibilities",
-        "outOfScope": "Exclusions",
+        "serviceDescription": "Detailed description of specific activities, methodologies, and deliverables that contribute to the overall ${technology} implementation success.",
+        "keyAssumptions": "Specific technical assumptions relevant to this subservice component.",
+        "clientResponsibilities": "Specific client actions and deliverables required for this subservice.",
+        "outOfScope": "Specific exclusions for this subservice to maintain clear boundaries.",
         "hours": 20
       }
     ]

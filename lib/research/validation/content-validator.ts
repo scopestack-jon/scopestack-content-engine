@@ -15,6 +15,74 @@ export class ContentValidator {
   }
 
   /**
+   * Generate a short, readable question slug (15 chars max)
+   */
+  private generateQuestionSlug(questionText: string): string {
+    // Extract key words and create meaningful short slug
+    const text = questionText.toLowerCase();
+    
+    if (text.includes('how many')) {
+      if (text.includes('user')) return 'users_count';
+      if (text.includes('mailbox')) return 'mailbox_count';
+      if (text.includes('server')) return 'server_count';
+      if (text.includes('site') || text.includes('location')) return 'site_count';
+      if (text.includes('workstation') || text.includes('endpoint')) return 'endpoint_count';
+      return 'quantity';
+    }
+    
+    if (text.includes('storage') || text.includes('gb') || text.includes('tb')) return 'storage_size';
+    if (text.includes('budget') || text.includes('cost')) return 'budget';
+    if (text.includes('timeline') || text.includes('deadline')) return 'timeline';
+    if (text.includes('priority')) return 'priority';
+    if (text.includes('existing') || text.includes('current')) return 'current_state';
+    if (text.includes('compliance') || text.includes('regulation')) return 'compliance';
+    if (text.includes('security')) return 'security';
+    if (text.includes('integration')) return 'integration';
+    if (text.includes('training')) return 'training_need';
+    if (text.includes('support')) return 'support_level';
+    
+    // Fallback: create slug from first meaningful words
+    return questionText.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .split(' ')
+      .filter(word => word.length > 2)
+      .slice(0, 2)
+      .join('_')
+      .substring(0, 15);
+  }
+
+  /**
+   * Detect if a question expects a numerical answer
+   */
+  private isNumericalQuestion(questionText: string): boolean {
+    const text = questionText.toLowerCase();
+    
+    // Common patterns for numerical questions
+    const numericalPatterns = [
+      'how many',
+      'number of', 
+      'quantity',
+      'count',
+      'size',
+      'gb',
+      'tb',
+      'terabytes',
+      'gigabytes',
+      'hours',
+      'days',
+      'weeks',
+      'months',
+      'years',
+      'budget',
+      'cost',
+      'price',
+      'amount'
+    ];
+    
+    return numericalPatterns.some(pattern => text.includes(pattern));
+  }
+
+  /**
    * Validates and sanitizes generated content
    */
   validateContent(content: Partial<GeneratedContent>): GeneratedContent {
@@ -142,21 +210,27 @@ export class ContentValidator {
 
   private sanitizeQuestion(question: any): Question {
     const questionText = String(question.text || question.question || 'Question').trim();
-    const slug = question.slug || questionText.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\s+/g, '_')
-      .substring(0, 50);
+    
+    // Generate shorter, more readable slug (15 chars max)
+    const slug = question.slug || this.generateQuestionSlug(questionText);
+    
+    // Determine if this is a numerical question
+    const isNumericalQuestion = this.isNumericalQuestion(questionText);
+    const questionType = isNumericalQuestion ? 'number' : 
+      (this.isValidQuestionType(question.type) ? question.type : 'multiple_choice');
 
     return {
       id: question.id || this.generateUniqueId('q'),
       text: questionText,
       question: questionText, // Frontend compatibility
       slug: slug, // Frontend compatibility
-      type: this.isValidQuestionType(question.type) ? question.type : 'multiple_choice',
-      options: Array.isArray(question.options) ? question.options : [
-        { key: "Yes", value: 1, default: true },
-        { key: "No", value: 0, default: false }
-      ],
+      type: questionType,
+      options: isNumericalQuestion ? undefined : (
+        Array.isArray(question.options) ? question.options : [
+          { key: "Yes", value: 1, default: true },
+          { key: "No", value: 0, default: false }
+        ]
+      ),
       required: question.required !== false // Default to true
     } as any; // Use any to accommodate both interfaces
   }
