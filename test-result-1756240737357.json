@@ -1,0 +1,32 @@
+{
+  "success": true,
+  "project": {
+    "id": "90425",
+    "status": "building",
+    "url": "https://app.scopestack.io/scopestack-demo/projects/90425",
+    "executiveSummary": "This project proposes a comprehensive Azure Cloud Infrastructure implementation for Test Client 2025-08-26, designed to deliver enterprise-grade capabilities and measurable business value. The engagement encompasses 5 key services across 4 phases, with an estimated effort of 260 hours. Core deliverables include Azure Infrastructure Assessment, Azure Architecture Design, Azure Landing Zone Implementation, ensuring a robust and scalable solution. Our approach is informed by industry best practices and proven methodologies, ensuring alignment with current standards and future scalability requirements. The proposed solution will enable Test Client 2025-08-26 to optimize operations, enhance security posture, and achieve strategic objectives through modern Azure Cloud Infrastructure capabilities.",
+    "pricing": {
+      "revenue": "0.0",
+      "cost": "0.0",
+      "margin": 0
+    }
+  },
+  "client": {
+    "id": "756261",
+    "name": "Test Client 2025-08-26"
+  },
+  "survey": null,
+  "document": {
+    "id": "236957",
+    "url": "https://scopestack-docs.s3.amazonaws.com/scopestack-demo/sow_download/document/236957/Diagnostic-Azure-Migration-Project-Test-1756240729772.pdf",
+    "status": "created"
+  },
+  "metadata": {
+    "technology": "Azure Cloud Infrastructure",
+    "totalHours": 260,
+    "serviceCount": 5,
+    "questionCount": 4,
+    "sourceCount": 3,
+    "generatedAt": "2025-08-26T20:38:57.351Z"
+  }
+}

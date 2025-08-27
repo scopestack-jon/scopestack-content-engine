@@ -301,7 +301,7 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
       const response = await fetch("/api/push-to-scopestack", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(content),
+        body: JSON.stringify({ content }),
       })
 
       if (response.ok) {
