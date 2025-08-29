@@ -7,6 +7,9 @@ interface PushToScopeStackRequest {
   clientName?: string
   projectName?: string
   questionnaireTags?: string[]
+  skipSurvey?: boolean
+  skipDocument?: boolean
+  useDirectServices?: boolean // Add services directly instead of via survey
 }
 
 function transformServicesToScopeStack(services: Service[]): ScopeStackService[] {
@@ -23,12 +26,16 @@ function transformServicesToScopeStack(services: Service[]): ScopeStackService[]
       name: serviceName,
       description: service.description || 'Service description',
       hours: service.hours || 0,
+      quantity: service.hours || 0,
       phase: service.phase || 'Implementation',
       position: index + 1,
       serviceDescription: service.serviceDescription || service.description || 'Service description',
       keyAssumptions: service.keyAssumptions || '',
       clientResponsibilities: service.clientResponsibilities || '',
       outOfScope: service.outOfScope || '',
+      serviceType: 'professional_services',
+      paymentFrequency: 'one_time',
+      taskSource: 'custom',
     }
   })
 }
@@ -102,7 +109,15 @@ function generateExecutiveSummary(
 
 export async function POST(request: NextRequest) {
   try {
-    const { content, clientName, projectName, questionnaireTags }: PushToScopeStackRequest = await request.json()
+    const { 
+      content, 
+      clientName, 
+      projectName, 
+      questionnaireTags,
+      skipSurvey = false,
+      skipDocument = false,
+      useDirectServices = false
+    }: PushToScopeStackRequest = await request.json()
 
     // Validate required fields
     if (!content) {
@@ -164,15 +179,26 @@ export async function POST(request: NextRequest) {
       clientId: client.id,
       accountId: user.accountId,
       executiveSummary,
-      // Note: Services will be added via survey workflow
     })
     console.log(`Created project: ${project.name} (ID: ${project.id})`)
 
-    // Step 5: Create survey if questionnaire is available
+    // Step 4a: Add services directly if requested
+    if (useDirectServices && content.services && content.services.length > 0) {
+      console.log('Step 4a: Adding services directly to project...')
+      try {
+        await scopeStackApi.addServicesToProject(project.id, scopeStackServices)
+        console.log(`Successfully added ${scopeStackServices.length} services to project`)
+      } catch (error) {
+        console.error('Failed to add services directly:', error)
+        // Continue with the rest of the workflow even if service addition fails
+      }
+    }
+
+    // Step 5: Create survey if questionnaire is available and not skipped
     let survey = null
     const tags = questionnaireTags || ['technology', content.technology.toLowerCase()]
     
-    try {
+    if (!skipSurvey && !useDirectServices) try {
       console.log('Step 5: Creating survey...')
       const questionnaires = await scopeStackApi.getQuestionnaires(tags[0])
       
@@ -199,9 +225,9 @@ export async function POST(request: NextRequest) {
       console.error('Survey creation failed, continuing without survey:', error)
     }
 
-    // Step 6: Generate project document
+    // Step 6: Generate project document (if not skipped)
     let document = null
-    try {
+    if (!skipDocument) try {
       console.log('Step 6: Generating project document...')
       document = await scopeStackApi.createProjectDocument(project.id)
       console.log('Document generated successfully')

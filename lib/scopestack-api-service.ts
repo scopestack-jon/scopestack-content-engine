@@ -63,6 +63,12 @@ export interface ScopeStackService {
   keyAssumptions?: string
   clientResponsibilities?: string
   outOfScope?: string
+  quantity?: number
+  serviceType?: string
+  paymentFrequency?: string
+  taskSource?: string
+  lobId?: string | null
+  serviceId?: string | null
 }
 
 export interface ScopeStackQuestionnaire {
@@ -316,33 +322,169 @@ export class ScopeStackApiService {
     for (let i = 0; i < services.length; i++) {
       const service = services[i]
       try {
-        await this.apiScoped!.post('/v1/project-services', {
+        const requestData = {
           data: {
             type: 'project-services',
             attributes: {
               name: service.name,
-              description: service.description,
-              'total-hours': service.hours,
-              position: service.position || i + 1,
-              'service-description': service.serviceDescription || service.description,
-              'key-assumptions': service.keyAssumptions || '',
-              'client-responsibilities': service.clientResponsibilities || '',
-              'out-of-scope': service.outOfScope || '',
-              active: true,
+              quantity: service.quantity || service.hours || 0,
+              'task-source': service.taskSource || 'custom',
+              'service-type': service.serviceType || 'professional_services',
+              'payment-frequency': service.paymentFrequency || 'one_time',
+              position: service.position || i,
+              'service-description': service.serviceDescription || service.description || '',
             },
             relationships: {
               project: {
                 data: {
-                  type: 'projects',
                   id: projectId,
-                },
-              },
-            },
-          },
-        })
-      } catch (error) {
+                  type: 'projects'
+                }
+              }
+            }
+          }
+        }
+
+        console.log(`Adding service ${service.name} with task-source: custom`)
+        const response = await this.apiScoped!.post('/v1/project-services', requestData)
+        console.log(`Successfully added service ${service.name}`)
+      } catch (error: any) {
         console.error(`Error adding service ${service.name}:`, error)
+        if (error.response?.data) {
+          console.error('Error details:', JSON.stringify(error.response.data, null, 2))
+        }
+        throw error // Re-throw to handle at higher level
       }
+    }
+  }
+
+  async createServiceInCatalog(serviceData: {
+    name: string
+    description: string
+    baseHours?: number
+    serviceType?: string
+    tags?: string[]
+  }): Promise<any> {
+    await this.ensureAccountSlug()
+    try {
+      const response = await this.apiScoped!.post('/v1/services', {
+        data: {
+          type: 'services',
+          attributes: {
+            name: serviceData.name,
+            description: serviceData.description,
+            'base-hours': serviceData.baseHours || 0,
+            'service-type': serviceData.serviceType || 'professional_services',
+            'tag-list': serviceData.tags || [],
+            active: true,
+            published: true,
+          },
+        },
+      })
+      return response.data.data
+    } catch (error) {
+      console.error('Error creating service in catalog:', error)
+      throw new Error('Failed to create service in catalog')
+    }
+  }
+
+  async createQuestionnaireFromContent(questionnaireData: {
+    name: string
+    description: string
+    questions: any[]
+    tags?: string[]
+  }): Promise<any> {
+    await this.ensureAccountSlug()
+    try {
+      const response = await this.apiScoped!.post('/v1/questionnaires', {
+        data: {
+          type: 'questionnaires',
+          attributes: {
+            name: questionnaireData.name,
+            description: questionnaireData.description,
+            'tag-list': questionnaireData.tags || [],
+            questions: questionnaireData.questions,
+            active: true,
+            published: true,
+          },
+        },
+      })
+      return response.data.data
+    } catch (error) {
+      console.error('Error creating questionnaire:', error)
+      throw new Error('Failed to create questionnaire')
+    }
+  }
+
+  async getServicesFromCatalog(tag?: string): Promise<any[]> {
+    await this.ensureAccountSlug()
+    try {
+      let url = '/v1/services?filter[active]=true&filter[published]=true'
+      if (tag) {
+        url += `&filter[tag-list]=${encodeURIComponent(tag)}`
+      }
+
+      const response = await this.apiScoped!.get(url)
+      return response.data.data
+    } catch (error) {
+      console.error('Error fetching services from catalog:', error)
+      return []
+    }
+  }
+
+  async addCatalogServiceToProject(projectId: string, serviceId: string, customization?: {
+    quantity?: number
+    description?: string
+    position?: number
+  }): Promise<void> {
+    await this.ensureAccountSlug()
+    try {
+      const requestData = {
+        data: {
+          type: 'project-services',
+          attributes: {
+            quantity: customization?.quantity || 0,
+            position: customization?.position || 0,
+            'service-type': 'professional_services',
+            'payment-frequency': 'one_time',
+            'task-source': 'service', // Using 'service' when adding from catalog
+            'override-hours': 0,
+            'total-hours': customization?.quantity || 0,
+            'extended-hours': 0,
+            'actual-hours': 0,
+            'lob-id': 0,
+            languages: {},
+            'calculated-pricing': {}
+          },
+          relationships: {
+            project: {
+              links: { self: 'string', related: 'string' },
+              data: { id: parseInt(projectId), type: 'projects' }
+            },
+            service: {
+              links: { self: 'string', related: 'string' },
+              data: { id: parseInt(serviceId), type: 'services' }
+            },
+            'project-location': { links: { self: 'string', related: 'string' }, data: null },
+            'project-phase': { links: { self: 'string', related: 'string' }, data: null },
+            'project-resource': { links: { self: 'string', related: 'string' }, data: null },
+            resource: { links: { self: 'string', related: 'string' }, data: null },
+            lob: { links: { self: 'string', related: 'string' }, data: null },
+            'project-subservices': { links: { self: 'string', related: 'string' }, data: [] },
+            notes: { links: { self: 'string', related: 'string' }, data: [] },
+            'allocated-governances': { links: { self: 'string', related: 'string' }, data: null }
+          }
+        }
+      }
+
+      await this.apiScoped!.post('/v1/project-services', requestData)
+      console.log(`Successfully added catalog service ${serviceId} to project ${projectId}`)
+    } catch (error: any) {
+      console.error('Error adding catalog service to project:', error)
+      if (error.response?.data) {
+        console.error('Error details:', JSON.stringify(error.response.data, null, 2))
+      }
+      throw error
     }
   }
 
