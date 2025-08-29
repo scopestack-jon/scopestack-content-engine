@@ -69,6 +69,15 @@ export interface ScopeStackService {
   taskSource?: string
   lobId?: string | null
   serviceId?: string | null
+  subservices?: Array<{
+    name: string
+    description: string
+    hours: number
+    serviceDescription?: string
+    keyAssumptions?: string
+    clientResponsibilities?: string
+    outOfScope?: string
+  }>
 }
 
 export interface ScopeStackQuestionnaire {
@@ -327,7 +336,8 @@ export class ScopeStackApiService {
             type: 'project-services',
             attributes: {
               name: service.name,
-              quantity: service.quantity || service.hours || 0,
+              quantity: 1, // Always set quantity to 1
+              'override-hours': service.hours || service.quantity || 0, // Map unit hours to override-hours
               'task-source': service.taskSource || 'custom',
               'service-type': service.serviceType || 'professional_services',
               'payment-frequency': service.paymentFrequency || 'one_time',
@@ -345,15 +355,62 @@ export class ScopeStackApiService {
           }
         }
 
-        console.log(`Adding service ${service.name} with task-source: custom`)
+        console.log(`Adding service ${service.name} with quantity=1 and override-hours=${service.hours || 0}`)
         const response = await this.apiScoped!.post('/v1/project-services', requestData)
-        console.log(`Successfully added service ${service.name}`)
+        const createdService = response.data.data
+        console.log(`Successfully added service ${service.name} (ID: ${createdService.id})`)
+
+        // Add subservices if they exist
+        if (service.subservices && Array.isArray(service.subservices) && service.subservices.length > 0) {
+          console.log(`Adding ${service.subservices.length} subservices for ${service.name}`)
+          await this.addSubservicesToService(createdService.id, service.subservices)
+        }
       } catch (error: any) {
         console.error(`Error adding service ${service.name}:`, error)
         if (error.response?.data) {
           console.error('Error details:', JSON.stringify(error.response.data, null, 2))
         }
         throw error // Re-throw to handle at higher level
+      }
+    }
+  }
+
+  async addSubservicesToService(parentServiceId: string, subservices: any[]): Promise<void> {
+    await this.ensureAccountSlug()
+    
+    for (let i = 0; i < subservices.length; i++) {
+      const subservice = subservices[i]
+      try {
+        const requestData = {
+          data: {
+            type: 'project-subservices',
+            attributes: {
+              name: subservice.name || `Subservice ${i + 1}`,
+              quantity: 1, // Always set quantity to 1
+              'override-hours': subservice.hours || 0, // Map unit hours to override-hours
+              'service-description': subservice.serviceDescription || subservice.description || '',
+              'task-source': 'custom',
+            },
+            relationships: {
+              'project-service': {
+                data: {
+                  id: parentServiceId,
+                  type: 'project-services'
+                }
+              }
+            }
+          }
+        }
+
+        console.log(`Adding subservice ${subservice.name} with quantity=1 and override-hours=${subservice.hours || 0} to service ${parentServiceId}`)
+        await this.apiScoped!.post('/v1/project-subservices', requestData)
+        console.log(`Successfully added subservice ${subservice.name}`)
+      } catch (error: any) {
+        console.error(`Error adding subservice ${subservice.name}:`, error)
+        if (error.response?.data) {
+          console.error('Subservice error details:', JSON.stringify(error.response.data, null, 2))
+        }
+        // Don't re-throw subservice errors - just log them and continue
       }
     }
   }

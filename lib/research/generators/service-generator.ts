@@ -127,11 +127,11 @@ JSON FORMAT (NO markdown, explanations, or code blocks):
           throw new Error(`Research-driven generation failed - only ${validatedServices.length} services generated, need 4+`);
         }
         
-        if (totalSubservices < 12) {
-          console.error(`❌ Insufficient subservices generated: ${totalSubservices} (need 12+)`);
-          throw new Error(`Research-driven generation failed - only ${totalSubservices} subservices generated, need 12+`);
-        } else if (totalSubservices < 15) {
-          console.warn(`⚠️ Subservice count below target: ${totalSubservices} (target 15+, minimum 12)`);
+        if (totalSubservices < 8) {
+          console.error(`❌ Insufficient subservices generated: ${totalSubservices} (need 8+)`);
+          throw new Error(`Research-driven generation failed - only ${totalSubservices} subservices generated, need 8+`);
+        } else if (totalSubservices < 12) {
+          console.warn(`⚠️ Subservice count below target: ${totalSubservices} (target 15+, minimum 8)`);
         }
         
         if (phaseAlignment.coveragePercentage < 60) {

@@ -36,6 +36,7 @@ function transformServicesToScopeStack(services: Service[]): ScopeStackService[]
       serviceType: 'professional_services',
       paymentFrequency: 'one_time',
       taskSource: 'custom',
+      subservices: service.subservices || [], // Include subservices
     }
   })
 }
@@ -246,7 +247,7 @@ export async function POST(request: NextRequest) {
         id: finalProject.id,
         name: finalProject.name,
         status: finalProject.status,
-        url: `https://app.scopestack.io/${user.accountSlug}/projects/${finalProject.id}`,
+        url: `https://app.scopestack.io/projects/${finalProject.id}/edit`,
         executiveSummary: finalProject.executiveSummary,
         pricing: {
           revenue: finalProject.contractRevenue,

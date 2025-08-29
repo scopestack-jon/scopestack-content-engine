@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FileText, Download, Clock, Hash, Link2, Calculator, ChevronRight, ChevronDown, Layers, Users, Settings, Target, CheckCircle, AlertCircle, Info, ArrowRight, Briefcase, Calendar, DollarSign, TrendingUp, Filter, Table, Eye } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { FileText, Download, Clock, Hash, Link2, Calculator, ChevronRight, ChevronDown, Layers, Users, Settings, Target, CheckCircle, AlertCircle, Info, ArrowRight, Briefcase, Calendar, DollarSign, TrendingUp, Filter, Table, Eye, ChevronUp } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { useState } from "react"
 
@@ -73,6 +75,11 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set())
   const [expandedCalculations, setExpandedCalculations] = useState<Set<number>>(new Set())
   const [selectedLanguageField, setSelectedLanguageField] = useState<string>("overview")
+  const [showScopeStackOptions, setShowScopeStackOptions] = useState(false)
+  const [scopeStackWorkflow, setScopeStackWorkflow] = useState<'project-with-services' | 'catalog-only' | 'full'>('project-with-services')
+  const [useDirectServices, setUseDirectServices] = useState(true)
+  const [skipSurvey, setSkipSurvey] = useState(false)
+  const [skipDocument, setSkipDocument] = useState(false)
 
   const toggleServiceExpanded = (index: number) => {
     const newExpanded = new Set(expandedServices)
@@ -298,19 +305,58 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
 
   const pushToScopeStack = async () => {
     try {
+      const requestBody = {
+        content,
+        useDirectServices,
+        skipSurvey,
+        skipDocument,
+        workflow: scopeStackWorkflow,
+      }
+
+      console.log('Pushing to ScopeStack with options:', {
+        workflow: scopeStackWorkflow,
+        useDirectServices,
+        skipSurvey,
+        skipDocument
+      })
+
       const response = await fetch("/api/push-to-scopestack", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(requestBody),
       })
 
       if (response.ok) {
-        alert("Content successfully pushed to ScopeStack!")
+        const result = await response.json()
+        if (result.project?.url) {
+          toast({
+            title: "Success!",
+            description: `Project created successfully. Services: ${result.metadata?.serviceCount || 0}, Hours: ${result.metadata?.totalHours || 0}`,
+          })
+          // Optionally open the project URL
+          if (confirm("Project created successfully! Would you like to open it in ScopeStack?")) {
+            window.open(result.project.url, '_blank')
+          }
+        } else {
+          toast({
+            title: "Success!",
+            description: "Content successfully pushed to ScopeStack!",
+          })
+        }
       } else {
-        alert("Failed to push to ScopeStack. Check your settings.")
+        const error = await response.json()
+        toast({
+          title: "Error",
+          description: error.details || "Failed to push to ScopeStack. Check your settings.",
+          variant: "destructive",
+        })
       }
     } catch (error) {
-      alert("Failed to push to ScopeStack. Check your settings.")
+      toast({
+        title: "Error", 
+        description: "Failed to push to ScopeStack. Check your settings.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -896,14 +942,162 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                 <Download className="h-4 w-4 mr-2" />
                 Export JSON
               </Button>
-              <Button onClick={pushToScopeStack} className="bg-green-600 hover:bg-green-700">
-                <Link2 className="h-4 w-4 mr-2" />
-                Push to ScopeStack
-              </Button>
+              <div className="relative">
+                <Button 
+                  onClick={() => setShowScopeStackOptions(!showScopeStackOptions)} 
+                  variant="outline" 
+                  className="bg-white/70 hover:bg-white"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configure
+                  {showScopeStackOptions ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+                </Button>
+                <Button onClick={pushToScopeStack} className="bg-green-600 hover:bg-green-700 ml-2">
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Push to ScopeStack
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>
       </Card>
+
+      {/* ScopeStack Configuration Panel */}
+      {showScopeStackOptions && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-blue-800">
+              <Settings className="h-5 w-5" />
+              ScopeStack Push Configuration
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Workflow Selection */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-blue-900">Workflow Type</Label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div 
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    scopeStackWorkflow === 'project-with-services' 
+                      ? 'border-blue-500 bg-blue-100' 
+                      : 'border-gray-200 bg-white hover:border-blue-300'
+                  }`}
+                  onClick={() => setScopeStackWorkflow('project-with-services')}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <input 
+                      type="radio" 
+                      checked={scopeStackWorkflow === 'project-with-services'} 
+                      onChange={() => setScopeStackWorkflow('project-with-services')}
+                      className="text-blue-600"
+                    />
+                    <Label className="font-medium text-sm">Create Project & Add Services</Label>
+                  </div>
+                  <p className="text-xs text-gray-600">
+                    Creates a project and adds services directly to it. Best for immediate project creation.
+                  </p>
+                </div>
+                <div 
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    scopeStackWorkflow === 'catalog-only' 
+                      ? 'border-blue-500 bg-blue-100' 
+                      : 'border-gray-200 bg-white hover:border-blue-300'
+                  }`}
+                  onClick={() => setScopeStackWorkflow('catalog-only')}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <input 
+                      type="radio" 
+                      checked={scopeStackWorkflow === 'catalog-only'} 
+                      onChange={() => setScopeStackWorkflow('catalog-only')}
+                      className="text-blue-600"
+                    />
+                    <Label className="font-medium text-sm">Add to Catalog Only</Label>
+                  </div>
+                  <p className="text-xs text-gray-600">
+                    Creates reusable services and questionnaires in your ScopeStack catalog for future use.
+                  </p>
+                </div>
+                <div 
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    scopeStackWorkflow === 'full' 
+                      ? 'border-blue-500 bg-blue-100' 
+                      : 'border-gray-200 bg-white hover:border-blue-300'
+                  }`}
+                  onClick={() => setScopeStackWorkflow('full')}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <input 
+                      type="radio" 
+                      checked={scopeStackWorkflow === 'full'} 
+                      onChange={() => setScopeStackWorkflow('full')}
+                      className="text-blue-600"
+                    />
+                    <Label className="font-medium text-sm">Full Workflow</Label>
+                  </div>
+                  <p className="text-xs text-gray-600">
+                    Creates catalog items first, then creates project and adds catalog services to it.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Service Creation Options */}
+            {(scopeStackWorkflow === 'project-with-services' || scopeStackWorkflow === 'full') && (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-blue-900">Service Creation Options</Label>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <Checkbox 
+                      id="useDirectServices" 
+                      checked={useDirectServices}
+                      onCheckedChange={setUseDirectServices}
+                    />
+                    <Label htmlFor="useDirectServices" className="text-sm">
+                      Add services directly (task-source: custom)
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Checkbox 
+                      id="skipSurvey" 
+                      checked={skipSurvey}
+                      onCheckedChange={setSkipSurvey}
+                    />
+                    <Label htmlFor="skipSurvey" className="text-sm">
+                      Skip survey creation
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Checkbox 
+                      id="skipDocument" 
+                      checked={skipDocument}
+                      onCheckedChange={setSkipDocument}
+                    />
+                    <Label htmlFor="skipDocument" className="text-sm">
+                      Skip document generation
+                    </Label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Current Configuration Summary */}
+            <div className="bg-white p-4 rounded-lg border">
+              <Label className="text-sm font-medium text-gray-700">Current Configuration</Label>
+              <div className="mt-2 text-sm text-gray-600 space-y-1">
+                <div>Workflow: <span className="font-medium">{scopeStackWorkflow}</span></div>
+                {(scopeStackWorkflow === 'project-with-services' || scopeStackWorkflow === 'full') && (
+                  <>
+                    <div>Direct Services: <span className="font-medium">{useDirectServices ? 'Yes' : 'No'}</span></div>
+                    <div>Skip Survey: <span className="font-medium">{skipSurvey ? 'Yes' : 'No'}</span></div>
+                    <div>Skip Document: <span className="font-medium">{skipDocument ? 'Yes' : 'No'}</span></div>
+                  </>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Content Tabs */}
       <Card>
