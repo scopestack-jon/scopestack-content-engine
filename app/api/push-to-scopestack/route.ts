@@ -132,16 +132,37 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!content) {
-      return Response.json({ error: "Content is required" }, { status: 400 })
+      console.error("❌ No content provided in request body")
+      return Response.json({ 
+        error: "Content is required", 
+        details: "Request body must include 'content' field with generated research data" 
+      }, { status: 400 })
     }
+
+    console.log("✅ Content validation passed", {
+      technology: content.technology,
+      serviceCount: content.services?.length || 0,
+      questionCount: content.questions?.length || 0
+    })
 
     // Get ScopeStack configuration from environment
     const scopeStackToken = process.env.SCOPESTACK_API_TOKEN || process.env.NEXT_PUBLIC_SCOPESTACK_API_TOKEN
     const scopeStackUrl = process.env.SCOPESTACK_API_URL || process.env.NEXT_PUBLIC_SCOPESTACK_API_URL
     const scopeStackAccountSlug = process.env.SCOPESTACK_ACCOUNT_SLUG || process.env.NEXT_PUBLIC_SCOPESTACK_ACCOUNT_SLUG
 
+    console.log("🔍 Environment variables check:", {
+      hasToken: !!scopeStackToken,
+      hasUrl: !!scopeStackUrl,
+      hasSlug: !!scopeStackAccountSlug,
+      tokenPrefix: scopeStackToken ? scopeStackToken.substring(0, 10) + '...' : 'missing'
+    })
+
     if (!scopeStackToken) {
-      return Response.json({ error: "ScopeStack API token not configured" }, { status: 400 })
+      console.error("❌ ScopeStack API token not found in environment variables")
+      return Response.json({ 
+        error: "ScopeStack API token not configured", 
+        details: "Please set SCOPESTACK_API_TOKEN or NEXT_PUBLIC_SCOPESTACK_API_TOKEN environment variable" 
+      }, { status: 400 })
     }
 
     // Initialize ScopeStack API service
@@ -310,14 +331,39 @@ export async function POST(request: NextRequest) {
     return Response.json(response)
     
   } catch (error) {
-    console.error("ScopeStack push failed:", error)
+    console.error("❌ ScopeStack push failed:", error)
     
-    // Return detailed error for debugging
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    // Determine appropriate status code based on error type
+    let statusCode = 500
+    let errorDetails = ''
+    
+    if (error instanceof Error) {
+      // Check for specific error patterns that should return 400
+      if (error.message.includes('API token') || error.message.includes('authentication') || error.message.includes('unauthorized')) {
+        statusCode = 400
+        errorDetails = 'Authentication failed - check ScopeStack API credentials'
+      } else if (error.message.includes('validation') || error.message.includes('required field')) {
+        statusCode = 400
+        errorDetails = 'Request validation failed - check required fields'
+      } else {
+        errorDetails = error.message
+      }
+    } else {
+      errorDetails = 'Unknown error occurred during ScopeStack integration'
+    }
+    
+    console.error("📊 Error analysis:", {
+      statusCode,
+      errorType: error instanceof Error ? error.constructor.name : typeof error,
+      message: error instanceof Error ? error.message : String(error)
+    })
+    
     return Response.json({ 
       error: "Failed to push content to ScopeStack", 
-      details: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
-    }, { status: 500 })
+      details: errorDetails,
+      statusCode,
+      timestamp: new Date().toISOString(),
+      stack: error instanceof Error && process.env.NODE_ENV === 'development' ? error.stack : undefined
+    }, { status: statusCode })
   }
 }
