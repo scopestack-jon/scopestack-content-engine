@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server"
 import { ScopeStackApiService, ScopeStackService } from "@/lib/scopestack-api-service"
 import type { GeneratedContent, Service, Question, ResearchSource } from "@/lib/research/types/interfaces"
+import { getLanguageConfigForAccount, DEMO_ACCOUNT_CONFIG } from "@/lib/scopestack-language-configs"
 
 interface PushToScopeStackRequest {
   content: GeneratedContent
@@ -67,43 +68,52 @@ function generateExecutiveSummary(
   sources: ResearchSource[],
   clientName?: string
 ): string {
-  const clientNameStr = clientName || 'the client'
+  const clientNameStr = clientName || 'your organization'
   
-  // Build service summary
+  // Build service metadata
   const serviceCount = services.length
   const totalHours = services.reduce((sum, service) => sum + service.hours, 0)
   const phases = [...new Set(services.map(s => s.phase).filter(Boolean))]
   
-  // Extract key insights from sources
-  const highCredibilitySources = sources.filter(s => s.credibility === 'high').slice(0, 3)
+  // Extract key service categories for better summary
+  const hasAssessment = services.some(s => s.phase?.toLowerCase().includes('initiation') || s.name.toLowerCase().includes('assessment'))
+  const hasPlanning = services.some(s => s.phase?.toLowerCase().includes('planning') || s.name.toLowerCase().includes('design'))
+  const hasImplementation = services.some(s => s.phase?.toLowerCase().includes('execution') || s.name.toLowerCase().includes('implementation'))
+  const hasValidation = services.some(s => s.phase?.toLowerCase().includes('monitoring') || s.name.toLowerCase().includes('test'))
   
-  let summary = `This project proposes a comprehensive ${technology} implementation for ${clientNameStr}, designed to deliver enterprise-grade capabilities and measurable business value. `
+  let summary = ''
   
-  summary += `The engagement encompasses ${serviceCount} key services across ${phases.length || 1} ${phases.length === 1 ? 'phase' : 'phases'}, with an estimated effort of ${totalHours} hours. `
+  // Paragraph 1: Introduction with client name and project context
+  summary += `${clientNameStr} is embarking on a strategic ${technology} initiative to modernize infrastructure and enhance operational capabilities. `
+  summary += `This comprehensive engagement will deliver a production-ready ${technology} solution tailored to meet specific business requirements and technical objectives. `
+  summary += `Our proposed approach encompasses ${serviceCount} specialized services delivered across ${phases.length || 1} project ${phases.length === 1 ? 'phase' : 'phases'}, ensuring systematic progress from initial assessment through full production deployment.\n\n`
   
-  // Add detailed service breakdown
-  summary += `\n\n**PROPOSED SERVICES:**\n`
+  // Paragraph 2: Client needs and recommended services overview
+  summary += `Based on industry best practices and proven implementation methodologies, we have structured this engagement to address critical areas including `
+  const serviceHighlights = []
+  if (hasAssessment) serviceHighlights.push('comprehensive requirements assessment')
+  if (hasPlanning) serviceHighlights.push('detailed architecture design')
+  if (hasImplementation) serviceHighlights.push('phased implementation and configuration')
+  if (hasValidation) serviceHighlights.push('rigorous testing and validation')
+  summary += serviceHighlights.join(', ') + '. '
+  
+  // Add key technical aspects
+  summary += `The technical solution will incorporate enterprise-grade security controls, high availability architecture, and scalable deployment patterns optimized for ${clientNameStr}'s environment. `
+  summary += `Each service phase builds upon previous deliverables, ensuring knowledge transfer and sustainable operations post-implementation.\n\n`
+  
+  // Paragraph 3: Service details and benefits
+  summary += `**RECOMMENDED SERVICES:**\n\n`
   services.forEach((service, index) => {
-    summary += `${index + 1}. **${service.name}** (${service.hours} hours) - ${service.phase || 'Implementation'} Phase\n`
-    summary += `   ${service.serviceDescription || service.description}\n`
-    if (service.keyAssumptions) {
-      summary += `   *Key Assumptions:* ${service.keyAssumptions}\n`
-    }
-    if (service.clientResponsibilities) {
-      summary += `   *Client Responsibilities:* ${service.clientResponsibilities}\n`
-    }
-    if (service.outOfScope) {
-      summary += `   *Out of Scope:* ${service.outOfScope}\n`
-    }
-    summary += `\n`
+    summary += `**${index + 1}. ${service.name}** (${service.hours} hours)\n`
+    summary += `${service.serviceDescription || service.description}\n\n`
   })
   
-  // Add credibility statement if we have high-quality sources
-  if (highCredibilitySources.length > 0) {
-    summary += `Our approach is informed by industry best practices and proven methodologies, ensuring alignment with current standards and future scalability requirements. `
-  }
-  
-  summary += `\nThe proposed solution will enable ${clientNameStr} to optimize operations, enhance security posture, and achieve strategic objectives through modern ${technology} capabilities.`
+  // Paragraph 4: Business outcomes and ROI
+  summary += `**ANTICIPATED BUSINESS OUTCOMES:**\n\n`
+  summary += `Upon successful completion of this ${technology} implementation, ${clientNameStr} will realize significant operational improvements including `
+  summary += `enhanced system reliability, reduced security risk exposure, improved compliance posture, and accelerated service delivery capabilities. `
+  summary += `The investment of ${totalHours} professional services hours will yield long-term value through automation efficiencies, reduced operational overhead, and improved business agility. `
+  summary += `Our methodology ensures minimal disruption to existing operations while delivering transformational technology capabilities that align with strategic business objectives.`
   
   return summary
 }
@@ -140,10 +150,20 @@ export async function POST(request: NextRequest) {
       baseUrl: scopeStackUrl,
       accountSlug: scopeStackAccountSlug,
     })
-
+    
     // Step 1: Get current user and account details
     console.log('Step 1: Authenticating with ScopeStack...')
     const user = await scopeStackApi.getCurrentUser()
+    
+    // Step 1a: Auto-discover and configure language fields for this account
+    console.log('Step 1a: Discovering language fields...')
+    try {
+      await scopeStackApi.autoConfigureLanguageFields()
+    } catch (error) {
+      console.warn('⚠️ Failed to auto-configure language fields, using defaults:', error)
+      // Fallback to demo config if auto-discovery fails
+      scopeStackApi.setLanguageFieldMappings(DEMO_ACCOUNT_CONFIG)
+    }
     
     // Step 2: Find or create client
     console.log('Step 2: Finding or creating client...')
@@ -186,11 +206,18 @@ export async function POST(request: NextRequest) {
     // Step 4a: Add services directly if requested
     if (useDirectServices && content.services && content.services.length > 0) {
       console.log('Step 4a: Adding services directly to project...')
+      console.log(`Project ID: ${project.id}`)
+      console.log(`Number of services to add: ${scopeStackServices.length}`)
+      console.log('First service example:', JSON.stringify(scopeStackServices[0], null, 2))
       try {
         await scopeStackApi.addServicesToProject(project.id, scopeStackServices)
         console.log(`Successfully added ${scopeStackServices.length} services to project`)
       } catch (error) {
         console.error('Failed to add services directly:', error)
+        if (error instanceof Error) {
+          console.error('Error message:', error.message)
+          console.error('Error stack:', error.stack)
+        }
         // Continue with the rest of the workflow even if service addition fails
       }
     }

@@ -390,14 +390,14 @@ export class ContentValidator {
       {
         name: "Requirements Assessment",
         description: "Assessment of current environment and requirements",
-        hours: 40,
+        hours: 24,
         phase: "Assessment",
         subservices: []
       },
       {
         name: "Implementation",
         description: "Core implementation and configuration",
-        hours: 80,
+        hours: 48,
         phase: "Implementation", 
         subservices: []
       }

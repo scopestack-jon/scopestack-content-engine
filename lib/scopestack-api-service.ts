@@ -4,6 +4,7 @@ export interface ScopeStackConfig {
   apiToken: string
   baseUrl?: string
   accountSlug?: string
+  languageFieldMappings?: Record<string, string>
 }
 
 export interface ScopeStackUser {
@@ -94,11 +95,31 @@ export class ScopeStackApiService {
   private accountSlug: string | null = null
   private apiScoped: AxiosInstance | null = null
   private apiGeneral: AxiosInstance
+  
+  // Configurable language field mappings - can be customized per account
+  private languageFieldMappings = {
+    keyAssumptions: 'assumptions',
+    clientResponsibilities: 'customer', // or could be 'deliverables' 
+    outOfScope: 'out',
+    serviceDescription: 'implementation_language', // primary service description
+    // Additional mappings for different content types
+    operationalNotes: 'operate',
+    deliverables: 'deliverables', 
+    designNotes: 'design_language',
+    planningNotes: 'planning_language',
+    internalNotes: 'internal_only',
+    sla: 'service_level_agreement'
+  }
 
   constructor(config: ScopeStackConfig) {
     this.apiToken = config.apiToken
     this.baseUrl = config.baseUrl || 'https://api.scopestack.io'
     this.accountSlug = config.accountSlug || null
+    
+    // Override language mappings if provided in config
+    if (config.languageFieldMappings) {
+      this.languageFieldMappings = { ...this.languageFieldMappings, ...config.languageFieldMappings }
+    }
 
     // Create general API instance for non-scoped endpoints
     this.apiGeneral = axios.create({
@@ -325,6 +346,118 @@ export class ScopeStackApiService {
     }
   }
 
+  /**
+   * Build languages object using configured field mappings
+   */
+  private buildLanguagesObject(service: any): Record<string, string> {
+    const languages: Record<string, string> = {}
+    
+    // Map our standard fields to account-specific language field names
+    if (service.keyAssumptions) {
+      languages[this.languageFieldMappings.keyAssumptions] = service.keyAssumptions
+    }
+    if (service.clientResponsibilities) {
+      languages[this.languageFieldMappings.clientResponsibilities] = service.clientResponsibilities
+    }
+    if (service.outOfScope) {
+      languages[this.languageFieldMappings.outOfScope] = service.outOfScope
+    }
+    
+    // Put main service description in implementation_language field if available
+    if (service.serviceDescription && this.languageFieldMappings.serviceDescription) {
+      languages[this.languageFieldMappings.serviceDescription] = service.serviceDescription
+    }
+    
+    return languages
+  }
+
+  /**
+   * Configure language field mappings for this account
+   */
+  public setLanguageFieldMappings(mappings: Record<string, string>): void {
+    this.languageFieldMappings = { ...this.languageFieldMappings, ...mappings }
+  }
+
+  /**
+   * Discover active language fields for the current account
+   */
+  public async discoverLanguageFields(): Promise<any[]> {
+    await this.ensureAccountSlug()
+    
+    try {
+      const response = await this.apiScoped!.get('/v1/language-fields?filter[active]=true')
+      const languageFields = response.data.data || []
+      
+      console.log(`📋 Discovered ${languageFields.length} active language fields for account`)
+      languageFields.forEach((field: any) => {
+        console.log(`  - ${field.attributes?.['sow-language'] || field.attributes?.name || 'Unknown'}: ${field.attributes?.label || 'No label'}`)
+      })
+      
+      return languageFields
+    } catch (error) {
+      console.error('Failed to discover language fields:', error)
+      return []
+    }
+  }
+
+  /**
+   * Auto-configure language field mappings based on discovered fields
+   */
+  public async autoConfigureLanguageFields(): Promise<void> {
+    const languageFields = await this.discoverLanguageFields()
+    
+    if (languageFields.length === 0) {
+      console.warn('⚠️ No language fields discovered, using default configuration')
+      return
+    }
+
+    // Create a mapping from discovered fields
+    const discoveredMappings: Record<string, string> = {}
+    
+    languageFields.forEach((field: any) => {
+      const sowLanguage = field.attributes?.['sow-language'] || field.attributes?.name
+      const label = field.attributes?.label?.toLowerCase() || ''
+      
+      if (!sowLanguage) return
+
+      // Map based on common patterns in field labels/names and sow_language values
+      const searchText = `${label} ${sowLanguage}`.toLowerCase()
+      
+      // Priority mapping - check exact matches first
+      if (sowLanguage === 'assumptions' || searchText.includes('assumption')) {
+        discoveredMappings.keyAssumptions = sowLanguage
+      } else if (sowLanguage === 'customer' || searchText.includes('client') || searchText.includes('customer') || searchText.includes('responsibility')) {
+        discoveredMappings.clientResponsibilities = sowLanguage
+      } else if (sowLanguage === 'out' || searchText.includes('out of scope') || searchText.includes('exclusion')) {
+        discoveredMappings.outOfScope = sowLanguage
+      } else if (sowLanguage === 'implementation_language' || searchText.includes('implementation') || (searchText.includes('service') && searchText.includes('description'))) {
+        discoveredMappings.serviceDescription = sowLanguage
+      } else if (sowLanguage === 'deliverables' || searchText.includes('deliverable')) {
+        discoveredMappings.deliverables = sowLanguage
+      } else if (sowLanguage === 'operate' || searchText.includes('operate') || searchText.includes('operational')) {
+        discoveredMappings.operationalNotes = sowLanguage
+      } else if (sowLanguage === 'design_language' || searchText.includes('design')) {
+        discoveredMappings.designNotes = sowLanguage
+      } else if (sowLanguage === 'planning_language' || searchText.includes('planning')) {
+        discoveredMappings.planningNotes = sowLanguage
+      } else if (sowLanguage === 'internal_only' || searchText.includes('internal')) {
+        discoveredMappings.internalNotes = sowLanguage
+      } else if (sowLanguage === 'service_level_agreement' || searchText.includes('sla') || searchText.includes('service level')) {
+        discoveredMappings.sla = sowLanguage
+      } else if (sowLanguage === 'sow_language' || searchText.includes('sow')) {
+        // SOW Language could be used for general service description if no implementation_language found
+        if (!discoveredMappings.serviceDescription) {
+          discoveredMappings.serviceDescription = sowLanguage
+        }
+      }
+    })
+
+    // Apply the discovered mappings
+    this.languageFieldMappings = { ...this.languageFieldMappings, ...discoveredMappings }
+    
+    console.log('✅ Auto-configured language field mappings:', discoveredMappings)
+  }
+
   async addServicesToProject(projectId: string, services: ScopeStackService[]): Promise<void> {
     await this.ensureAccountSlug()
     
@@ -342,12 +475,13 @@ export class ScopeStackApiService {
               'service-type': service.serviceType || 'professional_services',
               'payment-frequency': service.paymentFrequency || 'one_time',
               position: service.position || i,
-              'service-description': service.serviceDescription || service.description || '',
+              'service-description': service.description || '',
+              'languages': this.buildLanguagesObject(service),
             },
             relationships: {
               project: {
                 data: {
-                  id: projectId,
+                  id: parseInt(projectId.toString()),
                   type: 'projects'
                 }
               }
@@ -356,6 +490,7 @@ export class ScopeStackApiService {
         }
 
         console.log(`Adding service ${service.name} with quantity=1 and override-hours=${service.hours || 0}`)
+        console.log('Service request data:', JSON.stringify(requestData, null, 2))
         const response = await this.apiScoped!.post('/v1/project-services', requestData)
         const createdService = response.data.data
         console.log(`Successfully added service ${service.name} (ID: ${createdService.id})`)
@@ -388,7 +523,8 @@ export class ScopeStackApiService {
               name: subservice.name || `Subservice ${i + 1}`,
               quantity: 1, // Always set quantity to 1
               'override-hours': subservice.hours || 0, // Map unit hours to override-hours
-              'service-description': subservice.serviceDescription || subservice.description || '',
+              'service-description': subservice.description || '',
+              'languages': this.buildLanguagesObject(subservice),
               'task-source': 'custom',
             },
             relationships: {

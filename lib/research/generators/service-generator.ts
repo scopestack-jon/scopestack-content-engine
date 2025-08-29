@@ -21,17 +21,30 @@ export class ServiceGenerator {
         userRequest: userRequest
       };
       
-      // Create a streamlined prompt for faster service generation with enhanced scope language
-      const prompt = `Generate 4-5 professional services based on "${userRequest}" research with high-quality scope language.
+      // Create a structured prompt that explicitly requires all PMBOK phases
+      const prompt = `Generate exactly 5 professional services based on "${userRequest}" research, with ONE service for EACH PMBOK phase.
 
 Research: ${researchContext.summary}
 Key Insights: ${researchContext.insights.slice(0, 3).join(', ')}
 
+MANDATORY PHASE STRUCTURE:
+1. Initiation Phase Service (stakeholder analysis, project charter, initial requirements)
+2. Planning Phase Service (detailed design, architecture planning, project planning)  
+3. Execution Phase Service (implementation, deployment, configuration)
+4. Monitoring & Controlling Phase Service (testing, quality assurance, performance monitoring)
+5. Closing Phase Service (knowledge transfer, documentation, project handover)
+
 REQUIREMENTS:
-- 4-5 services aligned with PMBOK phases: Initiation, Planning, Execution, Monitoring & Controlling, Closing  
-- Each service has 4+ subservices (minimum 16 total subservices)
+- EXACTLY 5 services, one for each PMBOK phase above
+- Each service has 4+ subservices (minimum 20 total subservices)
 - Based on research findings for ${technology}
 - Professional consulting scope language throughout
+
+SERVICE NAMING GUIDELINES:
+- Include specific ${technology} components/features in service names
+- Avoid generic terms like "Assessment", "Planning", "Implementation" alone
+- Example good names: "${technology} Policy Engine Configuration", "${technology} High Availability Deployment", "${technology} RADIUS Integration Services"
+- Subservices should reference specific technical tasks or components
 
 SCOPE LANGUAGE QUALITY GUIDELINES:
 - serviceDescription: Clear business value and outcomes (2-3 sentences)
@@ -39,28 +52,72 @@ SCOPE LANGUAGE QUALITY GUIDELINES:
 - clientResponsibilities: Concrete deliverables/actions required from client
 - outOfScope: Specific exclusions to prevent scope creep
 
-JSON FORMAT (NO markdown, explanations, or code blocks):
+JSON FORMAT - Return exactly 5 services in this order (NO markdown, explanations, or code blocks):
 [
   {
-    "name": "Service Name",
+    "name": "${technology} Project Initiation & Stakeholder Analysis",
     "description": "Brief description",
-    "serviceDescription": "Professional description highlighting business value, technical approach, and key deliverables that directly address the ${technology} implementation challenges identified in research.",
-    "keyAssumptions": "Client provides necessary access credentials and technical documentation. Existing infrastructure meets minimum requirements identified in ${technology} specifications. Key stakeholders will be available for requirements validation sessions.",
+    "serviceDescription": "Professional description highlighting business value, technical approach, and key deliverables that directly address implementation challenges identified in research.",
+    "keyAssumptions": "Client provides necessary access credentials and technical documentation. Existing infrastructure meets minimum requirements. Key stakeholders will be available for requirements validation sessions.",
     "clientResponsibilities": "Client will provide dedicated technical resources for knowledge transfer sessions. Client responsible for coordinating internal approvals and change management communications. Client will validate all configurations in test environment before production deployment.",
     "outOfScope": "Hardware procurement and infrastructure setup excluded. Third-party integrations beyond standard APIs require separate engagement. End-user training beyond administrative handover sessions not included.",
-    "hours": 80,
-    "phase": "One of: Initiation, Planning, Execution, Monitoring & Controlling, Closing",
+    "hours": 24,
+    "phase": "Initiation",
     "subservices": [
       {
-        "name": "Subservice Name",
-        "description": "Subservice description", 
-        "serviceDescription": "Detailed description of specific activities, methodologies, and deliverables that contribute to the overall ${technology} implementation success.",
+        "name": "Requirements Gathering Workshop",
+        "description": "Technical subservice description", 
+        "serviceDescription": "Detailed description of specific components, configuration parameters, and integration points that contribute to the overall implementation success.",
         "keyAssumptions": "Specific technical assumptions relevant to this subservice component.",
         "clientResponsibilities": "Specific client actions and deliverables required for this subservice.",
         "outOfScope": "Specific exclusions for this subservice to maintain clear boundaries.",
-        "hours": 20
+        "hours": 6
       }
     ]
+  },
+  {
+    "name": "${technology} Architecture Design & Planning",
+    "description": "Brief description",
+    "serviceDescription": "Professional description...",
+    "keyAssumptions": "Client assumptions...", 
+    "clientResponsibilities": "Client responsibilities...",
+    "outOfScope": "Exclusions...",
+    "hours": 48,
+    "phase": "Planning",
+    "subservices": [...]
+  },
+  {
+    "name": "${technology} Implementation & Configuration",
+    "description": "Brief description",
+    "serviceDescription": "Professional description...",
+    "keyAssumptions": "Client assumptions...",
+    "clientResponsibilities": "Client responsibilities...", 
+    "outOfScope": "Exclusions...",
+    "hours": 80,
+    "phase": "Execution",
+    "subservices": [...]
+  },
+  {
+    "name": "${technology} Testing & Quality Assurance",
+    "description": "Brief description", 
+    "serviceDescription": "Professional description...",
+    "keyAssumptions": "Client assumptions...",
+    "clientResponsibilities": "Client responsibilities...",
+    "outOfScope": "Exclusions...",
+    "hours": 32,
+    "phase": "Monitoring & Controlling",
+    "subservices": [...]
+  },
+  {
+    "name": "${technology} Knowledge Transfer & Project Closure",
+    "description": "Brief description",
+    "serviceDescription": "Professional description...",
+    "keyAssumptions": "Client assumptions...",
+    "clientResponsibilities": "Client responsibilities...",
+    "outOfScope": "Exclusions...", 
+    "hours": 16,
+    "phase": "Closing",
+    "subservices": [...]
   }
 ]`;
 
@@ -95,22 +152,22 @@ JSON FORMAT (NO markdown, explanations, or code blocks):
       if (Array.isArray(services) && services.length > 0) {
         // Ensure all services have required fields
         const validatedServices: Service[] = services.map((s: any, index: number) => ({
-          name: s.name || `Research-Based Service ${index + 1}`,
-          description: s.description || `Service based on research findings`,
-          serviceDescription: s.serviceDescription || `This service is based on research findings for ${technology} implementation.`,
-          keyAssumptions: s.keyAssumptions || `Key assumptions derived from research analysis.`,
-          clientResponsibilities: s.clientResponsibilities || `Client responsibilities based on industry best practices found in research.`,
-          outOfScope: s.outOfScope || `Exclusions based on standard project boundaries identified in research.`,
-          hours: typeof s.hours === 'number' ? s.hours : 60,
+          name: s.name || `${technology} ${this.getPhaseSpecificServiceName(s.phase, index)}`,
+          description: s.description || `Specialized service based on research findings`,
+          serviceDescription: s.serviceDescription || s.description || '',
+          keyAssumptions: s.keyAssumptions || '',
+          clientResponsibilities: s.clientResponsibilities || '',
+          outOfScope: s.outOfScope || '',
+          hours: typeof s.hours === 'number' ? s.hours : this.getDefaultServiceHours(s.phase),
           phase: this.normalizePMBOKPhase(s.phase) || `Phase ${index + 1}`,
           subservices: Array.isArray(s.subservices) ? s.subservices.map((sub: any, subIndex: number) => ({
-            name: sub.name || `Subservice ${subIndex + 1}`,
-            description: sub.description || 'Research-based subservice',
-            serviceDescription: sub.serviceDescription || `This subservice is based on ${technology} best practices identified in research.`,
-            keyAssumptions: sub.keyAssumptions || `Assumptions based on research analysis.`,
-            clientResponsibilities: sub.clientResponsibilities || `Client responsibilities for this activity.`,
-            outOfScope: sub.outOfScope || `Standard exclusions for this type of work.`,
-            hours: typeof sub.hours === 'number' ? sub.hours : 20
+            name: sub.name || `${technology} ${this.getSubserviceSpecificName(s.phase, subIndex)}`,
+            description: sub.description || `Technical configuration task`,
+            serviceDescription: sub.serviceDescription || sub.description || '',
+            keyAssumptions: sub.keyAssumptions || '',
+            clientResponsibilities: sub.clientResponsibilities || '',
+            outOfScope: sub.outOfScope || '',
+            hours: typeof sub.hours === 'number' ? sub.hours : this.getDefaultSubserviceHours(s.phase)
           })) : []
         }));
 
@@ -122,9 +179,9 @@ JSON FORMAT (NO markdown, explanations, or code blocks):
         console.log(`📊 PMBOK phase coverage: ${phaseAlignment.coveragePercentage}% (${phaseAlignment.coveredPhases.length}/5 phases)`);
         
         // If we don't meet minimum requirements, fail rather than use fallbacks
-        if (validatedServices.length < 4) {
-          console.error(`❌ Insufficient services generated: ${validatedServices.length} (need 4+)`);
-          throw new Error(`Research-driven generation failed - only ${validatedServices.length} services generated, need 4+`);
+        if (validatedServices.length < 5) {
+          console.error(`❌ Insufficient services generated: ${validatedServices.length} (need 5)`);
+          throw new Error(`Research-driven generation failed - only ${validatedServices.length} services generated, need 5`);
         }
         
         if (totalSubservices < 8) {
@@ -134,10 +191,21 @@ JSON FORMAT (NO markdown, explanations, or code blocks):
           console.warn(`⚠️ Subservice count below target: ${totalSubservices} (target 15+, minimum 8)`);
         }
         
-        if (phaseAlignment.coveragePercentage < 60) {
-          console.error(`❌ Insufficient PMBOK phase coverage: ${phaseAlignment.coveragePercentage}% (need 60%+)`);
+        // Enforce full PMBOK phase coverage (100%)
+        if (phaseAlignment.coveragePercentage < 100) {
+          console.error(`❌ Incomplete PMBOK phase coverage: ${phaseAlignment.coveragePercentage}% (need 100%)`);
           console.error(`❌ Missing phases: ${phaseAlignment.missingPhases.join(', ')}`);
-          throw new Error(`Research-driven generation failed - insufficient PMBOK phase coverage: ${phaseAlignment.coveragePercentage}%`);
+          
+          // Add missing phases with fallback services
+          validatedServices = this.ensureAllPMBOKPhases(validatedServices, technology);
+          
+          // Re-validate after adding missing phases
+          const newPhaseAlignment = this.validatePMBOKPhases(validatedServices);
+          console.log(`📊 Phase coverage after correction: ${newPhaseAlignment.coveragePercentage}%`);
+          
+          if (newPhaseAlignment.coveragePercentage < 100) {
+            throw new Error(`Research-driven generation failed - could not achieve full PMBOK phase coverage`);
+          }
         }
 
         console.log(`✅ Generated ${validatedServices.length} research-driven services with ${totalSubservices} total subservices`);
@@ -150,6 +218,102 @@ JSON FORMAT (NO markdown, explanations, or code blocks):
     } catch (error) {
       console.error('❌ Research-driven service generation failed:', error);
       throw error; // Re-throw to fail rather than use fallbacks
+    }
+  }
+
+  /**
+   * Get phase-specific service name when AI doesn't provide one
+   */
+  private getPhaseSpecificServiceName(phase: string, index: number): string {
+    const normalizedPhase = this.normalizePMBOKPhase(phase);
+    
+    switch (normalizedPhase) {
+      case 'Initiation': return 'Discovery & Requirements Analysis';
+      case 'Planning': return 'Architecture & Design Services';
+      case 'Execution': return 'Platform Deployment & Configuration';
+      case 'Monitoring & Controlling': return 'Testing & Validation Services';
+      case 'Closing': return 'Knowledge Transfer & Documentation';
+      default: return `Technical Service ${index + 1}`;
+    }
+  }
+
+  /**
+   * Get subservice-specific name when AI doesn't provide one
+   */
+  private getSubserviceSpecificName(phase: string, index: number): string {
+    const normalizedPhase = this.normalizePMBOKPhase(phase);
+    const subserviceNames: Record<string, string[]> = {
+      'Initiation': [
+        'Current State Assessment',
+        'Requirements Workshop Facilitation',
+        'Use Case Documentation',
+        'Technical Prerequisites Review'
+      ],
+      'Planning': [
+        'High-Level Design Documentation',
+        'Network Topology Planning',
+        'Security Policy Framework',
+        'Integration Point Mapping'
+      ],
+      'Execution': [
+        'Core Platform Installation',
+        'Authentication Service Configuration',
+        'Policy Engine Setup',
+        'External System Integration'
+      ],
+      'Monitoring & Controlling': [
+        'Functional Testing Execution',
+        'Performance Baseline Validation',
+        'Security Compliance Verification',
+        'Failover Scenario Testing'
+      ],
+      'Closing': [
+        'Administrator Training Delivery',
+        'Runbook Documentation',
+        'Handover Session Facilitation',
+        'Post-Implementation Review'
+      ]
+    };
+    
+    const phaseNames = subserviceNames[normalizedPhase] || [
+      'Technical Configuration Task',
+      'System Integration Activity',
+      'Validation & Testing',
+      'Documentation & Training'
+    ];
+    
+    return phaseNames[index % phaseNames.length];
+  }
+
+  /**
+   * Get default service hours based on PMBOK phase
+   */
+  private getDefaultServiceHours(phase: string): number {
+    const normalizedPhase = this.normalizePMBOKPhase(phase);
+    
+    switch (normalizedPhase) {
+      case 'Initiation': return 24;
+      case 'Planning': return 48;
+      case 'Execution': return 80;
+      case 'Monitoring & Controlling': return 32;
+      case 'Closing': return 16;
+      default: return 40; // Default fallback
+    }
+  }
+
+  /**
+   * Get default subservice hours based on PMBOK phase
+   */
+  private getDefaultSubserviceHours(phase: string): number {
+    const normalizedPhase = this.normalizePMBOKPhase(phase);
+    
+    switch (normalizedPhase) {
+      case 'Initiation': return 6;
+      case 'Planning': return 12;
+      case 'Execution': return 20;
+      case 'Monitoring & Controlling': return 8;
+      case 'Closing': return 4;
+      default: return 12; // Default fallback
     }
   }
 
@@ -180,6 +344,102 @@ JSON FORMAT (NO markdown, explanations, or code blocks):
     
     // If no match, return original
     return phase;
+  }
+
+  /**
+   * Ensure all PMBOK phases are covered by adding missing services
+   */
+  private ensureAllPMBOKPhases(services: Service[], technology: string): Service[] {
+    const pmbokPhases = ['Initiation', 'Planning', 'Execution', 'Monitoring & Controlling', 'Closing'];
+    const phaseTemplates: Record<string, {name: string, description: string, hours: number, subservices: any[]}> = {
+      'Initiation': {
+        name: `${technology} Project Initiation & Requirements Discovery`,
+        description: 'Project kickoff and initial requirements analysis',
+        hours: 24,
+        subservices: [
+          { name: 'Stakeholder Identification Workshop', description: 'Identify and engage key project stakeholders', hours: 6 },
+          { name: 'Current State Assessment', description: 'Document existing environment and constraints', hours: 8 },
+          { name: 'Success Criteria Definition', description: 'Define measurable project success metrics', hours: 4 },
+          { name: 'Project Charter Development', description: 'Create formal project authorization document', hours: 6 }
+        ]
+      },
+      'Planning': {
+        name: `${technology} Architecture Design & Technical Planning`,
+        description: 'Detailed technical design and implementation planning',
+        hours: 48,
+        subservices: [
+          { name: 'Solution Architecture Design', description: 'Design comprehensive system architecture', hours: 16 },
+          { name: 'Integration Planning', description: 'Plan system integrations and data flows', hours: 12 },
+          { name: 'Security Framework Design', description: 'Design security policies and controls', hours: 12 },
+          { name: 'Implementation Roadmap', description: 'Create detailed implementation timeline', hours: 8 }
+        ]
+      },
+      'Execution': {
+        name: `${technology} System Implementation & Configuration`,
+        description: 'Core system deployment and configuration',
+        hours: 80,
+        subservices: [
+          { name: 'Platform Installation', description: 'Install and configure core platform components', hours: 24 },
+          { name: 'Security Configuration', description: 'Implement security policies and controls', hours: 20 },
+          { name: 'Integration Implementation', description: 'Configure system integrations', hours: 20 },
+          { name: 'User Access Configuration', description: 'Set up user accounts and permissions', hours: 16 }
+        ]
+      },
+      'Monitoring & Controlling': {
+        name: `${technology} Testing & Quality Validation`,
+        description: 'Comprehensive testing and quality assurance',
+        hours: 32,
+        subservices: [
+          { name: 'Functional Testing', description: 'Test all system functionality', hours: 12 },
+          { name: 'Security Testing', description: 'Validate security controls and policies', hours: 8 },
+          { name: 'Performance Testing', description: 'Test system performance and scalability', hours: 8 },
+          { name: 'User Acceptance Testing', description: 'Coordinate user acceptance testing', hours: 4 }
+        ]
+      },
+      'Closing': {
+        name: `${technology} Knowledge Transfer & Project Handover`,
+        description: 'Project closure and knowledge transfer activities',
+        hours: 16,
+        subservices: [
+          { name: 'Administrator Training', description: 'Train system administrators', hours: 8 },
+          { name: 'Documentation Handover', description: 'Deliver comprehensive system documentation', hours: 4 },
+          { name: 'Support Transition', description: 'Transition to ongoing support model', hours: 2 },
+          { name: 'Project Closure Review', description: 'Conduct project lessons learned session', hours: 2 }
+        ]
+      }
+    };
+
+    const currentPhases = this.validatePMBOKPhases(services);
+    const updatedServices = [...services];
+
+    // Add missing phases
+    for (const missingPhase of currentPhases.missingPhases) {
+      if (phaseTemplates[missingPhase]) {
+        const template = phaseTemplates[missingPhase];
+        const newService: Service = {
+          name: template.name,
+          description: template.description,
+          serviceDescription: '',
+          keyAssumptions: '',
+          clientResponsibilities: '',
+          outOfScope: '',
+          hours: template.hours,
+          phase: missingPhase,
+          subservices: template.subservices.map(sub => ({
+            ...sub,
+            serviceDescription: sub.serviceDescription || sub.description || '',
+            keyAssumptions: sub.keyAssumptions || '',
+            clientResponsibilities: sub.clientResponsibilities || '',
+            outOfScope: sub.outOfScope || ''
+          }))
+        };
+        
+        updatedServices.push(newService);
+        console.log(`➕ Added missing ${missingPhase} phase service: ${template.name}`);
+      }
+    }
+
+    return updatedServices;
   }
 
   /**

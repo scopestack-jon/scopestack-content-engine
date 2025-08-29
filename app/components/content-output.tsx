@@ -10,7 +10,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { FileText, Download, Clock, Hash, Link2, Calculator, ChevronRight, ChevronDown, Layers, Users, Settings, Target, CheckCircle, AlertCircle, Info, ArrowRight, Briefcase, Calendar, DollarSign, TrendingUp, Filter, Table, Eye, ChevronUp } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { Input } from "@/components/ui/input"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 interface GeneratedContent {
   technology: string
@@ -80,6 +82,8 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   const [useDirectServices, setUseDirectServices] = useState(true)
   const [skipSurvey, setSkipSurvey] = useState(false)
   const [skipDocument, setSkipDocument] = useState(false)
+  const [questionResponses, setQuestionResponses] = useState<Map<string, any>>(new Map())
+  const [modifiedServices, setModifiedServices] = useState(content?.services || [])
 
   const toggleServiceExpanded = (index: number) => {
     const newExpanded = new Set(expandedServices)
@@ -110,6 +114,89 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
     }
     setExpandedCalculations(newExpanded)
   }
+
+  // Handle question response changes
+  const handleQuestionResponse = (questionId: string, value: any) => {
+    const newResponses = new Map(questionResponses)
+    newResponses.set(questionId, value)
+    setQuestionResponses(newResponses)
+    
+    // Recalculate service hours based on responses
+    calculateServiceImpact()
+  }
+
+  // Calculate service impact based on question responses
+  const calculateServiceImpact = () => {
+    if (!content?.services) return
+    
+    let updatedServices = [...content.services]
+    
+    // Apply simple multipliers based on common question patterns
+    questionResponses.forEach((value, questionId) => {
+      const question = content.questions?.find(q => q.id === questionId || q.slug === questionId)
+      if (!question) return
+      
+      // Check for user count questions
+      if (question.question?.toLowerCase().includes('user') || question.question?.toLowerCase().includes('employee')) {
+        const userCount = parseInt(value)
+        if (!isNaN(userCount)) {
+          let multiplier = 1.0
+          if (userCount <= 100) multiplier = 0.8
+          else if (userCount <= 500) multiplier = 1.0
+          else if (userCount <= 2000) multiplier = 1.3
+          else if (userCount <= 5000) multiplier = 1.6
+          else multiplier = 2.0
+          
+          updatedServices = updatedServices.map(service => ({
+            ...service,
+            hours: Math.round(service.hours * multiplier)
+          }))
+        }
+      }
+      
+      // Check for location/site questions
+      if (question.question?.toLowerCase().includes('location') || question.question?.toLowerCase().includes('site')) {
+        const locationCount = parseInt(value)
+        if (!isNaN(locationCount)) {
+          let multiplier = 1.0
+          if (locationCount === 1) multiplier = 1.0
+          else if (locationCount <= 3) multiplier = 1.2
+          else if (locationCount <= 10) multiplier = 1.5
+          else if (locationCount <= 25) multiplier = 1.8
+          else multiplier = 2.2
+          
+          updatedServices = updatedServices.map(service => ({
+            ...service,
+            hours: Math.round(service.hours * multiplier)
+          }))
+        }
+      }
+      
+      // Check for complexity questions
+      if (question.question?.toLowerCase().includes('complex')) {
+        const selectedOption = question.options?.find(opt => opt.value === value || opt.key === value)
+        if (selectedOption) {
+          const optionText = typeof selectedOption === 'string' ? selectedOption : (selectedOption.key || selectedOption.value || '').toString().toLowerCase()
+          let multiplier = 1.0
+          if (optionText.includes('simple') || optionText.includes('basic')) multiplier = 0.8
+          else if (optionText.includes('moderate') || optionText.includes('standard')) multiplier = 1.0
+          else if (optionText.includes('complex') || optionText.includes('enterprise')) multiplier = 1.5
+          
+          updatedServices = updatedServices.map(service => ({
+            ...service,
+            hours: Math.round(service.hours * multiplier)
+          }))
+        }
+      }
+    })
+    
+    setModifiedServices(updatedServices)
+  }
+
+  // Update services when responses change
+  useEffect(() => {
+    calculateServiceImpact()
+  }, [questionResponses])
 
   // Debug logging
   console.log("ContentOutput received content:", {
@@ -897,8 +984,14 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
               <div className="flex items-center gap-4 text-sm">
                 <Badge variant="outline" className="flex items-center gap-1 bg-white/50">
                   <Clock className="h-3 w-3" />
-                  {content.totalHours || 0} total hours
+                  {content.totalHours || 0} base hours
                 </Badge>
+                {questionResponses.size > 0 && (
+                  <Badge variant="default" className="flex items-center gap-1 bg-blue-600">
+                    <Calculator className="h-3 w-3" />
+                    {modifiedServices.reduce((sum, s) => sum + (s.hours || 0), 0)} adjusted hours
+                  </Badge>
+                )}
                 <Badge variant="outline" className="flex items-center gap-1 bg-white/50">
                   <Users className="h-3 w-3" />
                   {content.questions?.length || 0} questions
@@ -928,7 +1021,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
               </Button>
               <Button 
                 onClick={() => {
-                  setExpandedServices(new Set(content.services?.map((_, i) => i) || []))
+                  setExpandedServices(new Set(modifiedServices?.map((_, i) => i) || []))
                   setExpandedQuestions(new Set(content.questions?.map((_, i) => i) || []))
                   setExpandedCalculations(new Set(content.calculations?.map((_, i) => i) || []))
                 }} 
@@ -1115,7 +1208,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                 </TabsTrigger>
                 <TabsTrigger value="services" className="flex items-center gap-2">
                   <Layers className="h-4 w-4" />
-                  Services ({content.services?.length || 0})
+                  Services ({modifiedServices?.length || 0})
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -1170,39 +1263,109 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                         <CollapsibleContent>
                           <div className="px-4 pb-4">
                             <div className="border-t pt-4">
-                              {question.options && Array.isArray(question.options) && question.options.length > 0 ? (
-                                <div className="grid gap-3">
-                                  {question.options.map((option, optIndex) => (
-                                    <div
-                                      key={optIndex}
-                                      className={`p-4 rounded-lg border transition-colors hover:shadow-sm ${
-                                        option.default 
-                                          ? "bg-blue-50 border-blue-200 shadow-sm" 
-                                          : "bg-gray-50 border-gray-200 hover:bg-gray-100"
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <span className="font-medium text-gray-900">
-                                          {getOptionDisplayText(option)}
-                                        </span>
-                                        <div className="flex items-center gap-2">
-                                          <Badge variant="secondary" className="text-xs">
-                                            Value: {getOptionNumericalValue(option, optIndex)}
-                                          </Badge>
-                                          {option.default && (
-                                            <Badge variant="default" className="text-xs">
-                                              Default
-                                            </Badge>
-                                          )}
-                                        </div>
-                                      </div>
+                              {/* Determine if this is a numerical input question */}
+                              {(!question.options || question.options.length === 0 || 
+                                question.question?.toLowerCase().includes('how many') || 
+                                question.question?.toLowerCase().includes('number of') ||
+                                question.question?.toLowerCase().includes('quantity') ||
+                                question.question?.toLowerCase().includes('count')) ? (
+                                /* Numerical input for questions without options or quantity questions */
+                                <div className="space-y-4">
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`question-${question.id || index}`}>
+                                      Enter a number:
+                                    </Label>
+                                    <Input
+                                      id={`question-${question.id || index}`}
+                                      type="number"
+                                      min="1"
+                                      placeholder="Enter value"
+                                      value={questionResponses.get(question.id || question.slug || `q-${index}`) || ''}
+                                      onChange={(e) => handleQuestionResponse(
+                                        question.id || question.slug || `q-${index}`,
+                                        e.target.value
+                                      )}
+                                      className="max-w-xs"
+                                    />
+                                    {/* Show helper text for common patterns */}
+                                    {(question.question?.toLowerCase().includes('user') || 
+                                      question.question?.toLowerCase().includes('employee')) && (
+                                      <p className="text-xs text-muted-foreground">
+                                        Impact: 1-100 (0.8x), 101-500 (1.0x), 501-2000 (1.3x), 2001-5000 (1.6x), 5000+ (2.0x)
+                                      </p>
+                                    )}
+                                    {(question.question?.toLowerCase().includes('location') || 
+                                      question.question?.toLowerCase().includes('site')) && (
+                                      <p className="text-xs text-muted-foreground">
+                                        Impact: 1 site (1.0x), 2-3 (1.2x), 4-10 (1.5x), 11-25 (1.8x), 25+ (2.2x)
+                                      </p>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Show current response */}
+                                  {questionResponses.has(question.id || question.slug || `q-${index}`) && (
+                                    <div className="mt-2 p-2 bg-green-50 rounded-md">
+                                      <span className="text-sm text-green-700">
+                                        Selected: {questionResponses.get(question.id || question.slug || `q-${index}`)}
+                                      </span>
                                     </div>
-                                  ))}
+                                  )}
                                 </div>
                               ) : (
-                                <div className="text-center text-gray-500 py-6">
-                                  <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                  <div className="text-sm">No options available</div>
+                                /* Multiple choice options with radio buttons */
+                                <div className="space-y-4">
+                                  <RadioGroup
+                                      value={questionResponses.get(question.id || question.slug || `q-${index}`) || ''}
+                                      onValueChange={(value) => handleQuestionResponse(
+                                        question.id || question.slug || `q-${index}`,
+                                        value
+                                      )}
+                                    >
+                                      <div className="space-y-2">
+                                        {question.options.map((option, optIndex) => {
+                                          const optionValue = getOptionNumericalValue(option, optIndex).toString()
+                                          const optionLabel = getOptionDisplayText(option)
+                                          
+                                          return (
+                                            <div
+                                              key={optIndex}
+                                              className={`flex items-center space-x-2 p-3 rounded-lg border transition-colors ${
+                                                questionResponses.get(question.id || question.slug || `q-${index}`) === optionValue
+                                                  ? "bg-blue-50 border-blue-300"
+                                                  : "hover:bg-gray-50"
+                                              }`}
+                                            >
+                                              <RadioGroupItem 
+                                                value={optionValue} 
+                                                id={`option-${question.id}-${optIndex}`}
+                                              />
+                                              <Label 
+                                                htmlFor={`option-${question.id}-${optIndex}`}
+                                                className="flex-1 cursor-pointer"
+                                              >
+                                                <div className="flex items-center justify-between">
+                                                  <span className="font-medium">
+                                                    {optionLabel}
+                                                  </span>
+                                                  <Badge variant="secondary" className="text-xs ml-2">
+                                                    Value: {optionValue}
+                                                  </Badge>
+                                                </div>
+                                              </Label>
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
+                                    </RadioGroup>
+                                  
+                                  {/* Show current response */}
+                                  {questionResponses.has(question.id || question.slug || `q-${index}`) && (
+                                    <div className="mt-2 p-2 bg-green-50 rounded-md">
+                                      <span className="text-sm text-green-700">
+                                        Selected: {questionResponses.get(question.id || question.slug || `q-${index}`)}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1357,9 +1520,9 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                 </div>
               </div>
 
-              {content.services && Array.isArray(content.services) && content.services.length > 0 ? (
+              {modifiedServices && Array.isArray(modifiedServices) && modifiedServices.length > 0 ? (
                 <div className="space-y-2">
-                  {sortServicesByPhase(content.services).map((service, serviceIndex) => (
+                  {sortServicesByPhase(modifiedServices).map((service, serviceIndex) => (
                     <Collapsible 
                       key={serviceIndex}
                       open={expandedServices.has(serviceIndex)}
