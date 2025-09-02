@@ -84,6 +84,8 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   const [skipDocument, setSkipDocument] = useState(false)
   const [questionResponses, setQuestionResponses] = useState<Map<string, any>>(new Map())
   const [modifiedServices, setModifiedServices] = useState(content?.services || [])
+  const [scopeStackApiKey, setScopeStackApiKey] = useState<string>('')
+  const [scopeStackAccountSlug, setScopeStackAccountSlug] = useState<string>('')
 
   const toggleServiceExpanded = (index: number) => {
     const newExpanded = new Set(expandedServices)
@@ -391,6 +393,15 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   }
 
   const pushToScopeStack = async () => {
+    if (!scopeStackApiKey) {
+      toast({
+        title: "API Key Required",
+        description: "Please enter your ScopeStack API key in the configuration panel.",
+        variant: "destructive",
+      })
+      return
+    }
+    
     try {
       const requestBody = {
         content,
@@ -398,6 +409,8 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
         skipSurvey,
         skipDocument,
         workflow: scopeStackWorkflow,
+        scopeStackApiKey,
+        scopeStackAccountSlug: scopeStackAccountSlug || undefined,
       }
 
       console.log('Pushing to ScopeStack with options:', {
@@ -1065,6 +1078,41 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* API Configuration */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-blue-900">API Configuration</Label>
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="apiKey" className="text-sm font-medium text-gray-700">
+                    ScopeStack API Key <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="apiKey"
+                    type="password"
+                    placeholder="Enter your ScopeStack API key"
+                    value={scopeStackApiKey}
+                    onChange={(e) => setScopeStackApiKey(e.target.value)}
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Your API key can be found in ScopeStack Settings → API Access</p>
+                </div>
+                <div>
+                  <Label htmlFor="accountSlug" className="text-sm font-medium text-gray-700">
+                    Account Slug (Optional)
+                  </Label>
+                  <Input
+                    id="accountSlug"
+                    type="text"
+                    placeholder="your-account-slug (optional)"
+                    value={scopeStackAccountSlug}
+                    onChange={(e) => setScopeStackAccountSlug(e.target.value)}
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Leave blank to use the default account associated with your API key</p>
+                </div>
+              </div>
+            </div>
+
             {/* Workflow Selection */}
             <div className="space-y-3">
               <Label className="text-sm font-medium text-blue-900">Workflow Type</Label>

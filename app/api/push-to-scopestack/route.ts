@@ -11,6 +11,8 @@ interface PushToScopeStackRequest {
   skipSurvey?: boolean
   skipDocument?: boolean
   useDirectServices?: boolean // Add services directly instead of via survey
+  scopeStackApiKey?: string // API key from request body
+  scopeStackAccountSlug?: string // Optional account slug from request body
 }
 
 function transformServicesToScopeStack(services: Service[]): ScopeStackService[] {
@@ -127,7 +129,9 @@ export async function POST(request: NextRequest) {
       questionnaireTags,
       skipSurvey = false,
       skipDocument = false,
-      useDirectServices = false
+      useDirectServices = false,
+      scopeStackApiKey,
+      scopeStackAccountSlug
     }: PushToScopeStackRequest = await request.json()
 
     // Validate required fields
@@ -145,23 +149,24 @@ export async function POST(request: NextRequest) {
       questionCount: content.questions?.length || 0
     })
 
-    // Get ScopeStack configuration from environment
-    const scopeStackToken = process.env.SCOPESTACK_API_TOKEN || process.env.NEXT_PUBLIC_SCOPESTACK_API_TOKEN
+    // Get ScopeStack configuration from request body or environment
+    const scopeStackToken = scopeStackApiKey || process.env.SCOPESTACK_API_TOKEN || process.env.NEXT_PUBLIC_SCOPESTACK_API_TOKEN
     const scopeStackUrl = process.env.SCOPESTACK_API_URL || process.env.NEXT_PUBLIC_SCOPESTACK_API_URL
-    const scopeStackAccountSlug = process.env.SCOPESTACK_ACCOUNT_SLUG || process.env.NEXT_PUBLIC_SCOPESTACK_ACCOUNT_SLUG
+    const accountSlug = scopeStackAccountSlug || process.env.SCOPESTACK_ACCOUNT_SLUG || process.env.NEXT_PUBLIC_SCOPESTACK_ACCOUNT_SLUG
 
-    console.log("🔍 Environment variables check:", {
+    console.log("🔍 Configuration check:", {
       hasToken: !!scopeStackToken,
+      tokenSource: scopeStackApiKey ? 'request' : 'environment',
       hasUrl: !!scopeStackUrl,
-      hasSlug: !!scopeStackAccountSlug,
+      hasSlug: !!accountSlug,
       tokenPrefix: scopeStackToken ? scopeStackToken.substring(0, 10) + '...' : 'missing'
     })
 
     if (!scopeStackToken) {
-      console.error("❌ ScopeStack API token not found in environment variables")
+      console.error("❌ ScopeStack API token not found")
       return Response.json({ 
         error: "ScopeStack API token not configured", 
-        details: "Please set SCOPESTACK_API_TOKEN or NEXT_PUBLIC_SCOPESTACK_API_TOKEN environment variable" 
+        details: "Please provide 'scopeStackApiKey' in request body or set SCOPESTACK_API_TOKEN environment variable" 
       }, { status: 400 })
     }
 
@@ -169,7 +174,7 @@ export async function POST(request: NextRequest) {
     const scopeStackApi = new ScopeStackApiService({
       apiToken: scopeStackToken,
       baseUrl: scopeStackUrl,
-      accountSlug: scopeStackAccountSlug,
+      accountSlug: accountSlug,
     })
     
     // Step 1: Get current user and account details
