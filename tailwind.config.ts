@@ -60,6 +60,13 @@ const config: Config = {
   				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
+  			},
+  			scopestack: {
+  				primary: 'hsl(var(--scopestack-primary))',
+  				button: 'hsl(var(--scopestack-button))',
+  				yellow: 'hsl(var(--scopestack-yellow))',
+  				orange: 'hsl(var(--scopestack-orange))',
+  				white: 'hsl(var(--scopestack-white))'
   			}
   		},
   		borderRadius: {

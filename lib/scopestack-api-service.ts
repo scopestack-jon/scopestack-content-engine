@@ -347,25 +347,52 @@ export class ScopeStackApiService {
   }
 
   /**
+   * Format text with line breaks after sentences
+   */
+  private formatSentences(text: string): string {
+    if (!text || typeof text !== 'string') return text
+    
+    // Split on sentence endings (., !, ?) followed by space and capital letter
+    // This handles cases like "All hardware components are available. Network prerequisites are met."
+    return text
+      .split(/([.!?])\s+(?=[A-Z])/)
+      .reduce((result, part, index, array) => {
+        if (index % 2 === 0) {
+          // This is the sentence text
+          result += part
+        } else {
+          // This is the punctuation
+          result += part
+          // Add line break after punctuation if there's more content
+          if (index < array.length - 1) {
+            result += '\n'
+          }
+        }
+        return result
+      }, '')
+      .trim()
+  }
+
+  /**
    * Build languages object using configured field mappings
    */
   private buildLanguagesObject(service: any): Record<string, string> {
     const languages: Record<string, string> = {}
     
-    // Map our standard fields to account-specific language field names
+    // Map our standard fields to account-specific language field names with sentence formatting
     if (service.keyAssumptions) {
-      languages[this.languageFieldMappings.keyAssumptions] = service.keyAssumptions
+      languages[this.languageFieldMappings.keyAssumptions] = this.formatSentences(service.keyAssumptions)
     }
     if (service.clientResponsibilities) {
-      languages[this.languageFieldMappings.clientResponsibilities] = service.clientResponsibilities
+      languages[this.languageFieldMappings.clientResponsibilities] = this.formatSentences(service.clientResponsibilities)
     }
     if (service.outOfScope) {
-      languages[this.languageFieldMappings.outOfScope] = service.outOfScope
+      languages[this.languageFieldMappings.outOfScope] = this.formatSentences(service.outOfScope)
     }
     
     // Put main service description in implementation_language field if available
     if (service.serviceDescription && this.languageFieldMappings.serviceDescription) {
-      languages[this.languageFieldMappings.serviceDescription] = service.serviceDescription
+      languages[this.languageFieldMappings.serviceDescription] = this.formatSentences(service.serviceDescription)
     }
     
     return languages
@@ -458,8 +485,10 @@ export class ScopeStackApiService {
     console.log('✅ Auto-configured language field mappings:', discoveredMappings)
   }
 
-  async addServicesToProject(projectId: string, services: ScopeStackService[]): Promise<void> {
+  async addServicesToProject(projectId: string, services: ScopeStackService[]): Promise<any[]> {
     await this.ensureAccountSlug()
+    
+    const createdServices: any[] = []
     
     for (let i = 0; i < services.length; i++) {
       const service = services[i]
@@ -494,6 +523,15 @@ export class ScopeStackApiService {
         const response = await this.apiScoped!.post('/v1/project-services', requestData)
         const createdService = response.data.data
         console.log(`Successfully added service ${service.name} (ID: ${createdService.id})`)
+        
+        // Add to our return array
+        createdServices.push({
+          id: createdService.id,
+          name: createdService.attributes.name,
+          hours: createdService.attributes['override-hours'],
+          phase: service.phase, // Keep original phase from input
+          type: createdService.attributes['service-type']
+        })
 
         // Add subservices if they exist
         if (service.subservices && Array.isArray(service.subservices) && service.subservices.length > 0) {
@@ -508,6 +546,8 @@ export class ScopeStackApiService {
         throw error // Re-throw to handle at higher level
       }
     }
+    
+    return createdServices
   }
 
   async addSubservicesToService(parentServiceId: string, subservices: any[]): Promise<void> {

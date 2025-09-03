@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { FileText, Download, Clock, Hash, Link2, Calculator, ChevronRight, ChevronDown, Layers, Users, Settings, Target, CheckCircle, AlertCircle, Info, ArrowRight, Briefcase, Calendar, DollarSign, TrendingUp, Filter, Table, Eye, ChevronUp } from "lucide-react"
+import { FileText, Download, Clock, Hash, Link2, Calculator, ChevronRight, ChevronDown, Layers, Users, Settings, Target, CheckCircle, AlertCircle, Info, ArrowRight, Briefcase, Calendar, DollarSign, TrendingUp, Filter, Table, Eye, ChevronUp, MoreVertical, Maximize, Minimize } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
@@ -77,15 +78,10 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set())
   const [expandedCalculations, setExpandedCalculations] = useState<Set<number>>(new Set())
   const [selectedLanguageField, setSelectedLanguageField] = useState<string>("overview")
-  const [showScopeStackOptions, setShowScopeStackOptions] = useState(false)
-  const [scopeStackWorkflow, setScopeStackWorkflow] = useState<'project-with-services' | 'catalog-only' | 'full'>('project-with-services')
-  const [useDirectServices, setUseDirectServices] = useState(true)
-  const [skipSurvey, setSkipSurvey] = useState(false)
-  const [skipDocument, setSkipDocument] = useState(false)
   const [questionResponses, setQuestionResponses] = useState<Map<string, any>>(new Map())
   const [modifiedServices, setModifiedServices] = useState(content?.services || [])
-  const [scopeStackApiKey, setScopeStackApiKey] = useState<string>('')
-  const [scopeStackAccountSlug, setScopeStackAccountSlug] = useState<string>('')
+  const [isPushingToScopeStack, setIsPushingToScopeStack] = useState(false)
+  const [pushProgress, setPushProgress] = useState<{step: string, details?: string} | null>(null)
 
   const toggleServiceExpanded = (index: number) => {
     const newExpanded = new Set(expandedServices)
@@ -345,12 +341,12 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   }
 
   const phaseColors = {
-    "Initiating": "bg-purple-100 text-purple-800",
-    "Planning": "bg-blue-100 text-blue-800",
-    "Design": "bg-green-100 text-green-800",
-    "Implementation": "bg-orange-100 text-orange-800",
-    "Monitoring & Control": "bg-yellow-100 text-yellow-800",
-    "Close Out": "bg-red-100 text-red-800",
+    "Initiating": "bg-scopestack-primary/10 text-scopestack-primary",
+    "Planning": "bg-scopestack-button/20 text-scopestack-primary",
+    "Design": "bg-scopestack-yellow/20 text-scopestack-primary",
+    "Implementation": "bg-scopestack-orange/20 text-scopestack-primary", 
+    "Monitoring & Control": "bg-scopestack-button/10 text-scopestack-primary",
+    "Close Out": "bg-scopestack-primary/20 text-scopestack-primary",
   }
 
   // Helper function to render error cards
@@ -393,14 +389,26 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   }
 
   const pushToScopeStack = async () => {
+    // Get settings from localStorage (from settings page)
+    const scopeStackApiKey = localStorage.getItem('scopestack_api_key') || ''
+    const scopeStackAccountSlug = localStorage.getItem('scopestack_account_slug') || ''
+    const scopeStackApiUrl = localStorage.getItem('scopestack_api_url') || 'https://api.scopestack.io'
+    const scopeStackWorkflow = localStorage.getItem('scopestack_workflow') || 'project-with-services'
+    const useDirectServices = localStorage.getItem('scopestack_use_direct_services') === 'true'
+    const skipSurvey = localStorage.getItem('scopestack_skip_survey') === 'true'
+    const skipDocument = localStorage.getItem('scopestack_skip_document') === 'true'
+    
     if (!scopeStackApiKey) {
       toast({
         title: "API Key Required",
-        description: "Please enter your ScopeStack API key in the configuration panel.",
+        description: "Please configure your ScopeStack API key in Settings.",
         variant: "destructive",
       })
       return
     }
+    
+    setIsPushingToScopeStack(true)
+    setPushProgress({ step: "Initializing...", details: "Preparing request payload" })
     
     try {
       const requestBody = {
@@ -411,14 +419,19 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
         workflow: scopeStackWorkflow,
         scopeStackApiKey,
         scopeStackAccountSlug: scopeStackAccountSlug || undefined,
+        scopeStackApiUrl: scopeStackApiUrl || undefined,
       }
 
       console.log('Pushing to ScopeStack with options:', {
         workflow: scopeStackWorkflow,
         useDirectServices,
         skipSurvey,
-        skipDocument
+        skipDocument,
+        hasApiKey: !!scopeStackApiKey,
+        apiKeyLength: scopeStackApiKey.length
       })
+
+      setPushProgress({ step: "Connecting to ScopeStack...", details: "Sending request to API" })
 
       const response = await fetch("/api/push-to-scopestack", {
         method: "POST",
@@ -426,37 +439,85 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
         body: JSON.stringify(requestBody),
       })
 
+      setPushProgress({ step: "Processing response...", details: "Parsing server response" })
+      const result = await response.json()
+      console.log('ScopeStack response:', { status: response.status, result })
+
       if (response.ok) {
-        const result = await response.json()
+        setPushProgress({ step: "✅ Success!", details: "Project created in ScopeStack" })
+        
         if (result.project?.url) {
           toast({
-            title: "Success!",
-            description: `Project created successfully. Services: ${result.metadata?.serviceCount || 0}, Hours: ${result.metadata?.totalHours || 0}`,
+            title: "\u2713 Success!",
+            description: `Project "${result.project.name || 'Unnamed Project'}" created successfully!`,
           })
+          
+          // Show detailed success info
+          setTimeout(() => {
+            toast({
+              title: "Project Details",
+              description: `ID: ${result.project.id} | Services: ${result.services?.length || 0} | Client: ${result.client?.name || 'N/A'}`,
+            })
+          }, 1000)
+          
           // Optionally open the project URL
-          if (confirm("Project created successfully! Would you like to open it in ScopeStack?")) {
-            window.open(result.project.url, '_blank')
-          }
+          setTimeout(() => {
+            if (confirm(`Project created successfully!\n\nProject: ${result.project.name || result.project.id}\nURL: ${result.project.url}\n\nWould you like to open it in ScopeStack?`)) {
+              window.open(result.project.url, '_blank')
+            }
+          }, 2000)
         } else {
           toast({
-            title: "Success!",
+            title: "\u2713 Success!",
             description: "Content successfully pushed to ScopeStack!",
           })
         }
+        
+        // Show warnings if any
+        if (result.warnings?.length > 0) {
+          setTimeout(() => {
+            toast({
+              title: "\u26a0\ufe0f Warnings",
+              description: `${result.warnings.length} warning(s): ${result.warnings[0]}`,
+              variant: "default"
+            })
+          }, 3000)
+        }
       } else {
-        const error = await response.json()
+        setPushProgress({ step: "Failed", details: result.error || "Unknown error" })
+        console.error('ScopeStack error:', result)
+        
+        const errorMessage = result.details || result.error || "Failed to push to ScopeStack"
         toast({
-          title: "Error",
-          description: error.details || "Failed to push to ScopeStack. Check your settings.",
+          title: "\u274c Push Failed",
+          description: errorMessage,
           variant: "destructive",
         })
+        
+        // Show additional error details if available
+        if (result.stack || result.statusCode) {
+          setTimeout(() => {
+            toast({
+              title: "Error Details",
+              description: `Status: ${result.statusCode || 'Unknown'} | Check console for full details`,
+              variant: "destructive"
+            })
+          }, 1500)
+        }
       }
     } catch (error) {
+      setPushProgress({ step: "Connection Failed", details: "Network or server error" })
+      console.error('ScopeStack push error:', error)
       toast({
-        title: "Error", 
-        description: "Failed to push to ScopeStack. Check your settings.",
+        title: "\u274c Network Error", 
+        description: "Failed to connect to the server. Please check your connection.",
         variant: "destructive",
       })
+    } finally {
+      setTimeout(() => {
+        setIsPushingToScopeStack(false)
+        setPushProgress(null)
+      }, 2000)
     }
   }
 
@@ -979,273 +1040,148 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
   return (
     <div className="space-y-6">
       {/* Enhanced Header */}
-      <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+      <Card className="bg-scopestack-primary border-scopestack-primary">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <div className="space-y-3">
               <CardTitle className="flex items-center gap-3 text-xl">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <FileText className="h-6 w-6 text-green-600" />
+                <div className="p-2 bg-scopestack-button rounded-lg">
+                  <FileText className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <div className="text-green-800">Generated Content</div>
-                  <div className="text-base font-normal text-green-600">
+                  <div className="text-white font-semibold">Generated Content</div>
+                  <div className="text-base font-normal text-scopestack-yellow">
                     {getTechnologyName(content.technology)}
                   </div>
                 </div>
               </CardTitle>
-              <div className="flex items-center gap-4 text-sm">
-                <Badge variant="outline" className="flex items-center gap-1 bg-white/50">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <Badge variant="outline" className="flex items-center gap-1 bg-white/20 text-white border-white/30 text-xs">
                   <Clock className="h-3 w-3" />
                   {content.totalHours || 0} base hours
                 </Badge>
                 {questionResponses.size > 0 && (
-                  <Badge variant="default" className="flex items-center gap-1 bg-blue-600">
+                  <Badge variant="default" className="flex items-center gap-1 bg-scopestack-button text-white text-xs">
                     <Calculator className="h-3 w-3" />
                     {modifiedServices.reduce((sum, s) => sum + (s.hours || 0), 0)} adjusted hours
                   </Badge>
                 )}
-                <Badge variant="outline" className="flex items-center gap-1 bg-white/50">
+                <Badge variant="outline" className="flex items-center gap-1 bg-white/20 text-white border-white/30 text-xs">
                   <Users className="h-3 w-3" />
                   {content.questions?.length || 0} questions
                 </Badge>
-                <Badge variant="outline" className="flex items-center gap-1 bg-white/50">
+                <Badge variant="outline" className="flex items-center gap-1 bg-white/20 text-white border-white/30 text-xs">
                   <Layers className="h-3 w-3" />
                   {content.services?.length || 0} services
                 </Badge>
-                <Badge variant="outline" className="flex items-center gap-1 bg-white/50">
+                <Badge variant="outline" className="flex items-center gap-1 bg-white/20 text-white border-white/30 text-xs">
                   <Calculator className="h-3 w-3" />
                   {content.calculations?.length || 0} calculations
                 </Badge>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              {/* Actions Dropdown Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                  >
+                    <MoreVertical className="h-4 w-4 mr-2" />
+                    Actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => {
+                    setExpandedServices(new Set(modifiedServices?.map((_, i) => i) || []))
+                    setExpandedQuestions(new Set(content.questions?.map((_, i) => i) || []))
+                    setExpandedCalculations(new Set(content.calculations?.map((_, i) => i) || []))
+                  }}>
+                    <Maximize className="h-4 w-4 mr-2" />
+                    Expand All
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    setExpandedServices(new Set())
+                    setExpandedQuestions(new Set())
+                    setExpandedCalculations(new Set())
+                  }}>
+                    <Minimize className="h-4 w-4 mr-2" />
+                    Collapse All
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={exportToScopeStack}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export JSON
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Settings Link */}
               <Button 
-                onClick={() => {
-                  setExpandedServices(new Set())
-                  setExpandedQuestions(new Set())
-                  setExpandedCalculations(new Set())
-                }} 
+                onClick={() => window.open('/settings', '_blank')}
                 variant="outline" 
                 size="sm"
-                className="bg-white/70 hover:bg-white"
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30"
               >
-                Collapse All
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
               </Button>
+
+              {/* Primary Push Button */}
               <Button 
-                onClick={() => {
-                  setExpandedServices(new Set(modifiedServices?.map((_, i) => i) || []))
-                  setExpandedQuestions(new Set(content.questions?.map((_, i) => i) || []))
-                  setExpandedCalculations(new Set(content.calculations?.map((_, i) => i) || []))
-                }} 
-                variant="outline" 
+                onClick={pushToScopeStack} 
+                className="bg-scopestack-button hover:bg-scopestack-button/90 text-white flex-shrink-0"
+                disabled={isPushingToScopeStack}
                 size="sm"
-                className="bg-white/70 hover:bg-white"
               >
-                Expand All
+                {isPushingToScopeStack ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    <span className="hidden sm:inline">Pushing...</span>
+                    <span className="sm:hidden">Push</span>
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Push to ScopeStack</span>
+                    <span className="sm:hidden">Push</span>
+                  </>
+                )}
               </Button>
-              <Button onClick={exportToScopeStack} variant="outline" className="bg-white/70 hover:bg-white">
-                <Download className="h-4 w-4 mr-2" />
-                Export JSON
-              </Button>
-              <div className="relative">
-                <Button 
-                  onClick={() => setShowScopeStackOptions(!showScopeStackOptions)} 
-                  variant="outline" 
-                  className="bg-white/70 hover:bg-white"
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  Configure
-                  {showScopeStackOptions ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
-                </Button>
-                <Button onClick={pushToScopeStack} className="bg-green-600 hover:bg-green-700 ml-2">
-                  <Link2 className="h-4 w-4 mr-2" />
-                  Push to ScopeStack
-                </Button>
-              </div>
             </div>
-          </div>
-        </CardHeader>
-      </Card>
-
-      {/* ScopeStack Configuration Panel */}
-      {showScopeStackOptions && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2 text-blue-800">
-              <Settings className="h-5 w-5" />
-              ScopeStack Push Configuration
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* API Configuration */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium text-blue-900">API Configuration</Label>
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="apiKey" className="text-sm font-medium text-gray-700">
-                    ScopeStack API Key <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="apiKey"
-                    type="password"
-                    placeholder="Enter your ScopeStack API key"
-                    value={scopeStackApiKey}
-                    onChange={(e) => setScopeStackApiKey(e.target.value)}
-                    className="mt-1"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Your API key can be found in ScopeStack Settings → API Access</p>
-                </div>
-                <div>
-                  <Label htmlFor="accountSlug" className="text-sm font-medium text-gray-700">
-                    Account Slug (Optional)
-                  </Label>
-                  <Input
-                    id="accountSlug"
-                    type="text"
-                    placeholder="your-account-slug (optional)"
-                    value={scopeStackAccountSlug}
-                    onChange={(e) => setScopeStackAccountSlug(e.target.value)}
-                    className="mt-1"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Leave blank to use the default account associated with your API key</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Workflow Selection */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium text-blue-900">Workflow Type</Label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div 
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                    scopeStackWorkflow === 'project-with-services' 
-                      ? 'border-blue-500 bg-blue-100' 
-                      : 'border-gray-200 bg-white hover:border-blue-300'
-                  }`}
-                  onClick={() => setScopeStackWorkflow('project-with-services')}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <input 
-                      type="radio" 
-                      checked={scopeStackWorkflow === 'project-with-services'} 
-                      onChange={() => setScopeStackWorkflow('project-with-services')}
-                      className="text-blue-600"
-                    />
-                    <Label className="font-medium text-sm">Create Project & Add Services</Label>
+            
+            {/* Push Progress Display */}
+            {pushProgress && (
+              <div className="mt-4 p-4 bg-white/20 rounded-md border border-white/30">
+                <div className="flex items-center justify-between text-white">
+                  <div className="flex items-center gap-3">
+                    <div className="animate-spin">⏳</div>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">{pushProgress.step}</span>
+                      {pushProgress.details && (
+                        <span className="text-xs text-white/80">{pushProgress.details}</span>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-600">
-                    Creates a project and adds services directly to it. Best for immediate project creation.
-                  </p>
-                </div>
-                <div 
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                    scopeStackWorkflow === 'catalog-only' 
-                      ? 'border-blue-500 bg-blue-100' 
-                      : 'border-gray-200 bg-white hover:border-blue-300'
-                  }`}
-                  onClick={() => setScopeStackWorkflow('catalog-only')}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <input 
-                      type="radio" 
-                      checked={scopeStackWorkflow === 'catalog-only'} 
-                      onChange={() => setScopeStackWorkflow('catalog-only')}
-                      className="text-blue-600"
-                    />
-                    <Label className="font-medium text-sm">Add to Catalog Only</Label>
-                  </div>
-                  <p className="text-xs text-gray-600">
-                    Creates reusable services and questionnaires in your ScopeStack catalog for future use.
-                  </p>
-                </div>
-                <div 
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                    scopeStackWorkflow === 'full' 
-                      ? 'border-blue-500 bg-blue-100' 
-                      : 'border-gray-200 bg-white hover:border-blue-300'
-                  }`}
-                  onClick={() => setScopeStackWorkflow('full')}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <input 
-                      type="radio" 
-                      checked={scopeStackWorkflow === 'full'} 
-                      onChange={() => setScopeStackWorkflow('full')}
-                      className="text-blue-600"
-                    />
-                    <Label className="font-medium text-sm">Full Workflow</Label>
-                  </div>
-                  <p className="text-xs text-gray-600">
-                    Creates catalog items first, then creates project and adds catalog services to it.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Service Creation Options */}
-            {(scopeStackWorkflow === 'project-with-services' || scopeStackWorkflow === 'full') && (
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-blue-900">Service Creation Options</Label>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <Checkbox 
-                      id="useDirectServices" 
-                      checked={useDirectServices}
-                      onCheckedChange={setUseDirectServices}
-                    />
-                    <Label htmlFor="useDirectServices" className="text-sm">
-                      Add services directly (task-source: custom)
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <Checkbox 
-                      id="skipSurvey" 
-                      checked={skipSurvey}
-                      onCheckedChange={setSkipSurvey}
-                    />
-                    <Label htmlFor="skipSurvey" className="text-sm">
-                      Skip survey creation
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <Checkbox 
-                      id="skipDocument" 
-                      checked={skipDocument}
-                      onCheckedChange={setSkipDocument}
-                    />
-                    <Label htmlFor="skipDocument" className="text-sm">
-                      Skip document generation
-                    </Label>
+                  <div className="text-xs text-white/60">
+                    Processing...
                   </div>
                 </div>
               </div>
             )}
+          </div>
+        </CardHeader>
+      </Card>
 
-            {/* Current Configuration Summary */}
-            <div className="bg-white p-4 rounded-lg border">
-              <Label className="text-sm font-medium text-gray-700">Current Configuration</Label>
-              <div className="mt-2 text-sm text-gray-600 space-y-1">
-                <div>Workflow: <span className="font-medium">{scopeStackWorkflow}</span></div>
-                {(scopeStackWorkflow === 'project-with-services' || scopeStackWorkflow === 'full') && (
-                  <>
-                    <div>Direct Services: <span className="font-medium">{useDirectServices ? 'Yes' : 'No'}</span></div>
-                    <div>Skip Survey: <span className="font-medium">{skipSurvey ? 'Yes' : 'No'}</span></div>
-                    <div>Skip Document: <span className="font-medium">{skipDocument ? 'Yes' : 'No'}</span></div>
-                  </>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Content Tabs */}
       <Card>
         <CardContent className="p-0">
           <Tabs defaultValue="questions" className="w-full">
             <div className="p-6 pb-0">
-              <TabsList className="grid w-full grid-cols-3 bg-gray-100">
+              <TabsList className="grid w-full grid-cols-3 bg-scopestack-primary/10">
                 <TabsTrigger value="questions" className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   Questions ({content.questions?.length || 0})

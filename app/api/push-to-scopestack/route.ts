@@ -13,6 +13,7 @@ interface PushToScopeStackRequest {
   useDirectServices?: boolean // Add services directly instead of via survey
   scopeStackApiKey?: string // API key from request body
   scopeStackAccountSlug?: string // Optional account slug from request body
+  scopeStackApiUrl?: string // Optional API URL from request body
 }
 
 function transformServicesToScopeStack(services: Service[]): ScopeStackService[] {
@@ -131,7 +132,8 @@ export async function POST(request: NextRequest) {
       skipDocument = false,
       useDirectServices = false,
       scopeStackApiKey,
-      scopeStackAccountSlug
+      scopeStackAccountSlug,
+      scopeStackApiUrl
     }: PushToScopeStackRequest = await request.json()
 
     // Validate required fields
@@ -151,13 +153,13 @@ export async function POST(request: NextRequest) {
 
     // Get ScopeStack configuration from request body or environment
     const scopeStackToken = scopeStackApiKey || process.env.SCOPESTACK_API_TOKEN || process.env.NEXT_PUBLIC_SCOPESTACK_API_TOKEN
-    const scopeStackUrl = process.env.SCOPESTACK_API_URL || process.env.NEXT_PUBLIC_SCOPESTACK_API_URL
+    const scopeStackUrl = scopeStackApiUrl || process.env.SCOPESTACK_API_URL || process.env.NEXT_PUBLIC_SCOPESTACK_API_URL || 'https://api.scopestack.io'
     const accountSlug = scopeStackAccountSlug || process.env.SCOPESTACK_ACCOUNT_SLUG || process.env.NEXT_PUBLIC_SCOPESTACK_ACCOUNT_SLUG
 
     console.log("🔍 Configuration check:", {
       hasToken: !!scopeStackToken,
       tokenSource: scopeStackApiKey ? 'request' : 'environment',
-      hasUrl: !!scopeStackUrl,
+      apiUrl: scopeStackUrl,
       hasSlug: !!accountSlug,
       tokenPrefix: scopeStackToken ? scopeStackToken.substring(0, 10) + '...' : 'missing'
     })
@@ -230,14 +232,20 @@ export async function POST(request: NextRequest) {
     console.log(`Created project: ${project.name} (ID: ${project.id})`)
 
     // Step 4a: Add services directly if requested
+    let createdServices: any[] = []
     if (useDirectServices && content.services && content.services.length > 0) {
       console.log('Step 4a: Adding services directly to project...')
       console.log(`Project ID: ${project.id}`)
       console.log(`Number of services to add: ${scopeStackServices.length}`)
       console.log('First service example:', JSON.stringify(scopeStackServices[0], null, 2))
       try {
-        await scopeStackApi.addServicesToProject(project.id, scopeStackServices)
+        createdServices = await scopeStackApi.addServicesToProject(project.id, scopeStackServices)
         console.log(`Successfully added ${scopeStackServices.length} services to project`)
+        if (createdServices && createdServices.length > 0) {
+          console.log('Created services:', createdServices.map(s => ({ id: s.id, name: s.name })))
+        } else {
+          console.log('No services returned from addServicesToProject')
+        }
       } catch (error) {
         console.error('Failed to add services directly:', error)
         if (error instanceof Error) {
@@ -322,6 +330,13 @@ export async function POST(request: NextRequest) {
         url: document.documentUrl,
         status: document.status,
       } : null,
+      services: createdServices && createdServices.length > 0 ? createdServices.map(service => ({
+        id: service.id,
+        name: service.name,
+        hours: service.hours || service.quantity,
+        phase: service.phase,
+        status: 'active'
+      })) : [],
       metadata: {
         technology: content.technology,
         totalHours: content.totalHours,

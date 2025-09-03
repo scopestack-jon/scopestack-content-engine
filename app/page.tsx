@@ -13,6 +13,7 @@ import { showErrorToast, showResearchErrorToast, showSuccessToast, useErrorHandl
 import { createAPIError, createResearchError, ErrorCode, ScopeStackError } from "@/lib/errors"
 import { withRetry } from "@/lib/retry"
 import Link from "next/link"
+import Image from "next/image"
 
 interface ResearchStep {
   id: string
@@ -475,51 +476,41 @@ export default function ScopeStackContentEngine() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-scopestack-primary/5 to-scopestack-button/10 p-4">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <Button 
               onClick={handleClearContent} 
               variant="outline" 
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-800"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-800 w-full sm:w-auto"
               disabled={isProcessing}
+              size="sm"
             >
               <RotateCcw className="h-4 w-4" />
               Reset
             </Button>
-            <div className="flex gap-2">
-              <Button 
-                onClick={() => {
-                  console.log("Debug localStorage:", {
-                    userInput,
-                    savedInput: localStorage.getItem("user_input"),
-                    buttonDisabled: !userInput.trim() || isProcessing
-                  });
-                  
-                  // Force reset if needed
-                  if (!userInput && localStorage.getItem("user_input")) {
-                    const savedInput = localStorage.getItem("user_input");
-                    console.log("Force resetting userInput from localStorage:", savedInput);
-                    setUserInput(savedInput || "");
-                  }
-                }} 
-                variant="outline" 
-                className="flex items-center gap-2 text-orange-600"
-              >
-                Debug
+            <Link href="/settings" className="w-full sm:w-auto">
+              <Button variant="outline" className="flex items-center gap-2 w-full" size="sm">
+                <Settings className="h-4 w-4" />
+                Settings
               </Button>
-              <Link href="/settings">
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Settings className="h-4 w-4" />
-                  Settings
-                </Button>
-              </Link>
-            </div>
+            </Link>
           </div>
-          <h1 className="text-4xl font-bold text-gray-900">ScopeStack Research-Driven Content Engine</h1>
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Image 
+              src="/scopestack-logo.svg" 
+              alt="ScopeStack" 
+              width={200} 
+              height={40}
+              className="h-10 w-auto"
+            />
+          </div>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 leading-tight">
+            Research-Driven Content Engine
+          </h1>
+          <p className="text-base sm:text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed px-4 sm:px-0">
             Conducts fresh research every time to generate structured professional services content dynamically from
             actual research findings. No templates, no canned data.
           </p>
@@ -561,7 +552,7 @@ export default function ScopeStackContentEngine() {
               <Button
                 onClick={handleGenerate}
                 disabled={(userInput ? !userInput.trim() : true) || isProcessing}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-scopestack-primary hover:bg-scopestack-primary/90 text-white"
               >
                 {isProcessing ? (
                   <>
