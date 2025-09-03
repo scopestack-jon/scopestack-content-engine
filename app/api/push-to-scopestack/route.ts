@@ -65,6 +65,92 @@ function transformQuestionsToSurveyResponses(questions: Question[]): Record<stri
   return responses
 }
 
+function generateProjectName(technology: string): string {
+  // Clean and extract key technology components from user input
+  const cleanTech = technology.trim()
+  
+  // Handle generic or unclear inputs first
+  if (/^(help|scope|scoping|project)\b/i.test(cleanTech) || 
+      /^(help\s+(me\s+)?(scope|scoping))/i.test(cleanTech) ||
+      cleanTech.length < 10) {
+    return 'Technology Implementation Project'
+  }
+  
+  // Common patterns to identify technology types
+  const techPatterns = [
+    // Network/Security
+    { pattern: /cisco\s+ise/i, name: 'Cisco ISE Network Access Control' },
+    { pattern: /palo\s+alto/i, name: 'Palo Alto Security Implementation' },
+    { pattern: /fortinet|fortigate/i, name: 'Fortinet Security Implementation' },
+    { pattern: /checkpoint/i, name: 'Check Point Security Implementation' },
+    { pattern: /meraki/i, name: 'Cisco Meraki Network Implementation' },
+    
+    // Cloud platforms
+    { pattern: /aws|amazon\s+web/i, name: 'AWS Cloud Implementation' },
+    { pattern: /azure|microsoft\s+cloud/i, name: 'Microsoft Azure Implementation' },
+    { pattern: /gcp|google\s+cloud/i, name: 'Google Cloud Implementation' },
+    { pattern: /office\s*365|o365/i, name: 'Microsoft 365 Implementation' },
+    
+    // Communication/Collaboration
+    { pattern: /teams/i, name: 'Microsoft Teams Implementation' },
+    { pattern: /zoom/i, name: 'Zoom Platform Implementation' },
+    { pattern: /webex/i, name: 'Cisco Webex Implementation' },
+    { pattern: /slack/i, name: 'Slack Workspace Implementation' },
+    
+    // Infrastructure
+    { pattern: /vmware/i, name: 'VMware Virtualization Implementation' },
+    { pattern: /hyper-?v/i, name: 'Hyper-V Virtualization Implementation' },
+    { pattern: /citrix/i, name: 'Citrix Implementation' },
+    { pattern: /active\s+directory|ad/i, name: 'Active Directory Implementation' },
+    
+    // Audio/Visual
+    { pattern: /av\s+|audio.*video|lighting.*sound|concert.*environment/i, name: 'Audio Visual System Implementation' },
+    
+    // Email/Migration
+    { pattern: /email.*migration|migration.*email/i, name: 'Email Migration Project' },
+    { pattern: /exchange/i, name: 'Microsoft Exchange Implementation' },
+    
+    // ERP/Business Applications
+    { pattern: /salesforce/i, name: 'Salesforce Implementation' },
+    { pattern: /sap/i, name: 'SAP Implementation' },
+    { pattern: /oracle/i, name: 'Oracle Implementation' },
+    
+    // Backup/Storage
+    { pattern: /backup/i, name: 'Backup Solution Implementation' },
+    { pattern: /storage/i, name: 'Storage Solution Implementation' },
+    
+    // General patterns
+    { pattern: /implementation/i, name: 'Technology Implementation Project' },
+    { pattern: /migration/i, name: 'Technology Migration Project' },
+    { pattern: /upgrade/i, name: 'Technology Upgrade Project' },
+    { pattern: /deployment/i, name: 'Technology Deployment Project' }
+  ]
+  
+  // Try to match patterns
+  for (const { pattern, name } of techPatterns) {
+    if (pattern.test(cleanTech)) {
+      return name
+    }
+  }
+  
+  // Fallback: Create a name from the first few meaningful words
+  const words = cleanTech.split(/\s+/)
+    .filter(word => 
+      word.length > 2 && 
+      !/^(a|an|the|for|with|and|or|but|in|on|at|to|by|from|help|me|scope|scoping|out)$/i.test(word)
+    )
+    .slice(0, 4)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+  
+  if (words.length >= 2) {
+    return `${words.join(' ')} Implementation`
+  } else if (words.length === 1) {
+    return `${words[0]} Technology Implementation`
+  }
+  
+  return 'Technology Implementation Project'
+}
+
 function generateExecutiveSummary(
   technology: string,
   services: Service[],
@@ -72,6 +158,9 @@ function generateExecutiveSummary(
   clientName?: string
 ): string {
   const clientNameStr = clientName || 'your organization'
+  
+  // Generate clean technology name for professional summary
+  const cleanTechnologyName = generateProjectName(technology).replace(' Implementation', '').replace(' Project', '')
   
   // Build service metadata
   const serviceCount = services.length
@@ -86,37 +175,36 @@ function generateExecutiveSummary(
   
   let summary = ''
   
-  // Paragraph 1: Introduction with client name and project context
-  summary += `${clientNameStr} is embarking on a strategic ${technology} initiative to modernize infrastructure and enhance operational capabilities. `
-  summary += `This comprehensive engagement will deliver a production-ready ${technology} solution tailored to meet specific business requirements and technical objectives. `
-  summary += `Our proposed approach encompasses ${serviceCount} specialized services delivered across ${phases.length || 1} project ${phases.length === 1 ? 'phase' : 'phases'}, ensuring systematic progress from initial assessment through full production deployment.\n\n`
+  // Paragraph 1: Strategic introduction
+  summary += `${clientNameStr} requires a ${cleanTechnologyName} solution to modernize infrastructure and enhance operational capabilities. `
+  summary += `This engagement delivers a production-ready implementation tailored to specific business requirements and technical objectives.\n\n`
   
-  // Paragraph 2: Client needs and recommended services overview
-  summary += `Based on industry best practices and proven implementation methodologies, we have structured this engagement to address critical areas including `
+  // Paragraph 2: Approach and methodology
   const serviceHighlights = []
-  if (hasAssessment) serviceHighlights.push('comprehensive requirements assessment')
-  if (hasPlanning) serviceHighlights.push('detailed architecture design')
-  if (hasImplementation) serviceHighlights.push('phased implementation and configuration')
-  if (hasValidation) serviceHighlights.push('rigorous testing and validation')
-  summary += serviceHighlights.join(', ') + '. '
+  if (hasAssessment) serviceHighlights.push('requirements assessment')
+  if (hasPlanning) serviceHighlights.push('architecture design')
+  if (hasImplementation) serviceHighlights.push('implementation and configuration')
+  if (hasValidation) serviceHighlights.push('testing and validation')
   
-  // Add key technical aspects
-  summary += `The technical solution will incorporate enterprise-grade security controls, high availability architecture, and scalable deployment patterns optimized for ${clientNameStr}'s environment. `
-  summary += `Each service phase builds upon previous deliverables, ensuring knowledge transfer and sustainable operations post-implementation.\n\n`
+  if (serviceHighlights.length > 0) {
+    summary += `Our structured approach includes ${serviceHighlights.join(', ')}, following industry best practices and proven methodologies. `
+  }
+  summary += `The solution incorporates enterprise-grade security controls, high availability architecture, and scalable deployment patterns.\n\n`
   
-  // Paragraph 3: Service details and benefits
-  summary += `**RECOMMENDED SERVICES:**\n\n`
+  // Paragraph 3: Service overview
+  summary += `**KEY SERVICES:**\n\n`
   services.forEach((service, index) => {
-    summary += `**${index + 1}. ${service.name}** (${service.hours} hours)\n`
-    summary += `${service.serviceDescription || service.description}\n\n`
+    summary += `**${index + 1}. ${service.name}**\n`
+    const description = service.serviceDescription || service.description
+    // Shorten long descriptions
+    const shortDescription = description.length > 150 ? description.substring(0, 150) + '...' : description
+    summary += `${shortDescription}\n\n`
   })
   
-  // Paragraph 4: Business outcomes and ROI
-  summary += `**ANTICIPATED BUSINESS OUTCOMES:**\n\n`
-  summary += `Upon successful completion of this ${technology} implementation, ${clientNameStr} will realize significant operational improvements including `
-  summary += `enhanced system reliability, reduced security risk exposure, improved compliance posture, and accelerated service delivery capabilities. `
-  summary += `The investment of ${totalHours} professional services hours will yield long-term value through automation efficiencies, reduced operational overhead, and improved business agility. `
-  summary += `Our methodology ensures minimal disruption to existing operations while delivering transformational technology capabilities that align with strategic business objectives.`
+  // Paragraph 4: Business outcomes
+  summary += `**EXPECTED OUTCOMES:**\n\n`
+  summary += `This ${cleanTechnologyName} implementation will deliver enhanced system reliability, reduced security risk exposure, improved compliance posture, and accelerated service delivery capabilities. `
+  summary += `The engagement provides long-term value through automation efficiencies, reduced operational overhead, and improved business agility while ensuring minimal disruption to existing operations.`
   
   return summary
 }
@@ -222,7 +310,9 @@ export async function POST(request: NextRequest) {
 
     // Step 4: Create project
     console.log('Step 4: Creating project...')
-    const finalProjectName = projectName || `${content.technology} Implementation - ${new Date().toLocaleDateString()}`
+    const generatedProjectName = generateProjectName(content.technology)
+    const finalProjectName = projectName || `${generatedProjectName} - ${new Date().toLocaleDateString()}`
+    console.log('Generated project name:', generatedProjectName)
     const project = await scopeStackApi.createProject({
       name: finalProjectName,
       clientId: client.id,

@@ -10,6 +10,26 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+  
+  @keyframes slide-in-from-bottom {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  .animate-in {
+    animation-duration: 0.3s;
+    animation-fill-mode: both;
+  }
+  
+  .slide-in-from-bottom-5 {
+    animation-name: slide-in-from-bottom;
+  }
 }
 
 @layer base {

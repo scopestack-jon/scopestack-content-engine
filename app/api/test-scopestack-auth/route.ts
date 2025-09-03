@@ -6,15 +6,19 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json()
-    const { apiKey, apiUrl, accountSlug } = body
+    const { apiKey, scopeStackApiKey, apiUrl, scopeStackApiUrl, accountSlug } = body
+    
+    // Support both parameter name formats for backwards compatibility
+    const finalApiKey = apiKey || scopeStackApiKey
+    const finalApiUrl = apiUrl || scopeStackApiUrl
     
     console.log('Test auth request:', {
-      hasApiKey: !!apiKey,
-      apiUrl: apiUrl || 'not provided',
+      hasApiKey: !!finalApiKey,
+      apiUrl: finalApiUrl || 'not provided',
       accountSlug: accountSlug || 'not provided'
     })
     
-    if (!apiKey) {
+    if (!finalApiKey) {
       console.log('No API key provided')
       return Response.json({ 
         error: "API key is required" 
@@ -22,19 +26,19 @@ export async function POST(request: NextRequest) {
     }
     
     // Default to the correct ScopeStack API URL
-    const baseUrl = apiUrl || 'https://api.scopestack.io'
+    const baseUrl = finalApiUrl || 'https://api.scopestack.io'
     
     console.log('Testing ScopeStack authentication:', {
       baseUrl,
-      hasApiKey: !!apiKey,
-      apiKeyPrefix: apiKey.substring(0, 10) + '...'
+      hasApiKey: !!finalApiKey,
+      apiKeyPrefix: finalApiKey.substring(0, 10) + '...'
     })
     
     // Test authentication using the /me endpoint
     try {
       const response = await axios.get(`${baseUrl}/v1/me`, {
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${finalApiKey}`,
           'Content-Type': 'application/vnd.api+json',
           'Accept': 'application/vnd.api+json',
         }

@@ -81,7 +81,9 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   const [questionResponses, setQuestionResponses] = useState<Map<string, any>>(new Map())
   const [modifiedServices, setModifiedServices] = useState(content?.services || [])
   const [isPushingToScopeStack, setIsPushingToScopeStack] = useState(false)
-  const [pushProgress, setPushProgress] = useState<{step: string, details?: string} | null>(null)
+  const [pushProgress, setPushProgress] = useState<{step: string, details?: string, status?: 'loading' | 'success' | 'error'} | null>(null)
+  const [scopeStackProjectUrl, setScopeStackProjectUrl] = useState<string | null>(null)
+  const [scopeStackProjectName, setScopeStackProjectName] = useState<string | null>(null)
 
   const toggleServiceExpanded = (index: number) => {
     const newExpanded = new Set(expandedServices)
@@ -195,6 +197,12 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   useEffect(() => {
     calculateServiceImpact()
   }, [questionResponses])
+
+  // Clear ScopeStack project URL when content changes (new generation)
+  useEffect(() => {
+    setScopeStackProjectUrl(null)
+    setScopeStackProjectName(null)
+  }, [content?.technology, content?.services?.length])
 
   // Debug logging
   console.log("ContentOutput received content:", {
@@ -401,14 +409,76 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
     if (!scopeStackApiKey) {
       toast({
         title: "API Key Required",
-        description: "Please configure your ScopeStack API key in Settings.",
+        description: "Redirecting to Settings to configure your ScopeStack API key...",
         variant: "destructive",
+        duration: 3000,
       })
+      
+      // Redirect to settings after a short delay
+      setTimeout(() => {
+        window.location.href = '/settings'
+      }, 1500)
       return
     }
     
     setIsPushingToScopeStack(true)
-    setPushProgress({ step: "Initializing...", details: "Preparing request payload" })
+    setPushProgress({ step: "Verifying API Key...", details: "Testing ScopeStack authentication", status: 'loading' })
+    
+    // First, test the API key
+    try {
+      const testResponse = await fetch('/api/test-scopestack-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scopeStackApiKey,
+          scopeStackApiUrl,
+        }),
+      })
+      
+      const testResult = await testResponse.json()
+      
+      if (!testResponse.ok || !testResult.success) {
+        setPushProgress({ step: "Authentication Failed", details: "Invalid API key or connection issue", status: 'error' })
+        
+        toast({
+          title: "Authentication Failed",
+          description: "Your ScopeStack API key is invalid. Redirecting to Settings...",
+          variant: "destructive",
+          duration: 3000,
+        })
+        
+        // Redirect to settings after a short delay
+        setTimeout(() => {
+          window.location.href = '/settings'
+        }, 2000)
+        
+        setIsPushingToScopeStack(false)
+        setTimeout(() => setPushProgress(null), 3000)
+        return
+      }
+      
+      // API key is valid, proceed with push
+      console.log('API key validated successfully:', testResult.user)
+    } catch (error) {
+      setPushProgress({ step: "Connection Failed", details: "Could not verify API key", status: 'error' })
+      
+      toast({
+        title: "Connection Error",
+        description: "Could not verify your API key. Redirecting to Settings...",
+        variant: "destructive",
+        duration: 3000,
+      })
+      
+      setTimeout(() => {
+        window.location.href = '/settings'
+      }, 2000)
+      
+      setIsPushingToScopeStack(false)
+      setTimeout(() => setPushProgress(null), 3000)
+      return
+    }
+    
+    setPushProgress({ step: "Initializing...", details: "Preparing request payload", status: 'loading' })
     
     try {
       const requestBody = {
@@ -431,7 +501,7 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
         apiKeyLength: scopeStackApiKey.length
       })
 
-      setPushProgress({ step: "Connecting to ScopeStack...", details: "Sending request to API" })
+      setPushProgress({ step: "Connecting to ScopeStack...", details: "Sending request to API", status: 'loading' })
 
       const response = await fetch("/api/push-to-scopestack", {
         method: "POST",
@@ -439,17 +509,22 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
         body: JSON.stringify(requestBody),
       })
 
-      setPushProgress({ step: "Processing response...", details: "Parsing server response" })
+      setPushProgress({ step: "Processing response...", details: "Parsing server response", status: 'loading' })
       const result = await response.json()
       console.log('ScopeStack response:', { status: response.status, result })
 
       if (response.ok) {
-        setPushProgress({ step: "✅ Success!", details: "Project created in ScopeStack" })
+        setPushProgress({ step: "Success!", details: "Project created in ScopeStack", status: 'success' })
         
         if (result.project?.url) {
+          // Store project details for persistent display
+          setScopeStackProjectUrl(result.project.url)
+          setScopeStackProjectName(result.project.name || 'Unnamed Project')
+          
           toast({
             title: "\u2713 Success!",
             description: `Project "${result.project.name || 'Unnamed Project'}" created successfully!`,
+            duration: 5000,
           })
           
           // Show detailed success info
@@ -457,19 +532,14 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
             toast({
               title: "Project Details",
               description: `ID: ${result.project.id} | Services: ${result.services?.length || 0} | Client: ${result.client?.name || 'N/A'}`,
+              duration: 5000,
             })
           }, 1000)
-          
-          // Optionally open the project URL
-          setTimeout(() => {
-            if (confirm(`Project created successfully!\n\nProject: ${result.project.name || result.project.id}\nURL: ${result.project.url}\n\nWould you like to open it in ScopeStack?`)) {
-              window.open(result.project.url, '_blank')
-            }
-          }, 2000)
         } else {
           toast({
             title: "\u2713 Success!",
             description: "Content successfully pushed to ScopeStack!",
+            duration: 5000,
           })
         }
         
@@ -484,15 +554,34 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
           }, 3000)
         }
       } else {
-        setPushProgress({ step: "Failed", details: result.error || "Unknown error" })
+        setPushProgress({ step: "Failed", details: result.error || "Unknown error", status: 'error' })
         console.error('ScopeStack error:', result)
         
         const errorMessage = result.details || result.error || "Failed to push to ScopeStack"
-        toast({
-          title: "\u274c Push Failed",
-          description: errorMessage,
-          variant: "destructive",
-        })
+        
+        // Check if it's an authentication error
+        if (result.statusCode === 401 || result.statusCode === 403 || 
+            (errorMessage && (errorMessage.toLowerCase().includes('unauthorized') || 
+                            errorMessage.toLowerCase().includes('authentication') ||
+                            errorMessage.toLowerCase().includes('api key')))) {
+          toast({
+            title: "Authentication Failed",
+            description: "API key is invalid or expired. Redirecting to Settings...",
+            variant: "destructive",
+            duration: 3000,
+          })
+          
+          setTimeout(() => {
+            window.location.href = '/settings'
+          }, 2000)
+        } else {
+          toast({
+            title: "\u274c Push Failed",
+            description: errorMessage,
+            variant: "destructive",
+            duration: 7000,
+          })
+        }
         
         // Show additional error details if available
         if (result.stack || result.statusCode) {
@@ -506,17 +595,23 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
         }
       }
     } catch (error) {
-      setPushProgress({ step: "Connection Failed", details: "Network or server error" })
+      setPushProgress({ step: "Connection Failed", details: "Network or server error", status: 'error' })
       console.error('ScopeStack push error:', error)
       toast({
         title: "\u274c Network Error", 
         description: "Failed to connect to the server. Please check your connection.",
         variant: "destructive",
+        duration: 7000,
       })
     } finally {
       setTimeout(() => {
         setIsPushingToScopeStack(false)
-        setPushProgress(null)
+        // Keep success/error status visible for longer
+        if (pushProgress?.status === 'success' || pushProgress?.status === 'error') {
+          setTimeout(() => setPushProgress(null), 3000)
+        } else {
+          setPushProgress(null)
+        }
       }, 2000)
     }
   }
@@ -976,9 +1071,89 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
   };
 
   // Helper function to safely get technology name
+  // Helper function to clean technology names (same logic as backend)
+  const generateCleanTechnologyName = (technology: string): string => {
+    const cleanTech = technology.trim()
+    
+    // Handle generic or unclear inputs first
+    if (/^(help|scope|scoping|project)\b/i.test(cleanTech) || 
+        /^(help\s+(me\s+)?(scope|scoping))/i.test(cleanTech) ||
+        cleanTech.length < 10) {
+      return 'Technology Solution'
+    }
+    
+    // Common patterns to identify technology types
+    const techPatterns = [
+      // Network/Security
+      { pattern: /cisco\s+ise/i, name: 'Cisco ISE Network Access Control' },
+      { pattern: /palo\s+alto/i, name: 'Palo Alto Security' },
+      { pattern: /fortinet|fortigate/i, name: 'Fortinet Security' },
+      { pattern: /checkpoint/i, name: 'Check Point Security' },
+      { pattern: /meraki/i, name: 'Cisco Meraki Network' },
+      
+      // Cloud platforms
+      { pattern: /aws|amazon\s+web/i, name: 'AWS Cloud' },
+      { pattern: /azure|microsoft\s+cloud/i, name: 'Microsoft Azure' },
+      { pattern: /gcp|google\s+cloud/i, name: 'Google Cloud' },
+      { pattern: /office\s*365|o365/i, name: 'Microsoft 365' },
+      
+      // Communication/Collaboration
+      { pattern: /teams/i, name: 'Microsoft Teams' },
+      { pattern: /zoom/i, name: 'Zoom Platform' },
+      { pattern: /webex/i, name: 'Cisco Webex' },
+      { pattern: /slack/i, name: 'Slack Workspace' },
+      
+      // Infrastructure
+      { pattern: /vmware/i, name: 'VMware Virtualization' },
+      { pattern: /hyper-?v/i, name: 'Hyper-V Virtualization' },
+      { pattern: /citrix/i, name: 'Citrix' },
+      { pattern: /active\s+directory|ad/i, name: 'Active Directory' },
+      
+      // Audio/Visual
+      { pattern: /av\s+|audio.*video|lighting.*sound|concert.*environment/i, name: 'Audio Visual System' },
+      
+      // Email/Migration
+      { pattern: /email.*migration|migration.*email/i, name: 'Email Migration' },
+      { pattern: /exchange/i, name: 'Microsoft Exchange' },
+      
+      // ERP/Business Applications
+      { pattern: /salesforce/i, name: 'Salesforce' },
+      { pattern: /sap/i, name: 'SAP' },
+      { pattern: /oracle/i, name: 'Oracle' },
+      
+      // Backup/Storage
+      { pattern: /backup/i, name: 'Backup Solution' },
+      { pattern: /storage/i, name: 'Storage Solution' },
+    ]
+    
+    // Try to match patterns
+    for (const { pattern, name } of techPatterns) {
+      if (pattern.test(cleanTech)) {
+        return name
+      }
+    }
+    
+    // Fallback: Create a name from the first few meaningful words
+    const words = cleanTech.split(/\s+/)
+      .filter(word => 
+        word.length > 2 && 
+        !/^(a|an|the|for|with|and|or|but|in|on|at|to|by|from|help|me|scope|scoping|out)$/i.test(word)
+      )
+      .slice(0, 4)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    
+    if (words.length >= 2) {
+      return words.join(' ')
+    } else if (words.length === 1) {
+      return `${words[0]} Technology`
+    }
+    
+    return 'Technology Solution'
+  }
+
   const getTechnologyName = (technology: any): string => {
     if (typeof technology === 'string') {
-      return technology;
+      return generateCleanTechnologyName(technology);
     }
     
     if (technology && typeof technology === 'object') {
@@ -1038,7 +1213,54 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Floating Push Status Notification */}
+      {isPushingToScopeStack && pushProgress && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm animate-in slide-in-from-bottom-5">
+          <Card className={`shadow-lg border-2 ${
+            pushProgress.status === 'success' 
+              ? 'border-green-500 bg-green-50' 
+              : pushProgress.status === 'error'
+              ? 'border-red-500 bg-red-50'
+              : 'border-scopestack-primary bg-white'
+          }`}>
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className={`mt-1 ${
+                  pushProgress.status === 'loading' ? 'animate-spin' : ''
+                }`}>
+                  {pushProgress.status === 'success' ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : pushProgress.status === 'error' ? (
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                  ) : (
+                    <div className="h-5 w-5 border-2 border-scopestack-primary/30 border-t-scopestack-primary rounded-full animate-spin" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-sm text-gray-900">
+                    Pushing to ScopeStack
+                  </div>
+                  <div className="text-sm text-gray-700 mt-1">
+                    {pushProgress.step}
+                  </div>
+                  {pushProgress.details && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {pushProgress.details}
+                    </div>
+                  )}
+                  {pushProgress.status === 'loading' && (
+                    <div className="mt-2 h-1 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-scopestack-primary rounded-full animate-pulse" style={{width: '60%'}} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      
       {/* Enhanced Header */}
       <Card className="bg-scopestack-primary border-scopestack-primary">
         <CardHeader>
@@ -1063,7 +1285,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                 {questionResponses.size > 0 && (
                   <Badge variant="default" className="flex items-center gap-1 bg-scopestack-button text-white text-xs">
                     <Calculator className="h-3 w-3" />
-                    {modifiedServices.reduce((sum, s) => sum + (s.hours || 0), 0)} adjusted hours
+                    {content.totalHours || 0} adjusted hours
                   </Badge>
                 )}
                 <Badge variant="outline" className="flex items-center gap-1 bg-white/20 text-white border-white/30 text-xs">
@@ -1078,7 +1300,32 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                   <Calculator className="h-3 w-3" />
                   {content.calculations?.length || 0} calculations
                 </Badge>
+                {/* ScopeStack Project Link */}
+                {scopeStackProjectUrl && (
+                  <Button
+                    onClick={() => window.open(scopeStackProjectUrl, '_blank')}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2 bg-green-500/20 text-white border-green-400/30 hover:bg-green-500/30 text-xs px-2 py-1 h-6"
+                  >
+                    <CheckCircle className="h-3 w-3" />
+                    <span className="hidden sm:inline">View in ScopeStack</span>
+                    <span className="sm:hidden">View Project</span>
+                  </Button>
+                )}
               </div>
+              {/* ScopeStack Project Details */}
+              {scopeStackProjectUrl && (
+                <div className="text-xs text-white/80 flex items-center gap-2">
+                  <span>✅ Pushed to ScopeStack:</span>
+                  <button
+                    onClick={() => window.open(scopeStackProjectUrl, '_blank')}
+                    className="underline hover:text-white transition-colors"
+                  >
+                    {scopeStackProjectName}
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               {/* Actions Dropdown Menu */}
@@ -1111,6 +1358,12 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                     Collapse All
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  {scopeStackProjectUrl && (
+                    <DropdownMenuItem onClick={() => window.open(scopeStackProjectUrl, '_blank')}>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      View in ScopeStack
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={exportToScopeStack}>
                     <Download className="h-4 w-4 mr-2" />
                     Export JSON
@@ -1129,16 +1382,30 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                 Settings
               </Button>
 
+              {/* View in ScopeStack Button */}
+              {scopeStackProjectUrl && (
+                <Button 
+                  onClick={() => window.open(scopeStackProjectUrl, '_blank')}
+                  variant="outline" 
+                  size="sm"
+                  className="bg-green-500/20 hover:bg-green-500/30 text-white border-green-400/30 flex-shrink-0"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">View in ScopeStack</span>
+                  <span className="sm:hidden">View</span>
+                </Button>
+              )}
+
               {/* Primary Push Button */}
               <Button 
                 onClick={pushToScopeStack} 
-                className="bg-scopestack-button hover:bg-scopestack-button/90 text-white flex-shrink-0"
+                className="bg-scopestack-button hover:bg-scopestack-button/90 text-white flex-shrink-0 relative"
                 disabled={isPushingToScopeStack}
                 size="sm"
               >
                 {isPushingToScopeStack ? (
                   <>
-                    <span className="animate-spin mr-2">⏳</span>
+                    <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
                     <span className="hidden sm:inline">Pushing...</span>
                     <span className="sm:hidden">Push</span>
                   </>
@@ -1154,10 +1421,26 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
             
             {/* Push Progress Display */}
             {pushProgress && (
-              <div className="mt-4 p-4 bg-white/20 rounded-md border border-white/30">
+              <div className={`mt-4 p-4 rounded-md border ${
+                pushProgress.status === 'success' 
+                  ? 'bg-green-500/20 border-green-400/30' 
+                  : pushProgress.status === 'error'
+                  ? 'bg-red-500/20 border-red-400/30'
+                  : 'bg-white/20 border-white/30'
+              }`}>
                 <div className="flex items-center justify-between text-white">
                   <div className="flex items-center gap-3">
-                    <div className="animate-spin">⏳</div>
+                    <div className={`${
+                      pushProgress.status === 'loading' ? 'animate-spin' : ''
+                    }`}>
+                      {pushProgress.status === 'success' ? (
+                        <CheckCircle className="h-5 w-5 text-green-400" />
+                      ) : pushProgress.status === 'error' ? (
+                        <AlertCircle className="h-5 w-5 text-red-400" />
+                      ) : (
+                        <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      )}
+                    </div>
                     <div className="flex flex-col">
                       <span className="font-medium text-sm">{pushProgress.step}</span>
                       {pushProgress.details && (
@@ -1166,7 +1449,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                     </div>
                   </div>
                   <div className="text-xs text-white/60">
-                    Processing...
+                    {pushProgress.status === 'success' ? 'Complete' : pushProgress.status === 'error' ? 'Failed' : 'Processing...'}
                   </div>
                 </div>
               </div>
@@ -1609,6 +1892,24 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                               </CardHeader>
                               <CardContent className="pt-0">
                                 <div className="space-y-4">
+                                  {/* Show service-level language field first if it exists */}
+                                  {service[selectedLanguageField] && (
+                                    <div className="border-l-4 border-green-200 bg-green-50 p-4 rounded-r mb-4">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                                          <span className="text-xs font-medium text-green-700">S</span>
+                                        </div>
+                                        <span className="font-medium text-gray-900 text-sm">
+                                          {getServiceName(service)} - Service Level
+                                        </span>
+                                      </div>
+                                      <div className="text-sm text-gray-700 leading-relaxed">
+                                        {service[selectedLanguageField]}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Then show subservice-level fields */}
                                   {getSubservices(service).map((sub: any, subIndex: number) => (
                                     <div key={subIndex} className="border-l-4 border-blue-200 bg-white p-4 rounded-r">
                                       <div className="flex items-center gap-2 mb-2">

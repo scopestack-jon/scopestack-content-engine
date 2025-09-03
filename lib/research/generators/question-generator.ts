@@ -38,15 +38,21 @@ Generate questions that are:
 3. Practical for professional services scoping
 4. Mix of multiple choice questions AND numerical quantity questions
 5. Use "How many" for quantity questions (users, mailboxes, servers, storage amounts)
+6. Use "What is the" for requirement/specification questions (bandwidth, capacity, etc.)
 
 QUESTION TYPES:
 - Multiple choice: For decisions, preferences, complexity levels
-- Numerical: For quantities like "How many users need to be migrated?", "How much storage data?", "What is the project budget?"
+- Number: For quantities like "How many users need to be migrated?", "What is the bandwidth requirement per site?", "How much storage data?"
 
 Return ONLY a JSON array of questions in this exact format:
 [
   {
     "text": "How many users need to be migrated?",
+    "type": "number",
+    "required": true
+  },
+  {
+    "text": "What is the average bandwidth requirement per site?",
     "type": "number",
     "required": true
   },
@@ -96,17 +102,64 @@ NO markdown, NO explanations, ONLY the JSON array.`;
             .replace(/\s+/g, '_')
             .substring(0, 50);
 
-          // Convert options to frontend format
-          const formattedOptions = Array.isArray(q.options) 
-            ? q.options.map((opt: string, optIndex: number) => ({
-                key: opt,
-                value: optIndex + 1,
-                default: optIndex === 0 // First option is default
-              }))
-            : [
-                { key: "Yes", value: 1, default: true },
-                { key: "No", value: 0, default: false }
+          // Convert options to frontend format based on question type
+          let formattedOptions: any[];
+          
+          if (q.type === 'number' || q.type === 'numerical') {
+            // For numerical questions, provide quantity ranges
+            const lowerQuestionText = questionText.toLowerCase();
+            
+            if (lowerQuestionText.includes('bandwidth') || lowerQuestionText.includes('mbps') || lowerQuestionText.includes('gbps')) {
+              formattedOptions = [
+                { key: "10-50 Mbps", value: 30, default: true },
+                { key: "50-100 Mbps", value: 75, default: false },
+                { key: "100-500 Mbps", value: 300, default: false },
+                { key: "500+ Mbps", value: 1000, default: false }
               ];
+            } else if (lowerQuestionText.includes('user') || lowerQuestionText.includes('endpoint') || lowerQuestionText.includes('device')) {
+              formattedOptions = [
+                { key: "1-50", value: 25, default: true },
+                { key: "51-200", value: 125, default: false },
+                { key: "201-1000", value: 600, default: false },
+                { key: "1000+", value: 2000, default: false }
+              ];
+            } else if (lowerQuestionText.includes('location') || lowerQuestionText.includes('site') || lowerQuestionText.includes('office')) {
+              formattedOptions = [
+                { key: "1-2 locations", value: 1, default: true },
+                { key: "3-10 locations", value: 6, default: false },
+                { key: "11-50 locations", value: 30, default: false },
+                { key: "50+ locations", value: 100, default: false }
+              ];
+            } else if (lowerQuestionText.includes('storage') || lowerQuestionText.includes('data') || lowerQuestionText.includes('tb') || lowerQuestionText.includes('gb')) {
+              formattedOptions = [
+                { key: "< 1 TB", value: 500, default: true },
+                { key: "1-10 TB", value: 5000, default: false },
+                { key: "10-100 TB", value: 50000, default: false },
+                { key: "100+ TB", value: 200000, default: false }
+              ];
+            } else {
+              // Generic quantity ranges
+              formattedOptions = [
+                { key: "1-10", value: 5, default: true },
+                { key: "11-50", value: 30, default: false },
+                { key: "51-200", value: 125, default: false },
+                { key: "200+", value: 500, default: false }
+              ];
+            }
+          } else if (Array.isArray(q.options)) {
+            // For multiple choice questions with provided options
+            formattedOptions = q.options.map((opt: string, optIndex: number) => ({
+              key: opt,
+              value: optIndex + 1,
+              default: optIndex === 0 // First option is default
+            }));
+          } else {
+            // Default Yes/No for boolean questions
+            formattedOptions = [
+              { key: "Yes", value: 1, default: true },
+              { key: "No", value: 0, default: false }
+            ];
+          }
 
           const finalQuestion = {
             id: `q${index + 1}`,

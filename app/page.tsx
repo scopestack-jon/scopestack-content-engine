@@ -86,32 +86,39 @@ export default function ScopeStackContentEngine() {
   const { handleError } = useErrorHandler()
 
   useEffect(() => {
-    // Load saved content and input from localStorage
-    const savedContent = localStorage.getItem("generated_content")
-    const savedInput = localStorage.getItem("user_input")
-
-    console.log("Initial load from localStorage:", {
-      savedContent: savedContent ? "exists" : "null",
-      savedInput,
-      savedInputLength: savedInput?.length || 0
-    })
-
-    if (savedContent) {
-      try {
-        setGeneratedContent(JSON.parse(savedContent))
-      } catch (e) {
-        handleError(e, {
-          context: 'loading saved content',
-          showToast: false // Don't show toast on app load
-        })
-      }
-    }
-
-    if (savedInput) {
-      console.log("Setting userInput from localStorage:", savedInput)
-      setUserInput(savedInput)
+    // Check if we're coming back from settings or another page
+    const isReturning = sessionStorage.getItem("page_loaded")
+    
+    if (!isReturning) {
+      // This is a fresh page load (new tab, refresh, or first visit)
+      localStorage.removeItem("generated_content")
+      localStorage.removeItem("user_input")
+      console.log("Fresh page load - cleared saved content and input from localStorage")
+      
+      // Mark that we've loaded the page in this session
+      sessionStorage.setItem("page_loaded", "true")
     } else {
-      console.log("No saved input found in localStorage")
+      // We're returning from another page (like settings)
+      // Try to restore saved content
+      const savedContent = localStorage.getItem("generated_content")
+      const savedInput = localStorage.getItem("user_input")
+      
+      if (savedContent) {
+        try {
+          setGeneratedContent(JSON.parse(savedContent))
+          console.log("Restored saved content from localStorage")
+        } catch (e) {
+          handleError(e, {
+            context: 'loading saved content',
+            showToast: false
+          })
+        }
+      }
+      
+      if (savedInput) {
+        setUserInput(savedInput)
+        console.log("Restored saved input from localStorage")
+      }
     }
 
     // Log current settings for debugging
@@ -128,7 +135,7 @@ export default function ScopeStackContentEngine() {
     })
   }, [])
 
-  // Save content whenever it changes
+  // Save content whenever it changes and auto-collapse research
   useEffect(() => {
     if (generatedContent) {
       console.log("Generated content state updated:", generatedContent)
@@ -142,14 +149,7 @@ export default function ScopeStackContentEngine() {
     if (userInput) {
       localStorage.setItem("user_input", userInput)
     }
-    // Debug why the button might be disabled
-    console.log("Input state updated:", {
-      userInput,
-      isEmpty: !userInput.trim(),
-      isProcessing,
-      buttonDisabled: !userInput.trim() || isProcessing
-    })
-  }, [userInput, isProcessing])
+  }, [userInput])
 
   const handleClearContent = () => {
     // Clear all state
