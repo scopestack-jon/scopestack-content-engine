@@ -16,8 +16,9 @@ interface RequestLogger {
   getRequestLogs: (limit?: number) => Promise<RequestLogEntry[]>
 }
 
-class FileRequestLogger implements RequestLogger {
-  private logFile = '/tmp/scopestack-requests.jsonl'
+class VercelRequestLogger implements RequestLogger {
+  private memoryLogs: RequestLogEntry[] = []
+  private maxLogs = 1000 // Keep last 1000 entries in memory
 
   async logRequest(entry: Omit<RequestLogEntry, 'id' | 'timestamp'>): Promise<void> {
     const logEntry: RequestLogEntry = {
@@ -26,36 +27,51 @@ class FileRequestLogger implements RequestLogger {
       ...entry
     }
 
-    // In production, this would go to a database
-    // For now, log to console and optionally to file in development
-    console.log('📊 REQUEST LOG:', JSON.stringify(logEntry, null, 2))
+    // Always log to console for Vercel logs visibility
+    console.log('📊 SOLUTION GENERATED:', {
+      timestamp: logEntry.timestamp,
+      user: logEntry.userName || 'Anonymous',
+      account: logEntry.accountSlug || 'N/A', 
+      request: logEntry.userRequest,
+      duration: logEntry.duration ? `${logEntry.duration}ms` : 'N/A'
+    })
     
+    // Store in memory (limited retention)
+    this.memoryLogs.push(logEntry)
+    
+    // Keep only recent logs to prevent memory issues
+    if (this.memoryLogs.length > this.maxLogs) {
+      this.memoryLogs = this.memoryLogs.slice(-this.maxLogs)
+    }
+    
+    // In development, also write to file
     if (process.env.NODE_ENV === 'development') {
       try {
         const fs = require('fs').promises
-        await fs.appendFile(this.logFile, JSON.stringify(logEntry) + '\n')
+        const logFile = '/tmp/scopestack-requests.jsonl'
+        await fs.appendFile(logFile, JSON.stringify(logEntry) + '\n')
       } catch (error) {
         // Fail silently in case of file system issues
-        console.warn('Failed to write to log file:', error)
       }
     }
   }
-
 
   async getRequestLogs(limit = 100): Promise<RequestLogEntry[]> {
-    try {
-      if (process.env.NODE_ENV === 'development') {
+    // In development, try to read from file first
+    if (process.env.NODE_ENV === 'development') {
+      try {
         const fs = require('fs').promises
-        const data = await fs.readFile(this.logFile, 'utf8')
+        const data = await fs.readFile('/tmp/scopestack-requests.jsonl', 'utf8')
         const logs = data.trim().split('\n').map(line => JSON.parse(line))
         return logs.slice(-limit)
+      } catch (error) {
+        // Fall through to memory logs
       }
-    } catch (error) {
-      // File doesn't exist or can't be read
     }
-    return []
+    
+    // Return from memory (Vercel production)
+    return this.memoryLogs.slice(-limit)
   }
-
 }
 
 // Singleton instance
@@ -63,7 +79,7 @@ let logger: RequestLogger | null = null
 
 export function getRequestLogger(): RequestLogger {
   if (!logger) {
-    logger = new FileRequestLogger()
+    logger = new VercelRequestLogger()
   }
   return logger
 }
