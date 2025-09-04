@@ -420,11 +420,11 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   }) => {
     setAuthenticatedAccount(accountInfo)
     
-    // Get other settings from localStorage
+    // Get other settings from localStorage with proper defaults
     const scopeStackApiUrl = localStorage.getItem('scopestack_api_url') || 'https://api.scopestack.io'
     const scopeStackWorkflow = localStorage.getItem('scopestack_workflow') || 'project-with-services'
-    const useDirectServices = localStorage.getItem('scopestack_use_direct_services') === 'true'
-    const skipSurvey = localStorage.getItem('scopestack_skip_survey') === 'true'
+    const useDirectServices = localStorage.getItem('scopestack_use_direct_services') !== 'false' // Default to true
+    const skipSurvey = localStorage.getItem('scopestack_skip_survey') !== 'false' // Default to true  
     const skipDocument = localStorage.getItem('scopestack_skip_document') === 'true'
     
     setIsPushingToScopeStack(true)
