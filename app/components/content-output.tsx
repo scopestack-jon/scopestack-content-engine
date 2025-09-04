@@ -9,11 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { FileText, Download, Clock, Hash, Link2, Calculator, ChevronRight, ChevronDown, Layers, Users, Settings, Target, CheckCircle, AlertCircle, Info, ArrowRight, Briefcase, Calendar, DollarSign, TrendingUp, Filter, Table, Eye, ChevronUp, MoreVertical, Maximize, Minimize } from "lucide-react"
+import { FileText, Download, Clock, Hash, Link2, Calculator, ChevronRight, ChevronDown, Layers, Users, Settings, Target, CheckCircle, AlertCircle, Info, ArrowRight, Briefcase, Calendar, DollarSign, TrendingUp, Filter, Table, Eye, ChevronUp, MoreVertical, Maximize, Minimize, User } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { ScopeStackAuthModal } from "./scopestack-auth-modal"
 
 interface GeneratedContent {
   technology: string
@@ -84,6 +85,14 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
   const [pushProgress, setPushProgress] = useState<{step: string, details?: string, status?: 'loading' | 'success' | 'error'} | null>(null)
   const [scopeStackProjectUrl, setScopeStackProjectUrl] = useState<string | null>(null)
   const [scopeStackProjectName, setScopeStackProjectName] = useState<string | null>(null)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [authenticatedAccount, setAuthenticatedAccount] = useState<{
+    userName: string
+    accountSlug: string
+    accountId: string
+    email: string
+    apiKey: string
+  } | null>(null)
 
   const toggleServiceExpanded = (index: number) => {
     const newExpanded = new Set(expandedServices)
@@ -396,87 +405,34 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
     URL.revokeObjectURL(url)
   }
 
-  const pushToScopeStack = async () => {
-    // Get settings from localStorage (from settings page)
-    const scopeStackApiKey = (localStorage.getItem('scopestack_api_key') || '').trim()
-    const scopeStackAccountSlug = (localStorage.getItem('scopestack_account_slug') || '').trim()
-    const scopeStackApiUrl = (localStorage.getItem('scopestack_api_url') || 'https://api.scopestack.io').trim().replace(/\/$/, '')
+  // Handle the initial push button click - show auth modal
+  const handlePushToScopeStack = () => {
+    setShowAuthModal(true)
+  }
+
+  // Handle authentication success and perform the actual push
+  const pushToScopeStack = async (accountInfo: {
+    userName: string
+    accountSlug: string
+    accountId: string
+    email: string
+    apiKey: string
+  }) => {
+    setAuthenticatedAccount(accountInfo)
+    
+    // Get other settings from localStorage
+    const scopeStackApiUrl = localStorage.getItem('scopestack_api_url') || 'https://api.scopestack.io'
     const scopeStackWorkflow = localStorage.getItem('scopestack_workflow') || 'project-with-services'
     const useDirectServices = localStorage.getItem('scopestack_use_direct_services') === 'true'
     const skipSurvey = localStorage.getItem('scopestack_skip_survey') === 'true'
     const skipDocument = localStorage.getItem('scopestack_skip_document') === 'true'
     
-    if (!scopeStackApiKey) {
-      toast({
-        title: "API Key Required",
-        description: "Redirecting to Settings to configure your ScopeStack API key...",
-        variant: "destructive",
-        duration: 3000,
-      })
-      
-      // Redirect to settings after a short delay
-      setTimeout(() => {
-        window.location.href = '/settings'
-      }, 1500)
-      return
-    }
-    
     setIsPushingToScopeStack(true)
-    setPushProgress({ step: "Verifying API Key...", details: "Testing ScopeStack authentication", status: 'loading' })
-    
-    // First, test the API key
-    try {
-      const testResponse = await fetch('/api/test-scopestack-auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scopeStackApiKey,
-          scopeStackApiUrl,
-        }),
-      })
-      
-      const testResult = await testResponse.json()
-      
-      if (!testResponse.ok || !testResult.success) {
-        setPushProgress({ step: "Authentication Failed", details: "Invalid API key or connection issue", status: 'error' })
-        
-        toast({
-          title: "Authentication Failed",
-          description: "Your ScopeStack API key is invalid. Redirecting to Settings...",
-          variant: "destructive",
-          duration: 3000,
-        })
-        
-        // Redirect to settings after a short delay
-        setTimeout(() => {
-          window.location.href = '/settings'
-        }, 2000)
-        
-        setIsPushingToScopeStack(false)
-        setTimeout(() => setPushProgress(null), 3000)
-        return
-      }
-      
-      // API key is valid, proceed with push
-      console.log('API key validated successfully:', testResult.user)
-    } catch (error) {
-      setPushProgress({ step: "Connection Failed", details: "Could not verify API key", status: 'error' })
-      
-      toast({
-        title: "Connection Error",
-        description: "Could not verify your API key. Redirecting to Settings...",
-        variant: "destructive",
-        duration: 3000,
-      })
-      
-      setTimeout(() => {
-        window.location.href = '/settings'
-      }, 2000)
-      
-      setIsPushingToScopeStack(false)
-      setTimeout(() => setPushProgress(null), 3000)
-      return
-    }
+    setPushProgress({ 
+      step: `Pushing to ${accountInfo.accountSlug}...`, 
+      details: `Connected as ${accountInfo.userName}`, 
+      status: 'loading' 
+    })
     
     setPushProgress({ step: "Initializing...", details: "Preparing request payload", status: 'loading' })
     
@@ -487,8 +443,8 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
         skipSurvey,
         skipDocument,
         workflow: scopeStackWorkflow,
-        scopeStackApiKey,
-        scopeStackAccountSlug: scopeStackAccountSlug || undefined,
+        scopeStackApiKey: accountInfo.apiKey,
+        scopeStackAccountSlug: accountInfo.accountSlug,
         scopeStackApiUrl: scopeStackApiUrl || undefined,
       }
 
@@ -497,8 +453,10 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
         useDirectServices,
         skipSurvey,
         skipDocument,
-        hasApiKey: !!scopeStackApiKey,
-        apiKeyLength: scopeStackApiKey.length
+        accountSlug: accountInfo.accountSlug,
+        userName: accountInfo.userName,
+        hasApiKey: !!accountInfo.apiKey,
+        apiKeyLength: accountInfo.apiKey.length
       })
 
       setPushProgress({ step: "Connecting to ScopeStack...", details: "Sending request to API", status: 'loading' })
@@ -1396,9 +1354,17 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                 </Button>
               )}
 
+              {/* Account Indicator */}
+              {authenticatedAccount && (
+                <div className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
+                  <User className="h-3 w-3" />
+                  <span>Connected: {authenticatedAccount.accountSlug}</span>
+                </div>
+              )}
+
               {/* Primary Push Button */}
               <Button 
-                onClick={pushToScopeStack} 
+                onClick={handlePushToScopeStack} 
                 className="bg-scopestack-button hover:bg-scopestack-button/90 text-white flex-shrink-0 relative"
                 disabled={isPushingToScopeStack}
                 size="sm"
@@ -1959,6 +1925,13 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
         </Tabs>
         </CardContent>
       </Card>
+      
+      {/* Authentication Modal */}
+      <ScopeStackAuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onAuthenticated={pushToScopeStack}
+      />
     </div>
   )
 }
