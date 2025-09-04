@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getResearchOrchestrator } from '../../../lib/research/orchestrator/research-orchestrator';
-import { getRequestLogger, getSessionId } from '../../../lib/request-logger';
+import { getRequestLogger, getScopeStackUserInfo, getSessionId } from '../../../lib/request-logger';
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -13,19 +13,24 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const userRequest = body.input || body.request;
+    const scopeStackApiKey = body.scopeStackApiKey;
+    const scopeStackApiUrl = body.scopeStackApiUrl;
     
     if (!userRequest) {
       return NextResponse.json({ error: 'Input or request is required' }, { status: 400 });
     }
 
-    // Log the request  
+    // Get user info from ScopeStack if credentials provided
+    const { userName, accountSlug } = await getScopeStackUserInfo(scopeStackApiKey, scopeStackApiUrl);
     const sessionId = getSessionId(request);
     
     await logger.logRequest({
       userRequest,
       requestType: 'research',
       sessionId,
-      status: 'started'
+      status: 'started',
+      userName,
+      accountSlug
     });
 
     console.log('🔍 Starting research for:', userRequest);
@@ -132,7 +137,9 @@ export async function POST(request: NextRequest) {
                 requestType: 'research',
                 sessionId,
                 status: 'completed',
-                duration: Date.now() - startTime
+                duration: Date.now() - startTime,
+                userName,
+                accountSlug
               }).catch(err => console.warn('Failed to log completion:', err));
             } else if (event.type === 'error') {
               sendSSE({
@@ -167,7 +174,9 @@ export async function POST(request: NextRequest) {
             sessionId,
             status: 'failed',
             duration: Date.now() - startTime,
-            errorMessage
+            errorMessage,
+            userName,
+            accountSlug
           }).catch(err => console.warn('Failed to log error:', err));
           
           sendSSE({

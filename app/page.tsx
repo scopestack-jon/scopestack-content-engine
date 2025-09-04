@@ -216,6 +216,9 @@ export default function ScopeStackContentEngine() {
             research: localStorage.getItem("research_prompt"),
             analysis: localStorage.getItem("analysis_prompt"),
           },
+          // Include ScopeStack credentials for user attribution
+          scopeStackApiKey: localStorage.getItem("scopestack_api_key"),
+          scopeStackApiUrl: localStorage.getItem("scopestack_api_url"),
         }),
       })
 
