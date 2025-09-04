@@ -44,22 +44,23 @@ class ScopeStackOAuthService {
   }
 
   // Exchange authorization code for tokens
-  async exchangeCodeForTokens(code: string): Promise<ScopeStackSession> {
+  async exchangeCodeForTokens(code: string, redirectUri?: string): Promise<ScopeStackSession> {
     try {
-      const redirectUri = this.getRedirectUri()
+      // Use the provided redirect URI or default to the configured one
+      const finalRedirectUri = redirectUri || 'https://scopestack-content-engine.vercel.app/api/oauth/scopestack/callback'
       
       const formData = new URLSearchParams({
         grant_type: 'authorization_code',
         client_id: this.clientId,
         client_secret: this.clientSecret,
         code,
-        redirect_uri: redirectUri
+        redirect_uri: finalRedirectUri
       })
 
       console.log('Exchanging code for tokens:', {
         endpoint: this.tokenEndpoint,
         clientId: this.clientId,
-        redirectUri,
+        redirectUri: finalRedirectUri,
         hasCode: !!code
       })
 

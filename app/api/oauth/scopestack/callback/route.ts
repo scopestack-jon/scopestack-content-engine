@@ -29,11 +29,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Exchange authorization code for tokens
-    const session = await scopeStackOAuth.exchangeCodeForTokens(code);
+    console.log('Attempting to exchange code for tokens...');
+    const redirectUri = 'https://scopestack-content-engine.vercel.app/api/oauth/scopestack/callback';
+    const session = await scopeStackOAuth.exchangeCodeForTokens(code, redirectUri);
     
     console.log('OAuth callback successful:', {
       userName: session.userName,
-      accountSlug: session.accountSlug
+      accountSlug: session.accountSlug,
+      hasAccessToken: !!session.accessToken,
+      expiresAt: new Date(session.expiresAt).toISOString()
     });
 
     // Store session in a way that the frontend can access it
@@ -46,8 +50,9 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('OAuth callback error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'callback_failed';
     return NextResponse.redirect(
-      new URL(`/?oauth_error=${encodeURIComponent('callback_failed')}`, request.url)
+      new URL(`/?oauth_error=${encodeURIComponent(errorMessage)}`, request.url)
     );
   }
 }
