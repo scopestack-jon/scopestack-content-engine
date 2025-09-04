@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server"
 import { ScopeStackApiService, ScopeStackService } from "@/lib/scopestack-api-service"
 import type { GeneratedContent, Service, Question, ResearchSource } from "@/lib/research/types/interfaces"
 import { getLanguageConfigForAccount, DEMO_ACCOUNT_CONFIG } from "@/lib/scopestack-language-configs"
+import { getRequestLogger, extractTechnology, getSessionId } from "@/lib/request-logger"
 
 interface PushToScopeStackRequest {
   content: GeneratedContent
@@ -221,6 +222,9 @@ function generateExecutiveSummary(
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  const logger = getRequestLogger();
+
   try {
     const { 
       content, 
@@ -234,6 +238,28 @@ export async function POST(request: NextRequest) {
       scopeStackAccountSlug,
       scopeStackApiUrl
     }: PushToScopeStackRequest = await request.json()
+
+    // Log the push request
+    const technology = content?.technology || extractTechnology(JSON.stringify(content));
+    const sessionId = getSessionId(request);
+    
+    await logger.logRequest({
+      userRequest: `Push ${technology || 'content'} to ScopeStack: ${projectName || clientName || 'Unnamed Project'}`,
+      requestType: 'push-to-scopestack',
+      sessionId,
+      status: 'started',
+      technology,
+      metadata: {
+        userAgent: request.headers.get('user-agent'),
+        clientName,
+        projectName,
+        serviceCount: content?.services?.length || 0,
+        questionCount: content?.questions?.length || 0,
+        useDirectServices,
+        skipSurvey,
+        skipDocument
+      }
+    });
 
     // Validate required fields
     if (!content) {
@@ -450,6 +476,30 @@ export async function POST(request: NextRequest) {
       },
     }
 
+    // Log successful completion
+    await logger.logRequest({
+      userRequest: `Push ${technology || 'content'} to ScopeStack: ${projectName || clientName || 'Unnamed Project'}`,
+      requestType: 'push-to-scopestack',
+      sessionId,
+      status: 'completed',
+      duration: Date.now() - startTime,
+      technology,
+      metadata: {
+        userAgent: request.headers.get('user-agent'),
+        clientName,
+        projectName,
+        serviceCount: content?.services?.length || 0,
+        questionCount: content?.questions?.length || 0,
+        useDirectServices,
+        skipSurvey,
+        skipDocument,
+        pushedToScopeStack: true,
+        projectId: finalProject.id,
+        contractRevenue: finalProject.contractRevenue,
+        servicesCreated: createdServices?.length || 0
+      }
+    });
+
     console.log('Successfully pushed content to ScopeStack!')
     return Response.json(response)
     
@@ -473,6 +523,32 @@ export async function POST(request: NextRequest) {
       }
     } else {
       errorDetails = 'Unknown error occurred during ScopeStack integration'
+    }
+
+    // Log the error
+    try {
+      const body = await request.json();
+      const content = body.content;
+      const technology = content?.technology || extractTechnology(JSON.stringify(content || {}));
+      const sessionId = getSessionId(request);
+      const projectName = body.projectName || body.clientName;
+
+      await logger.logRequest({
+        userRequest: `Push ${technology || 'content'} to ScopeStack: ${projectName || 'Unnamed Project'}`,
+        requestType: 'push-to-scopestack',
+        sessionId,
+        status: 'failed',
+        duration: Date.now() - startTime,
+        technology,
+        errorMessage: errorDetails,
+        metadata: {
+          userAgent: request.headers.get('user-agent'),
+          statusCode,
+          errorType: error instanceof Error ? error.constructor.name : typeof error
+        }
+      });
+    } catch (logError) {
+      console.warn('Failed to log error:', logError);
     }
     
     console.error("📊 Error analysis:", {
