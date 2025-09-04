@@ -135,6 +135,37 @@ export default function ScopeStackContentEngine() {
     })
   }, [])
 
+  // Handle OAuth success callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const oauthSuccess = urlParams.get('oauth_success');
+    const sessionData = urlParams.get('session_data');
+
+    if (oauthSuccess === 'true' && sessionData) {
+      try {
+        // Decode and store the OAuth session
+        const session = JSON.parse(atob(sessionData));
+        localStorage.setItem('scopestack_session', JSON.stringify(session));
+        
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Show success notification
+        console.log('OAuth authentication successful:', {
+          userName: session.userName,
+          accountSlug: session.accountSlug,
+          expiresAt: new Date(session.expiresAt).toLocaleString()
+        });
+        
+        // Optional: Show toast notification
+        // You could add a toast here if needed
+        
+      } catch (error) {
+        console.error('Failed to process OAuth session:', error);
+      }
+    }
+  }, []);
+
   // Save content whenever it changes and auto-collapse research
   useEffect(() => {
     if (generatedContent) {
