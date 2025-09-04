@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Shield, CheckCircle, AlertCircle, User, Building2, Lock, Mail } from "lucide-react"
+import { Loader2, Shield, CheckCircle, AlertCircle, User, Building2, Lock, Mail, Info } from "lucide-react"
 
 interface ScopeStackAuthModalProps {
   isOpen: boolean
@@ -25,8 +25,6 @@ interface AccountInfo {
 }
 
 export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeStackAuthModalProps) {
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
   const [isValidating, setIsValidating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null)
@@ -59,37 +57,28 @@ export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeS
     setError(null)
 
     try {
-      const response = await fetch("/api/test-scopestack-auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: username.trim(),
-          password: password,
-        }),
+      // Generate state for CSRF protection
+      const state = Math.random().toString(36).substring(2, 15)
+      localStorage.setItem('oauth_state', state)
+      
+      // Get authorization URL
+      const response = await fetch('/api/oauth/scopestack/authorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state })
       })
-
+      
       const result = await response.json()
-
-      if (response.ok && result.success) {
-        const info: AccountInfo = {
-          userName: result.userName,
-          accountSlug: result.accountSlug,
-          accountId: result.accountId,
-          email: result.email,
-          accessToken: result.accessToken,
-          refreshToken: result.refreshToken,
-          expiresAt: result.expiresAt,
-        }
-        setAccountInfo(info)
-        setStep("confirm")
-        
-        // Save session to localStorage
-        localStorage.setItem("scopestack_session", JSON.stringify(info))
+      
+      if (response.ok && result.authUrl) {
+        console.log('Redirecting to OAuth:', result.authUrl)
+        // Redirect to ScopeStack OAuth
+        window.location.href = result.authUrl
       } else {
-        setError(result.error || "Invalid username or password. Please check and try again.")
+        setError(result.error || 'Failed to initiate OAuth flow')
       }
     } catch (err) {
-      setError("Failed to authenticate. Please check your connection.")
+      setError('Failed to start authentication. Please check your connection.')
     } finally {
       setIsValidating(false)
     }
@@ -105,10 +94,9 @@ export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeS
   const handleChangeAccount = () => {
     // Clear saved session
     localStorage.removeItem("scopestack_session")
+    localStorage.removeItem("oauth_state")
     
     // Reset state
-    setUsername("")
-    setPassword("")
     setAccountInfo(null)
     setStep("input")
     setError(null)
@@ -130,51 +118,20 @@ export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeS
           </DialogTitle>
           <DialogDescription>
             {step === "input" 
-              ? "Enter your ScopeStack service account credentials to push content to your account."
+              ? "Click below to authenticate with ScopeStack using OAuth. You'll be redirected to ScopeStack to sign in."
               : "Confirm the account details before pushing content."}
           </DialogDescription>
         </DialogHeader>
 
         {step === "input" ? (
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="username" className="flex items-center gap-1">
-                <Mail className="h-3 w-3" />
-                Service Account Username
-              </Label>
-              <Input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your service account username"
-                disabled={isValidating}
-                autoComplete="username"
-              />
-              <p className="text-xs text-muted-foreground">
-                Use your ScopeStack service account credentials
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="flex items-center gap-1">
-                <Lock className="h-3 w-3" />
-                Service Account Password
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your service account password"
-                disabled={isValidating}
-                autoComplete="current-password"
-                onKeyDown={(e) => e.key === "Enter" && !isValidating && authenticate()}
-              />
-              <p className="text-xs text-muted-foreground">
-                Your credentials are used to obtain secure OAuth tokens.
-              </p>
-            </div>
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                You will be redirected to ScopeStack to complete the authentication process securely. 
+                After signing in, you'll be redirected back with an authorization code to complete the setup.
+              </AlertDescription>
+            </Alert>
 
             {error && (
               <Alert variant="destructive">
@@ -229,16 +186,19 @@ export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeS
               </Button>
               <Button 
                 onClick={authenticate} 
-                disabled={!username || !password || isValidating}
+                disabled={isValidating}
                 className="bg-scopestack-primary hover:bg-scopestack-primary/90"
               >
                 {isValidating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Authenticating...
+                    Redirecting...
                   </>
                 ) : (
-                  "Sign In"
+                  <>
+                    <Shield className="mr-2 h-4 w-4" />
+                    Sign In with ScopeStack
+                  </>
                 )}
               </Button>
             </>

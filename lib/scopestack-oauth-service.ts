@@ -21,10 +21,90 @@ interface ScopeStackSession {
 }
 
 class ScopeStackOAuthService {
-  private readonly clientId = "xmhTrbBbsVIOmZZkxkDxvx5towkN5wIFtSmO9dacYh4"
-  private readonly clientSecret = "wrh-uLcXu2px5QWSygoMl7zu6wU6N5C7WkhrHr0cJn8"
+  private readonly clientId = "RgBzfGa7M8EWytl0hmrr1tvuKMS5dnbSf-CNklATrkg"
+  private readonly clientSecret = "Br-R1mDx8MgBBc5KROejTwz7UgL7gEU61Edd47mHOOE"
   private readonly tokenEndpoint = "https://app.scopestack.io/oauth/token"
+  private readonly authorizeEndpoint = "https://app.scopestack.io/oauth/authorize"
   private readonly apiBaseUrl = "https://api.scopestack.io"
+
+  // Get OAuth authorization URL for redirect flow
+  getAuthorizationUrl(redirectUri: string, state?: string): string {
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      // Remove scope parameter to test if that's causing the issue
+    })
+
+    if (state) {
+      params.set('state', state)
+    }
+
+    return `${this.authorizeEndpoint}?${params.toString()}`
+  }
+
+  // Exchange authorization code for tokens
+  async exchangeCodeForTokens(code: string): Promise<ScopeStackSession> {
+    try {
+      const redirectUri = this.getRedirectUri()
+      
+      const formData = new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        code,
+        redirect_uri: redirectUri
+      })
+
+      console.log('Exchanging code for tokens:', {
+        endpoint: this.tokenEndpoint,
+        clientId: this.clientId,
+        redirectUri,
+        hasCode: !!code
+      })
+
+      const response = await fetch(this.tokenEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData.toString()
+      })
+
+      const responseText = await response.text()
+      console.log('Token exchange response:', response.status, responseText)
+
+      if (!response.ok) {
+        throw new Error(`Token exchange failed: ${responseText}`)
+      }
+
+      const tokenResponse: OAuthTokenResponse = JSON.parse(responseText)
+      
+      // Get user info using the access token
+      const userInfo = await this.getUserInfo(tokenResponse.access_token)
+      
+      // Calculate token expiration time
+      const expiresAt = Date.now() + (tokenResponse.expires_in * 1000)
+      
+      return {
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token,
+        expiresAt,
+        accountSlug: userInfo.accountSlug,
+        accountId: userInfo.accountId,
+        userName: userInfo.userName,
+        email: userInfo.email
+      }
+    } catch (error) {
+      console.error('Code exchange failed:', error)
+      throw new Error('Failed to exchange authorization code for tokens')
+    }
+  }
+
+  private getRedirectUri(): string {
+    // Use 127.0.0.1 for local development (some OAuth providers prefer this over localhost)
+    return 'http://127.0.0.1:3001/api/oauth/scopestack/callback'
+  }
 
   async authenticate(credentials: ScopeStackCredentials): Promise<ScopeStackSession> {
     try {
@@ -106,6 +186,13 @@ class ScopeStackOAuthService {
       password: credentials.password
     })
 
+    console.log('OAuth token request:', {
+      endpoint: this.tokenEndpoint,
+      clientId: this.clientId,
+      username: credentials.username,
+      hasPassword: !!credentials.password
+    })
+
     const response = await fetch(this.tokenEndpoint, {
       method: 'POST',
       headers: {
@@ -114,13 +201,29 @@ class ScopeStackOAuthService {
       body: formData.toString()
     })
 
+    console.log('OAuth response status:', response.status)
+    const responseText = await response.text()
+    console.log('OAuth response body:', responseText)
+
     if (!response.ok) {
-      const error = await response.text()
-      console.error('OAuth token request failed:', error)
-      throw new Error('Invalid username or password')
+      console.error('OAuth token request failed:', responseText)
+      
+      // Parse the error response to provide better error messages
+      try {
+        const errorData = JSON.parse(responseText)
+        if (errorData.error === 'invalid_grant') {
+          throw new Error('Invalid username or password, or password grant not enabled for this client')
+        } else if (errorData.error === 'invalid_client') {
+          throw new Error('Invalid client credentials')
+        } else {
+          throw new Error(errorData.error_description || errorData.error || 'Authentication failed')
+        }
+      } catch (parseError) {
+        throw new Error('Invalid username or password')
+      }
     }
 
-    return response.json()
+    return JSON.parse(responseText)
   }
 
   private async getUserInfo(accessToken: string): Promise<{
