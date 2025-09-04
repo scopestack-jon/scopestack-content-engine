@@ -272,13 +272,13 @@ export async function POST(request: NextRequest) {
     // Clean up API URL - remove trailing slashes and ensure correct format
     const rawUrl = scopeStackApiUrl || process.env.SCOPESTACK_API_URL || process.env.NEXT_PUBLIC_SCOPESTACK_API_URL || 'https://api.scopestack.io'
     const scopeStackUrl = rawUrl.replace(/\/$/, '') // Remove trailing slash
-    const accountSlug = scopeStackAccountSlug || process.env.SCOPESTACK_ACCOUNT_SLUG || process.env.NEXT_PUBLIC_SCOPESTACK_ACCOUNT_SLUG
+    const configAccountSlug = scopeStackAccountSlug || process.env.SCOPESTACK_ACCOUNT_SLUG || process.env.NEXT_PUBLIC_SCOPESTACK_ACCOUNT_SLUG
 
     console.log("🔍 Configuration check:", {
       hasToken: !!scopeStackToken,
       tokenSource: scopeStackApiKey ? 'request' : 'environment',
       apiUrl: scopeStackUrl,
-      hasSlug: !!accountSlug,
+      hasSlug: !!configAccountSlug,
       tokenPrefix: scopeStackToken ? scopeStackToken.substring(0, 10) + '...' : 'missing'
     })
 
@@ -294,7 +294,7 @@ export async function POST(request: NextRequest) {
     const scopeStackApi = new ScopeStackApiService({
       apiToken: scopeStackToken,
       baseUrl: scopeStackUrl,
-      accountSlug: accountSlug,
+      accountSlug: configAccountSlug,
     })
     
     // Step 1: Get current user and account details
