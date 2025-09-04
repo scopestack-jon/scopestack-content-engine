@@ -398,9 +398,9 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
 
   const pushToScopeStack = async () => {
     // Get settings from localStorage (from settings page)
-    const scopeStackApiKey = localStorage.getItem('scopestack_api_key') || ''
-    const scopeStackAccountSlug = localStorage.getItem('scopestack_account_slug') || ''
-    const scopeStackApiUrl = localStorage.getItem('scopestack_api_url') || 'https://api.scopestack.io'
+    const scopeStackApiKey = (localStorage.getItem('scopestack_api_key') || '').trim()
+    const scopeStackAccountSlug = (localStorage.getItem('scopestack_account_slug') || '').trim()
+    const scopeStackApiUrl = (localStorage.getItem('scopestack_api_url') || 'https://api.scopestack.io').trim().replace(/\/$/, '')
     const scopeStackWorkflow = localStorage.getItem('scopestack_workflow') || 'project-with-services'
     const useDirectServices = localStorage.getItem('scopestack_use_direct_services') === 'true'
     const skipSurvey = localStorage.getItem('scopestack_skip_survey') === 'true'

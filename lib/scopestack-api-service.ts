@@ -113,7 +113,8 @@ export class ScopeStackApiService {
 
   constructor(config: ScopeStackConfig) {
     this.apiToken = config.apiToken
-    this.baseUrl = config.baseUrl || 'https://api.scopestack.io'
+    // Ensure base URL doesn't have trailing slash
+    this.baseUrl = (config.baseUrl || 'https://api.scopestack.io').replace(/\/$/, '')
     this.accountSlug = config.accountSlug || null
     
     // Override language mappings if provided in config

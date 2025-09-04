@@ -26,11 +26,22 @@ function transformServicesToScopeStack(services: Service[]): ScopeStackService[]
       serviceName = JSON.stringify(serviceName).replace(/[{}"]/g, '').replace(/,/g, ', ') || 'Unnamed Service'
     }
     
+    // Transform subservices to include calculated quantities and hours
+    const transformedSubservices = (service.subservices || []).map((subservice: any) => {
+      return {
+        ...subservice,
+        // Subservices retain their calculated values from question responses
+        hours: subservice.hours || subservice.baseHours || 1,
+        quantity: subservice.quantity || subservice.baseQuantity || 1,
+      }
+    })
+    
     return {
       name: serviceName,
       description: service.description || 'Service description',
-      hours: service.hours || 0,
-      quantity: service.hours || 0,
+      // Services always have Qty=1, Hours=1 when pushed to ScopeStack
+      hours: 1,
+      quantity: 1,
       phase: service.phase || 'Implementation',
       position: index + 1,
       serviceDescription: service.serviceDescription || service.description || 'Service description',
@@ -40,7 +51,7 @@ function transformServicesToScopeStack(services: Service[]): ScopeStackService[]
       serviceType: 'professional_services',
       paymentFrequency: 'one_time',
       taskSource: 'custom',
-      subservices: service.subservices || [], // Include subservices
+      subservices: transformedSubservices, // Include transformed subservices with calculated values
     }
   })
 }
@@ -241,7 +252,9 @@ export async function POST(request: NextRequest) {
 
     // Get ScopeStack configuration from request body or environment
     const scopeStackToken = scopeStackApiKey || process.env.SCOPESTACK_API_TOKEN || process.env.NEXT_PUBLIC_SCOPESTACK_API_TOKEN
-    const scopeStackUrl = scopeStackApiUrl || process.env.SCOPESTACK_API_URL || process.env.NEXT_PUBLIC_SCOPESTACK_API_URL || 'https://api.scopestack.io'
+    // Clean up API URL - remove trailing slashes and ensure correct format
+    const rawUrl = scopeStackApiUrl || process.env.SCOPESTACK_API_URL || process.env.NEXT_PUBLIC_SCOPESTACK_API_URL || 'https://api.scopestack.io'
+    const scopeStackUrl = rawUrl.replace(/\/$/, '') // Remove trailing slash
     const accountSlug = scopeStackAccountSlug || process.env.SCOPESTACK_ACCOUNT_SLUG || process.env.NEXT_PUBLIC_SCOPESTACK_ACCOUNT_SLUG
 
     console.log("🔍 Configuration check:", {

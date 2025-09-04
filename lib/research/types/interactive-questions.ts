@@ -290,19 +290,24 @@ export function calculateServiceImpact(
     
     const impact = response.impact;
     
-    // Apply complexity multiplier
+    // Apply complexity multiplier to subservices (not services)
     if (impact.complexityMultiplier) {
       modifiedServices = modifiedServices.map(service => ({
         ...service,
+        // Service hours stay at base level for ScopeStack (will be set to 1 later)
+        // but we apply the multiplier for UI display purposes
         hours: Math.round(service.hours * impact.complexityMultiplier),
         subservices: service.subservices?.map((sub: any) => ({
           ...sub,
-          hours: Math.round(sub.hours * impact.complexityMultiplier)
+          // Apply multiplier to subservice hours (where the real calculations happen)
+          hours: Math.round(sub.hours * impact.complexityMultiplier),
+          baseHours: sub.baseHours || sub.hours, // Preserve original base hours
+          quantity: sub.quantity || 1 // Preserve or set default quantity
         }))
       }));
     }
     
-    // Apply hour modifiers
+    // Apply hour modifiers - prioritize subservice-level modifications
     if (impact.hourModifiers) {
       impact.hourModifiers.forEach(modifier => {
         modifiedServices = modifiedServices.map(service => {
@@ -311,21 +316,87 @@ export function calculateServiceImpact(
             new RegExp(modifier.phasePattern, 'i').test(service.phase || '');
           
           if (matchesService || matchesPhase) {
-            let newHours = service.hours;
+            // Modify subservices instead of service-level hours
+            const updatedSubservices = service.subservices?.map((sub: any) => {
+              let newHours = sub.hours;
+              
+              switch (modifier.operation) {
+                case 'multiply':
+                  newHours = Math.round(sub.hours * modifier.value);
+                  break;
+                case 'add':
+                  newHours = sub.hours + modifier.value;
+                  break;
+                case 'set':
+                  newHours = modifier.value;
+                  break;
+              }
+              
+              return { 
+                ...sub, 
+                hours: newHours,
+                baseHours: sub.baseHours || sub.hours, // Preserve original base hours
+                quantity: sub.quantity || 1 // Preserve or set default quantity
+              };
+            }) || [];
             
-            switch (modifier.operation) {
-              case 'multiply':
-                newHours = Math.round(service.hours * modifier.value);
-                break;
-              case 'add':
-                newHours = service.hours + modifier.value;
-                break;
-              case 'set':
-                newHours = modifier.value;
-                break;
-            }
+            // Recalculate service hours as sum of subservice hours for UI display
+            const totalSubserviceHours = updatedSubservices.reduce((sum, sub) => sum + sub.hours, 0);
             
-            return { ...service, hours: newHours };
+            return { 
+              ...service, 
+              hours: totalSubserviceHours, // For UI display only
+              subservices: updatedSubservices
+            };
+          }
+          
+          return service;
+        });
+      });
+    }
+    
+    // Apply subservice-specific modifiers
+    if (impact.subserviceModifiers) {
+      impact.subserviceModifiers.forEach(subModifier => {
+        modifiedServices = modifiedServices.map(service => {
+          const matchesParent = !subModifier.parentService || service.name.includes(subModifier.parentService);
+          
+          if (matchesParent && service.subservices) {
+            const updatedSubservices = service.subservices.map((sub: any) => {
+              const isTargetSubservice = !subModifier.targetSubservices || 
+                subModifier.targetSubservices.some(target => sub.name.includes(target));
+              
+              if (isTargetSubservice) {
+                switch (subModifier.operation) {
+                  case 'multiply':
+                    return { 
+                      ...sub, 
+                      hours: Math.round(sub.hours * (subModifier.value || 1)),
+                      quantity: Math.round((sub.quantity || 1) * (subModifier.value || 1))
+                    };
+                  case 'add':
+                    return { 
+                      ...sub, 
+                      hours: sub.hours + (subModifier.value || 0),
+                      quantity: (sub.quantity || 1) + Math.round(subModifier.value || 0)
+                    };
+                  case 'remove':
+                    return null; // Mark for removal
+                  default:
+                    return sub;
+                }
+              }
+              return sub;
+            }).filter(sub => sub !== null); // Remove nulled subservices
+            
+            // Recalculate service hours as sum of remaining subservice hours
+            const totalSubserviceHours = updatedSubservices.reduce((sum, sub) => sum + sub.hours, 0);
+            
+            return {
+              ...service,
+              hours: totalSubserviceHours, // For UI display only
+              subservices: updatedSubservices
+            };
           }
           
           return service;

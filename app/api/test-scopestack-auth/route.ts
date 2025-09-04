@@ -28,20 +28,26 @@ export async function POST(request: NextRequest) {
     // Default to the correct ScopeStack API URL
     const baseUrl = finalApiUrl || 'https://api.scopestack.io'
     
+    // Ensure URL doesn't have trailing slash
+    const cleanBaseUrl = baseUrl.replace(/\/$/, '')
+    const fullUrl = `${cleanBaseUrl}/v1/me`
+    
     console.log('Testing ScopeStack authentication:', {
-      baseUrl,
+      baseUrl: cleanBaseUrl,
+      fullUrl,
       hasApiKey: !!finalApiKey,
       apiKeyPrefix: finalApiKey.substring(0, 10) + '...'
     })
     
     // Test authentication using the /me endpoint
     try {
-      const response = await axios.get(`${baseUrl}/v1/me`, {
+      const response = await axios.get(fullUrl, {
         headers: {
           'Authorization': `Bearer ${finalApiKey}`,
           'Content-Type': 'application/vnd.api+json',
           'Accept': 'application/vnd.api+json',
-        }
+        },
+        timeout: 10000 // Add 10 second timeout
       })
       
       const userData = response.data.data.attributes
@@ -64,7 +70,10 @@ export async function POST(request: NextRequest) {
       console.error('Authentication failed:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
-        data: error.response?.data
+        data: error.response?.data,
+        requestUrl: fullUrl,
+        errorCode: error.code,
+        errorMessage: error.message
       })
       
       if (error.response?.status === 401) {
@@ -73,11 +82,23 @@ export async function POST(request: NextRequest) {
         }, { status: 401 })
       } else if (error.response?.status === 404) {
         return Response.json({ 
-          error: "API endpoint not found. Please check the API URL." 
+          error: `API endpoint not found. URL tried: ${fullUrl}. Please verify the API URL is correct.`,
+          details: `Expected format: https://api.scopestack.io (no trailing slash)`
         }, { status: 404 })
+      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        return Response.json({ 
+          error: `Cannot connect to ScopeStack API at ${cleanBaseUrl}. Please check the URL.`,
+          details: error.message
+        }, { status: 503 })
+      } else if (error.code === 'ETIMEDOUT') {
+        return Response.json({ 
+          error: "Connection to ScopeStack API timed out. Please try again.",
+          details: `Timeout after 10 seconds trying to reach ${fullUrl}`
+        }, { status: 504 })
       } else {
         return Response.json({ 
-          error: `Authentication failed: ${error.response?.statusText || error.message}` 
+          error: `Authentication failed: ${error.response?.statusText || error.message}`,
+          details: error.response?.data || error.message
         }, { status: error.response?.status || 500 })
       }
     }

@@ -105,10 +105,13 @@ export default function SettingsPage() {
     setSaveStatus("idle")
 
     try {
-      // Save to localStorage
+      // Clean and save to localStorage
+      const cleanUrl = scopeStackUrl.trim().replace(/\/$/, '')
+      const cleanToken = scopeStackToken.trim()
+      
       localStorage.setItem("openrouter_key", openRouterKey)
-      localStorage.setItem("scopestack_api_key", scopeStackToken)
-      localStorage.setItem("scopestack_api_url", scopeStackUrl)
+      localStorage.setItem("scopestack_api_key", cleanToken)
+      localStorage.setItem("scopestack_api_url", cleanUrl)
       localStorage.setItem("scopestack_account_slug", "")
       localStorage.setItem("scopestack_workflow", "project-with-services")
       localStorage.setItem("scopestack_use_direct_services", "true")
@@ -138,12 +141,16 @@ export default function SettingsPage() {
     }
 
     try {
+      // Clean up the URL and token before sending
+      const cleanUrl = scopeStackUrl.trim().replace(/\/$/, '')
+      const cleanToken = scopeStackToken.trim()
+      
       const response = await fetch("/api/test-scopestack-auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          apiKey: scopeStackToken,
-          apiUrl: scopeStackUrl,
+          apiKey: cleanToken,
+          apiUrl: cleanUrl,
         }),
       })
 
