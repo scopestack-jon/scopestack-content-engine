@@ -472,44 +472,36 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
       console.log('ScopeStack response:', { status: response.status, result })
 
       if (response.ok) {
-        setPushProgress({ step: "Success!", details: "Project created in ScopeStack", status: 'success' })
-        
+        // Store project details for persistent display
         if (result.project?.url) {
-          // Store project details for persistent display
           setScopeStackProjectUrl(result.project.url)
-          setScopeStackProjectName(result.project.name || 'Unnamed Project')
-          
-          toast({
-            title: "\u2713 Success!",
-            description: `Project "${result.project.name || 'Unnamed Project'}" created successfully!`,
-            duration: 5000,
-          })
-          
-          // Show detailed success info
-          setTimeout(() => {
-            toast({
-              title: "Project Details",
-              description: `ID: ${result.project.id} | Services: ${result.services?.length || 0} | Client: ${result.client?.name || 'N/A'}`,
-              duration: 5000,
-            })
-          }, 1000)
-        } else {
-          toast({
-            title: "\u2713 Success!",
-            description: "Content successfully pushed to ScopeStack!",
-            duration: 5000,
-          })
+          setScopeStackProjectName(result.project.name || content.technology + ' Project')
         }
         
-        // Show warnings if any
+        // Clear progress after a brief success display
+        setPushProgress({ step: "Complete!", details: "Project ready in ScopeStack", status: 'success' })
+        setTimeout(() => setPushProgress(null), 2000)
+        
+        // Single comprehensive success toast
+        const projectName = result.project?.name || content.technology + ' Project'
+        const serviceCount = result.services?.length || 0
+        
+        toast({
+          title: `✅ Project created successfully!`,
+          description: `${serviceCount} services pushed to ScopeStack`,
+          duration: 4000,
+        })
+        
+        // Only show warnings if they exist
         if (result.warnings?.length > 0) {
           setTimeout(() => {
             toast({
-              title: "\u26a0\ufe0f Warnings",
-              description: `${result.warnings.length} warning(s): ${result.warnings[0]}`,
-              variant: "default"
+              title: "⚠️ Warnings",
+              description: result.warnings[0],
+              variant: "default",
+              duration: 6000,
             })
-          }, 3000)
+          }, 1500)
         }
       } else {
         setPushProgress({ step: "Failed", details: result.error || "Unknown error", status: 'error' })
@@ -1172,28 +1164,14 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
 
   return (
     <div className="space-y-6 relative">
-      {/* Floating Push Status Notification */}
-      {isPushingToScopeStack && pushProgress && (
+      {/* Floating Push Status Notification - Only show during loading */}
+      {pushProgress && pushProgress.status === 'loading' && (
         <div className="fixed bottom-4 right-4 z-50 max-w-sm animate-in slide-in-from-bottom-5">
-          <Card className={`shadow-lg border-2 ${
-            pushProgress.status === 'success' 
-              ? 'border-green-500 bg-green-50' 
-              : pushProgress.status === 'error'
-              ? 'border-red-500 bg-red-50'
-              : 'border-scopestack-primary bg-white'
-          }`}>
+          <Card className="shadow-lg border-2 border-scopestack-primary bg-white">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
-                <div className={`mt-1 ${
-                  pushProgress.status === 'loading' ? 'animate-spin' : ''
-                }`}>
-                  {pushProgress.status === 'success' ? (
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                  ) : pushProgress.status === 'error' ? (
-                    <AlertCircle className="h-5 w-5 text-red-600" />
-                  ) : (
-                    <div className="h-5 w-5 border-2 border-scopestack-primary/30 border-t-scopestack-primary rounded-full animate-spin" />
-                  )}
+                <div className="mt-1">
+                  <div className="h-5 w-5 border-2 border-scopestack-primary/30 border-t-scopestack-primary rounded-full animate-spin" />
                 </div>
                 <div className="flex-1">
                   <div className="font-semibold text-sm text-gray-900">
@@ -1207,11 +1185,9 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                       {pushProgress.details}
                     </div>
                   )}
-                  {pushProgress.status === 'loading' && (
-                    <div className="mt-2 h-1 bg-gray-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-scopestack-primary rounded-full animate-pulse" style={{width: '60%'}} />
-                    </div>
-                  )}
+                  <div className="mt-2 h-1 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="h-full bg-scopestack-primary rounded-full animate-pulse" style={{width: '60%'}} />
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -1275,13 +1251,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
               {/* ScopeStack Project Details */}
               {scopeStackProjectUrl && (
                 <div className="text-xs text-white/80 flex items-center gap-2">
-                  <span>✅ Pushed to ScopeStack:</span>
-                  <button
-                    onClick={() => window.open(scopeStackProjectUrl, '_blank')}
-                    className="underline hover:text-white transition-colors"
-                  >
-                    {scopeStackProjectName}
-                  </button>
+                  <span>✅ Project pushed to ScopeStack</span>
                 </div>
               )}
             </div>
@@ -1385,41 +1355,6 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
               </Button>
             </div>
             
-            {/* Push Progress Display */}
-            {pushProgress && (
-              <div className={`mt-4 p-4 rounded-md border ${
-                pushProgress.status === 'success' 
-                  ? 'bg-green-500/20 border-green-400/30' 
-                  : pushProgress.status === 'error'
-                  ? 'bg-red-500/20 border-red-400/30'
-                  : 'bg-white/20 border-white/30'
-              }`}>
-                <div className="flex items-center justify-between text-white">
-                  <div className="flex items-center gap-3">
-                    <div className={`${
-                      pushProgress.status === 'loading' ? 'animate-spin' : ''
-                    }`}>
-                      {pushProgress.status === 'success' ? (
-                        <CheckCircle className="h-5 w-5 text-green-400" />
-                      ) : pushProgress.status === 'error' ? (
-                        <AlertCircle className="h-5 w-5 text-red-400" />
-                      ) : (
-                        <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      )}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-medium text-sm">{pushProgress.step}</span>
-                      {pushProgress.details && (
-                        <span className="text-xs text-white/80">{pushProgress.details}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-xs text-white/60">
-                    {pushProgress.status === 'success' ? 'Complete' : pushProgress.status === 'error' ? 'Failed' : 'Processing...'}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </CardHeader>
       </Card>
