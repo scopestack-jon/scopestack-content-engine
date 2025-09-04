@@ -132,8 +132,8 @@ export async function POST(request: NextRequest) {
                 }
               });
 
-              // Log successful completion
-              await logger.logRequest({
+              // Log successful completion (fire and forget to avoid blocking)
+              logger.logRequest({
                 userRequest,
                 requestType: 'research',
                 sessionId,
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
                   sourcesFound: event.content?.sources?.length || 0,
                   servicesGenerated: event.content?.services?.length || 0
                 }
-              });
+              }).catch(err => console.warn('Failed to log completion:', err));
             } else if (event.type === 'error') {
               sendSSE({
                 type: "error",
@@ -173,8 +173,8 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Log the error
-          await logger.logRequest({
+          // Log the error (fire and forget to avoid blocking)
+          logger.logRequest({
             userRequest,
             requestType: 'research',
             sessionId,
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
               userAgent: request.headers.get('user-agent'),
               contentLength: userRequest.length
             }
-          });
+          }).catch(err => console.warn('Failed to log error:', err));
           
           sendSSE({
             type: "error",
