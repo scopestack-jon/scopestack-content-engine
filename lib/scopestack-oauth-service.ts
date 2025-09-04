@@ -21,8 +21,8 @@ interface ScopeStackSession {
 }
 
 class ScopeStackOAuthService {
-  private readonly clientId = "RgBzfGa7M8EWytl0hmrr1tvuKMS5dnbSf-CNklATrkg"
-  private readonly clientSecret = "Br-R1mDx8MgBBc5KROejTwz7UgL7gEU61Edd47mHOOE"
+  private readonly clientId = "I8VeTSSNnwoqnaN5FQ7biwp0_O37RNGjPvZC1v6qRGI"
+  private readonly clientSecret = "4BdXU3ipmtkKDuSCycCMWFeOGGsAHoVAzuGfiLzzq8M"
   private readonly tokenEndpoint = "https://app.scopestack.io/oauth/token"
   private readonly authorizeEndpoint = "https://app.scopestack.io/oauth/authorize"
   private readonly apiBaseUrl = "https://api.scopestack.io"
