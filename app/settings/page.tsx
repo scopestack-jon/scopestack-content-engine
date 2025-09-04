@@ -17,15 +17,19 @@ import {
   Brain,
   TestTube,
   Settings,
+  LogIn,
+  LogOut,
+  User,
 } from "lucide-react"
 import Link from "next/link"
 
 export default function SettingsPage() {
   const [openRouterKey, setOpenRouterKey] = useState("")
   const [scopeStackUrl, setScopeStackUrl] = useState("")
-  const [scopeStackToken, setScopeStackToken] = useState("")
+  const [scopeStackSession, setScopeStackSession] = useState<any>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle")
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
 
   const [researchModel, setResearchModel] = useState("anthropic/claude-3.5-sonnet")
   const [analysisModel, setAnalysisModel] = useState("openai/gpt-4-turbo")
@@ -56,11 +60,25 @@ export default function SettingsPage() {
     // Load saved settings from localStorage
     const savedOpenRouterKey = localStorage.getItem("openrouter_key") || ""
     const savedScopeStackUrl = localStorage.getItem("scopestack_api_url") || "https://api.scopestack.io"
-    const savedScopeStackToken = localStorage.getItem("scopestack_api_key") || ""
+    const savedScopeStackSession = localStorage.getItem("scopestack_session")
 
     setOpenRouterKey(savedOpenRouterKey)
     setScopeStackUrl(savedScopeStackUrl)
-    setScopeStackToken(savedScopeStackToken)
+    
+    if (savedScopeStackSession) {
+      try {
+        const session = JSON.parse(savedScopeStackSession)
+        if (session.expiresAt > Date.now()) {
+          setScopeStackSession(session)
+        } else {
+          // Session expired, remove it
+          localStorage.removeItem("scopestack_session")
+        }
+      } catch (error) {
+        // Invalid session data, remove it
+        localStorage.removeItem("scopestack_session")
+      }
+    }
 
     const savedResearchModel = localStorage.getItem("research_model") || "anthropic/claude-3.5-sonnet"
     const savedAnalysisModel = localStorage.getItem("analysis_model") || "openai/gpt-4-turbo"
@@ -72,6 +90,34 @@ export default function SettingsPage() {
     setContentModel(savedContentModel)
     setFormatModel(savedFormatModel)
   }, [])
+
+  // Handle OAuth success callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const oauthSuccess = urlParams.get('oauth_success');
+    const sessionData = urlParams.get('session_data');
+
+    if (oauthSuccess === 'true' && sessionData) {
+      try {
+        // Decode and store the OAuth session
+        const session = JSON.parse(atob(sessionData));
+        localStorage.setItem('scopestack_session', JSON.stringify(session));
+        setScopeStackSession(session);
+        
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Show success notification
+        setSaveStatus("success");
+        setTimeout(() => setSaveStatus("idle"), 3000);
+        
+      } catch (error) {
+        console.error('Failed to process OAuth session:', error);
+        setSaveStatus("error");
+        setTimeout(() => setSaveStatus("idle"), 3000);
+      }
+    }
+  }, []);
 
   // Fetch all available models from OpenRouter when API key changes
   useEffect(() => {
@@ -107,12 +153,9 @@ export default function SettingsPage() {
     try {
       // Clean and save to localStorage
       const cleanUrl = scopeStackUrl.trim().replace(/\/$/, '')
-      const cleanToken = scopeStackToken.trim()
       
       localStorage.setItem("openrouter_key", openRouterKey)
-      localStorage.setItem("scopestack_api_key", cleanToken)
       localStorage.setItem("scopestack_api_url", cleanUrl)
-      localStorage.setItem("scopestack_account_slug", "")
       localStorage.setItem("scopestack_workflow", "project-with-services")
       localStorage.setItem("scopestack_use_direct_services", "true")
       localStorage.setItem("scopestack_skip_survey", "false")
@@ -134,36 +177,37 @@ export default function SettingsPage() {
     }
   }
 
-  const testScopeStackConnection = async () => {
-    if (!scopeStackUrl || !scopeStackToken) {
-      alert("Please enter both ScopeStack URL and API key")
-      return
-    }
-
+  const authenticateWithScopeStack = async () => {
+    setIsAuthenticating(true)
     try {
-      // Clean up the URL and token before sending
-      const cleanUrl = scopeStackUrl.trim().replace(/\/$/, '')
-      const cleanToken = scopeStackToken.trim()
+      const state = Math.random().toString(36).substring(2, 15)
+      localStorage.setItem('oauth_state', state)
       
-      const response = await fetch("/api/test-scopestack-auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          apiKey: cleanToken,
-          apiUrl: cleanUrl,
-        }),
+      const response = await fetch('/api/oauth/scopestack/authorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state })
       })
-
-      if (response.ok) {
-        const result = await response.json()
-        alert(`ScopeStack connection successful! Connected as: ${result.userName || 'Unknown'} (${result.accountSlug || 'Unknown'})`)
+      
+      const result = await response.json()
+      if (response.ok && result.authUrl) {
+        // Redirect to OAuth authorization
+        window.location.href = result.authUrl
       } else {
-        const result = await response.json()
-        alert(`ScopeStack connection failed: ${result.error || 'Please check your credentials.'}`)
+        alert('Failed to start OAuth authentication')
       }
     } catch (error) {
-      alert("ScopeStack connection failed. Please check your credentials.")
+      console.error('OAuth authentication error:', error)
+      alert('Failed to start OAuth authentication')
+    } finally {
+      setIsAuthenticating(false)
     }
+  }
+
+  const disconnectScopeStack = () => {
+    localStorage.removeItem('scopestack_session')
+    setScopeStackSession(null)
+    alert('Disconnected from ScopeStack successfully')
   }
 
   return (
@@ -199,22 +243,70 @@ export default function SettingsPage() {
                   <Alert>
                     <Database className="h-4 w-4" />
                     <AlertDescription>
-                      Connect to your ScopeStack instance to automatically push generated content.
+                      Connect to your ScopeStack instance using OAuth to automatically push generated content.
                     </AlertDescription>
                   </Alert>
 
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="scopestack-api-key">ScopeStack API Key <span className="text-red-500">*</span></Label>
-                      <Input
-                        id="scopestack-api-key"
-                        type="password"
-                        placeholder="Enter your ScopeStack API key"
-                        value={scopeStackToken}
-                        onChange={(e) => setScopeStackToken(e.target.value)}
-                      />
-                      <p className="text-xs text-gray-500">Your API key can be found in ScopeStack Settings → API Access</p>
-                    </div>
+                    {scopeStackSession ? (
+                      // Authenticated state
+                      <div className="space-y-4">
+                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-center gap-2 text-green-800 mb-2">
+                            <CheckCircle className="h-4 w-4" />
+                            <span className="font-medium">Connected to ScopeStack</span>
+                          </div>
+                          <div className="text-sm text-green-700 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <User className="h-3 w-3" />
+                              <span>User: {scopeStackSession.userName}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Database className="h-3 w-3" />
+                              <span>Account: {scopeStackSession.accountSlug}</span>
+                            </div>
+                            <div className="text-xs text-green-600">
+                              Session expires: {new Date(scopeStackSession.expiresAt).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <Button
+                          onClick={disconnectScopeStack}
+                          variant="outline"
+                          className="flex items-center gap-2 text-red-600 hover:text-red-800 hover:bg-red-50"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Disconnect
+                        </Button>
+                      </div>
+                    ) : (
+                      // Not authenticated state
+                      <div className="space-y-4">
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="text-blue-800 text-sm mb-3">
+                            Sign in to your ScopeStack account to enable automatic content pushing and user attribution.
+                          </div>
+                          <Button
+                            onClick={authenticateWithScopeStack}
+                            disabled={isAuthenticating}
+                            className="bg-scopestack-primary hover:bg-scopestack-primary/90 text-white flex items-center gap-2"
+                          >
+                            {isAuthenticating ? (
+                              <>
+                                <Key className="h-4 w-4 animate-spin" />
+                                Authenticating...
+                              </>
+                            ) : (
+                              <>
+                                <LogIn className="h-4 w-4" />
+                                Sign in to ScopeStack
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="scopestack-api-url">API URL</Label>
@@ -227,16 +319,6 @@ export default function SettingsPage() {
                       />
                       <p className="text-xs text-gray-500">Default: https://api.scopestack.io</p>
                     </div>
-
-                    <Button
-                      onClick={testScopeStackConnection}
-                      variant="outline"
-                      className="flex items-center gap-2"
-                      disabled={!scopeStackUrl || !scopeStackToken}
-                    >
-                      <TestTube className="h-4 w-4" />
-                      Test Connection
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
