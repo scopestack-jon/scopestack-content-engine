@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Key, Shield, CheckCircle, AlertCircle, User, Building2 } from "lucide-react"
+import { Loader2, Shield, CheckCircle, AlertCircle, User, Building2, Lock, Mail } from "lucide-react"
 
 interface ScopeStackAuthModalProps {
   isOpen: boolean
@@ -19,38 +19,42 @@ interface AccountInfo {
   accountSlug: string
   accountId: string
   email: string
-  apiKey: string
+  accessToken: string
+  refreshToken: string
+  expiresAt: number
 }
 
 export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeStackAuthModalProps) {
-  const [apiKey, setApiKey] = useState("")
-  const [apiUrl, setApiUrl] = useState("https://api.scopestack.io")
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
   const [isValidating, setIsValidating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null)
   const [step, setStep] = useState<"input" | "confirm">("input")
 
-  // Check for existing saved credentials
+  // Check for existing saved session
   useEffect(() => {
-    const savedKey = localStorage.getItem("scopestack_api_key")
-    const savedUrl = localStorage.getItem("scopestack_api_url") || "https://api.scopestack.io"
-    const savedAccountInfo = localStorage.getItem("scopestack_account_info")
+    const savedSession = localStorage.getItem("scopestack_session")
     
-    if (savedKey && savedAccountInfo) {
-      setApiKey(savedKey)
-      setApiUrl(savedUrl)
+    if (savedSession) {
       try {
-        const info = JSON.parse(savedAccountInfo)
-        setAccountInfo(info)
-        setStep("confirm")
+        const session = JSON.parse(savedSession)
+        // Check if token is not expired
+        if (session.expiresAt && Date.now() < session.expiresAt) {
+          setAccountInfo(session)
+          setStep("confirm")
+        } else {
+          // Session expired, clear it
+          localStorage.removeItem("scopestack_session")
+        }
       } catch (e) {
         // Invalid saved data, start fresh
-        localStorage.removeItem("scopestack_account_info")
+        localStorage.removeItem("scopestack_session")
       }
     }
   }, [isOpen])
 
-  const validateApiKey = async () => {
+  const authenticate = async () => {
     setIsValidating(true)
     setError(null)
 
@@ -59,8 +63,8 @@ export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeS
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          apiKey: apiKey.trim(),
-          apiUrl: apiUrl.trim().replace(/\/$/, ""),
+          username: username.trim(),
+          password: password,
         }),
       })
 
@@ -72,20 +76,20 @@ export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeS
           accountSlug: result.accountSlug,
           accountId: result.accountId,
           email: result.email,
-          apiKey: apiKey.trim(),
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+          expiresAt: result.expiresAt,
         }
         setAccountInfo(info)
         setStep("confirm")
         
-        // Save to localStorage for this session
-        localStorage.setItem("scopestack_api_key", apiKey.trim())
-        localStorage.setItem("scopestack_api_url", apiUrl.trim())
-        localStorage.setItem("scopestack_account_info", JSON.stringify(info))
+        // Save session to localStorage
+        localStorage.setItem("scopestack_session", JSON.stringify(info))
       } else {
-        setError(result.error || "Invalid API key. Please check and try again.")
+        setError(result.error || "Invalid username or password. Please check and try again.")
       }
     } catch (err) {
-      setError("Failed to validate API key. Please check your connection.")
+      setError("Failed to authenticate. Please check your connection.")
     } finally {
       setIsValidating(false)
     }
@@ -99,13 +103,12 @@ export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeS
   }
 
   const handleChangeAccount = () => {
-    // Clear saved credentials
-    localStorage.removeItem("scopestack_api_key")
-    localStorage.removeItem("scopestack_api_url")
-    localStorage.removeItem("scopestack_account_info")
+    // Clear saved session
+    localStorage.removeItem("scopestack_session")
     
     // Reset state
-    setApiKey("")
+    setUsername("")
+    setPassword("")
     setAccountInfo(null)
     setStep("input")
     setError(null)
@@ -127,7 +130,7 @@ export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeS
           </DialogTitle>
           <DialogDescription>
             {step === "input" 
-              ? "Enter your ScopeStack API credentials to push content to your account."
+              ? "Enter your ScopeStack service account credentials to push content to your account."
               : "Confirm the account details before pushing content."}
           </DialogDescription>
         </DialogHeader>
@@ -135,38 +138,41 @@ export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeS
         {step === "input" ? (
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="api-url" className="flex items-center gap-1">
-                API URL
+              <Label htmlFor="username" className="flex items-center gap-1">
+                <Mail className="h-3 w-3" />
+                Service Account Username
               </Label>
               <Input
-                id="api-url"
-                type="url"
-                value={apiUrl}
-                onChange={(e) => setApiUrl(e.target.value)}
-                placeholder="https://api.scopestack.io"
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your service account username"
                 disabled={isValidating}
+                autoComplete="username"
               />
               <p className="text-xs text-muted-foreground">
-                Default: https://api.scopestack.io
+                Use your ScopeStack service account credentials
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="api-key" className="flex items-center gap-1">
-                <Key className="h-3 w-3" />
-                API Key
+              <Label htmlFor="password" className="flex items-center gap-1">
+                <Lock className="h-3 w-3" />
+                Service Account Password
               </Label>
               <Input
-                id="api-key"
+                id="password"
                 type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Enter your ScopeStack API key"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your service account password"
                 disabled={isValidating}
-                onKeyDown={(e) => e.key === "Enter" && !isValidating && validateApiKey()}
+                autoComplete="current-password"
+                onKeyDown={(e) => e.key === "Enter" && !isValidating && authenticate()}
               />
               <p className="text-xs text-muted-foreground">
-                Your API key will be stored locally for this session only.
+                Your credentials are used to obtain secure OAuth tokens.
               </p>
             </div>
 
@@ -182,7 +188,7 @@ export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeS
             <Alert className="border-green-200 bg-green-50">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-900">
-                API key validated successfully!
+                Authentication successful!
               </AlertDescription>
             </Alert>
 
@@ -222,17 +228,17 @@ export function ScopeStackAuthModal({ isOpen, onClose, onAuthenticated }: ScopeS
                 Cancel
               </Button>
               <Button 
-                onClick={validateApiKey} 
-                disabled={!apiKey || !apiUrl || isValidating}
+                onClick={authenticate} 
+                disabled={!username || !password || isValidating}
                 className="bg-scopestack-primary hover:bg-scopestack-primary/90"
               >
                 {isValidating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Validating...
+                    Authenticating...
                   </>
                 ) : (
-                  "Validate API Key"
+                  "Sign In"
                 )}
               </Button>
             </>
