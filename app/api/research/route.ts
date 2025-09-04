@@ -24,14 +24,7 @@ export async function POST(request: NextRequest) {
     const { userName, accountSlug } = await getScopeStackUserInfo(scopeStackApiKey, scopeStackApiUrl);
     const sessionId = getSessionId(request);
     
-    await logger.logRequest({
-      userRequest,
-      requestType: 'research',
-      sessionId,
-      status: 'started',
-      userName,
-      accountSlug
-    });
+    // Don't log "started" entries - only log completed solutions
 
     console.log('🔍 Starting research for:', userRequest);
     
@@ -131,16 +124,16 @@ export async function POST(request: NextRequest) {
                 }
               });
 
-              // Log successful completion (fire and forget to avoid blocking)
+              // Log completed solution with user attribution (fire and forget to avoid blocking)
               logger.logRequest({
                 userRequest,
-                requestType: 'research',
+                requestType: 'research', 
                 sessionId,
                 status: 'completed',
                 duration: Date.now() - startTime,
                 userName,
                 accountSlug
-              }).catch(err => console.warn('Failed to log completion:', err));
+              }).catch(err => console.warn('Failed to log solution:', err));
             } else if (event.type === 'error') {
               sendSSE({
                 type: "error",
@@ -167,17 +160,7 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Log the error (fire and forget to avoid blocking)
-          logger.logRequest({
-            userRequest,
-            requestType: 'research',
-            sessionId,
-            status: 'failed',
-            duration: Date.now() - startTime,
-            errorMessage,
-            userName,
-            accountSlug
-          }).catch(err => console.warn('Failed to log error:', err));
+          // Don't log errors - only successful solutions
           
           sendSSE({
             type: "error",
@@ -200,24 +183,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('❌ Route error:', error);
     
-    // Log route-level errors
-    try {
-      const body = await request.json();
-      const userRequest = body.input || body.request;
-      const sessionId = getSessionId(request);
-      
-      await logger.logRequest({
-        userRequest: userRequest || 'Request parsing failed',
-        requestType: 'research',
-        sessionId,
-        status: 'failed',
-        duration: Date.now() - startTime,
-        errorMessage: error instanceof Error ? error.message : 'Internal server error'
-      });
-    } catch (logError) {
-      // Don't let logging errors break the response
-      console.warn('Failed to log route error:', logError);
-    }
+    // Don't log route errors - only successful solutions
     
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal server error' },

@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server"
 import { ScopeStackApiService, ScopeStackService } from "@/lib/scopestack-api-service"
 import type { GeneratedContent, Service, Question, ResearchSource } from "@/lib/research/types/interfaces"
 import { getLanguageConfigForAccount, DEMO_ACCOUNT_CONFIG } from "@/lib/scopestack-language-configs"
-import { getRequestLogger, getScopeStackUserInfo, getSessionId } from "@/lib/request-logger"
+// Removed request logging - only tracking research solutions
 
 interface PushToScopeStackRequest {
   content: GeneratedContent
@@ -222,8 +222,6 @@ function generateExecutiveSummary(
 }
 
 export async function POST(request: NextRequest) {
-  const startTime = Date.now();
-  const logger = getRequestLogger();
 
   try {
     const { 
@@ -239,18 +237,7 @@ export async function POST(request: NextRequest) {
       scopeStackApiUrl
     }: PushToScopeStackRequest = await request.json()
 
-    // Get user info from ScopeStack API
-    const { userName, accountSlug } = await getScopeStackUserInfo(scopeStackApiKey, scopeStackApiUrl);
-    const sessionId = getSessionId(request);
-    
-    await logger.logRequest({
-      userRequest: `Push to ScopeStack: ${projectName || clientName || 'Unnamed Project'}`,
-      requestType: 'push-to-scopestack',
-      sessionId,
-      status: 'started',
-      userName,
-      accountSlug
-    });
+    // Don't log push-to-scopestack requests - only research solutions
 
     // Validate required fields
     if (!content) {
@@ -467,16 +454,7 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    // Log successful completion
-    await logger.logRequest({
-      userRequest: `Push to ScopeStack: ${projectName || clientName || 'Unnamed Project'}`,
-      requestType: 'push-to-scopestack',
-      sessionId,
-      status: 'completed',
-      duration: Date.now() - startTime,
-      userName,
-      accountSlug
-    });
+    // Don't log push completions - only research solutions
 
     console.log('Successfully pushed content to ScopeStack!')
     return Response.json(response)
@@ -503,22 +481,7 @@ export async function POST(request: NextRequest) {
       errorDetails = 'Unknown error occurred during ScopeStack integration'
     }
 
-    // Log the error
-    try {
-      const sessionId = getSessionId(request);
-      const projectName = (await request.clone().json()).projectName || (await request.clone().json()).clientName;
-
-      await logger.logRequest({
-        userRequest: `Push to ScopeStack: ${projectName || 'Unnamed Project'}`,
-        requestType: 'push-to-scopestack',
-        sessionId,
-        status: 'failed',
-        duration: Date.now() - startTime,
-        errorMessage: errorDetails
-      });
-    } catch (logError) {
-      console.warn('Failed to log error:', logError);
-    }
+    // Don't log push errors - only research solutions
     
     console.error("📊 Error analysis:", {
       statusCode,
