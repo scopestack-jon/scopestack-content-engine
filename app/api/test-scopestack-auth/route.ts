@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server"
-import axios from "axios"
 
 export async function POST(request: NextRequest) {
   console.log('Test auth endpoint called')
@@ -39,18 +38,54 @@ export async function POST(request: NextRequest) {
       apiKeyPrefix: finalApiKey.substring(0, 10) + '...'
     })
     
-    // Test authentication using the /me endpoint
+    // Test authentication using the /me endpoint with native fetch
     try {
-      const response = await axios.get(fullUrl, {
-        headers: {
-          'Authorization': `Bearer ${finalApiKey}`,
-          'Content-Type': 'application/vnd.api+json',
-          'Accept': 'application/vnd.api+json',
-        },
-        timeout: 10000 // Add 10 second timeout
+      console.log('Making request with fetch to:', fullUrl)
+      console.log('Headers being sent:', {
+        'Authorization': `Bearer ${finalApiKey.substring(0, 20)}...`,
+        'Accept': 'application/vnd.api+json'
       })
       
-      const userData = response.data.data.attributes
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${finalApiKey}`,
+          'Accept': 'application/vnd.api+json',
+        },
+      })
+      
+      console.log('Raw response status:', response.status)
+      const responseText = await response.text()
+      console.log('Raw response text:', responseText)
+      
+      // Try to parse as JSON
+      let responseData
+      try {
+        responseData = JSON.parse(responseText)
+      } catch (e) {
+        console.error('Failed to parse response as JSON:', e)
+        throw new Error(`Invalid JSON response: ${responseText}`)
+      }
+      
+      // Check if we got a 404 even with valid request
+      if (response.status === 404) {
+        throw new Error('Endpoint not found')
+      }
+      
+      if (response.status === 401) {
+        throw new Error('Unauthorized')
+      }
+      
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`)
+      }
+      
+      if (!responseData || !responseData.data) {
+        console.error('Invalid response format:', responseData)
+        throw new Error('Invalid response format')
+      }
+      
+      const userData = responseData.data.attributes
       
       console.log('Authentication successful:', {
         userName: userData.name,
@@ -68,38 +103,25 @@ export async function POST(request: NextRequest) {
       
     } catch (error: any) {
       console.error('Authentication failed:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
+        errorMessage: error.message,
         requestUrl: fullUrl,
-        errorCode: error.code,
-        errorMessage: error.message
+        errorDetails: error
       })
       
-      if (error.response?.status === 401) {
+      if (error.message === 'Unauthorized') {
         return Response.json({ 
           error: "Invalid API key. Please check your API key and try again." 
         }, { status: 401 })
-      } else if (error.response?.status === 404) {
+      } else if (error.message === 'Endpoint not found') {
         return Response.json({ 
           error: `API endpoint not found. URL tried: ${fullUrl}. Please verify the API URL is correct.`,
           details: `Expected format: https://api.scopestack.io (no trailing slash)`
         }, { status: 404 })
-      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-        return Response.json({ 
-          error: `Cannot connect to ScopeStack API at ${cleanBaseUrl}. Please check the URL.`,
-          details: error.message
-        }, { status: 503 })
-      } else if (error.code === 'ETIMEDOUT') {
-        return Response.json({ 
-          error: "Connection to ScopeStack API timed out. Please try again.",
-          details: `Timeout after 10 seconds trying to reach ${fullUrl}`
-        }, { status: 504 })
       } else {
         return Response.json({ 
-          error: `Authentication failed: ${error.response?.statusText || error.message}`,
-          details: error.response?.data || error.message
-        }, { status: error.response?.status || 500 })
+          error: `Authentication failed: ${error.message}`,
+          details: error.message
+        }, { status: 500 })
       }
     }
     
