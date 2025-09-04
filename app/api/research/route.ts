@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getResearchOrchestrator } from '../../../lib/research/orchestrator/research-orchestrator';
-import { getRequestLogger, extractTechnology, getSessionId } from '../../../lib/request-logger';
+import { getRequestLogger, getSessionId } from '../../../lib/request-logger';
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -18,20 +18,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Input or request is required' }, { status: 400 });
     }
 
-    // Log the request
-    const technology = extractTechnology(userRequest);
+    // Log the request  
     const sessionId = getSessionId(request);
     
     await logger.logRequest({
       userRequest,
       requestType: 'research',
       sessionId,
-      status: 'started',
-      technology,
-      metadata: {
-        userAgent: request.headers.get('user-agent'),
-        contentLength: userRequest.length
-      }
+      status: 'started'
     });
 
     console.log('🔍 Starting research for:', userRequest);
@@ -138,14 +132,7 @@ export async function POST(request: NextRequest) {
                 requestType: 'research',
                 sessionId,
                 status: 'completed',
-                duration: Date.now() - startTime,
-                technology,
-                metadata: {
-                  userAgent: request.headers.get('user-agent'),
-                  contentLength: userRequest.length,
-                  sourcesFound: event.content?.sources?.length || 0,
-                  servicesGenerated: event.content?.services?.length || 0
-                }
+                duration: Date.now() - startTime
               }).catch(err => console.warn('Failed to log completion:', err));
             } else if (event.type === 'error') {
               sendSSE({
@@ -180,12 +167,7 @@ export async function POST(request: NextRequest) {
             sessionId,
             status: 'failed',
             duration: Date.now() - startTime,
-            technology,
-            errorMessage,
-            metadata: {
-              userAgent: request.headers.get('user-agent'),
-              contentLength: userRequest.length
-            }
+            errorMessage
           }).catch(err => console.warn('Failed to log error:', err));
           
           sendSSE({
@@ -213,7 +195,6 @@ export async function POST(request: NextRequest) {
     try {
       const body = await request.json();
       const userRequest = body.input || body.request;
-      const technology = extractTechnology(userRequest || '');
       const sessionId = getSessionId(request);
       
       await logger.logRequest({
@@ -222,12 +203,7 @@ export async function POST(request: NextRequest) {
         sessionId,
         status: 'failed',
         duration: Date.now() - startTime,
-        technology,
-        errorMessage: error instanceof Error ? error.message : 'Internal server error',
-        metadata: {
-          userAgent: request.headers.get('user-agent'),
-          routeLevel: true
-        }
+        errorMessage: error instanceof Error ? error.message : 'Internal server error'
       });
     } catch (logError) {
       // Don't let logging errors break the response

@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server"
 import { ScopeStackApiService, ScopeStackService } from "@/lib/scopestack-api-service"
 import type { GeneratedContent, Service, Question, ResearchSource } from "@/lib/research/types/interfaces"
 import { getLanguageConfigForAccount, DEMO_ACCOUNT_CONFIG } from "@/lib/scopestack-language-configs"
-import { getRequestLogger, extractTechnology, getSessionId } from "@/lib/request-logger"
+import { getRequestLogger, getScopeStackUserInfo, getSessionId } from "@/lib/request-logger"
 
 interface PushToScopeStackRequest {
   content: GeneratedContent
@@ -239,26 +239,17 @@ export async function POST(request: NextRequest) {
       scopeStackApiUrl
     }: PushToScopeStackRequest = await request.json()
 
-    // Log the push request
-    const technology = content?.technology || extractTechnology(JSON.stringify(content));
+    // Get user info from ScopeStack API
+    const { userName, accountSlug } = await getScopeStackUserInfo(scopeStackApiKey, scopeStackApiUrl);
     const sessionId = getSessionId(request);
     
     await logger.logRequest({
-      userRequest: `Push ${technology || 'content'} to ScopeStack: ${projectName || clientName || 'Unnamed Project'}`,
+      userRequest: `Push to ScopeStack: ${projectName || clientName || 'Unnamed Project'}`,
       requestType: 'push-to-scopestack',
       sessionId,
       status: 'started',
-      technology,
-      metadata: {
-        userAgent: request.headers.get('user-agent'),
-        clientName,
-        projectName,
-        serviceCount: content?.services?.length || 0,
-        questionCount: content?.questions?.length || 0,
-        useDirectServices,
-        skipSurvey,
-        skipDocument
-      }
+      userName,
+      accountSlug
     });
 
     // Validate required fields
@@ -478,26 +469,13 @@ export async function POST(request: NextRequest) {
 
     // Log successful completion
     await logger.logRequest({
-      userRequest: `Push ${technology || 'content'} to ScopeStack: ${projectName || clientName || 'Unnamed Project'}`,
+      userRequest: `Push to ScopeStack: ${projectName || clientName || 'Unnamed Project'}`,
       requestType: 'push-to-scopestack',
       sessionId,
       status: 'completed',
       duration: Date.now() - startTime,
-      technology,
-      metadata: {
-        userAgent: request.headers.get('user-agent'),
-        clientName,
-        projectName,
-        serviceCount: content?.services?.length || 0,
-        questionCount: content?.questions?.length || 0,
-        useDirectServices,
-        skipSurvey,
-        skipDocument,
-        pushedToScopeStack: true,
-        projectId: finalProject.id,
-        contractRevenue: finalProject.contractRevenue,
-        servicesCreated: createdServices?.length || 0
-      }
+      userName,
+      accountSlug
     });
 
     console.log('Successfully pushed content to ScopeStack!')
@@ -527,25 +505,16 @@ export async function POST(request: NextRequest) {
 
     // Log the error
     try {
-      const body = await request.json();
-      const content = body.content;
-      const technology = content?.technology || extractTechnology(JSON.stringify(content || {}));
       const sessionId = getSessionId(request);
-      const projectName = body.projectName || body.clientName;
+      const projectName = (await request.clone().json()).projectName || (await request.clone().json()).clientName;
 
       await logger.logRequest({
-        userRequest: `Push ${technology || 'content'} to ScopeStack: ${projectName || 'Unnamed Project'}`,
+        userRequest: `Push to ScopeStack: ${projectName || 'Unnamed Project'}`,
         requestType: 'push-to-scopestack',
         sessionId,
         status: 'failed',
         duration: Date.now() - startTime,
-        technology,
-        errorMessage: errorDetails,
-        metadata: {
-          userAgent: request.headers.get('user-agent'),
-          statusCode,
-          errorType: error instanceof Error ? error.constructor.name : typeof error
-        }
+        errorMessage: errorDetails
       });
     } catch (logError) {
       console.warn('Failed to log error:', logError);

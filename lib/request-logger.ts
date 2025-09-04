@@ -3,33 +3,17 @@ interface RequestLogEntry {
   timestamp: string
   userRequest: string
   requestType: 'research' | 'push-to-scopestack' | 'test'
-  userId?: string
+  userName?: string
+  accountSlug?: string
   sessionId?: string
   status: 'started' | 'completed' | 'failed'
   duration?: number
   errorMessage?: string
-  technology?: string
-  metadata?: {
-    sourcesFound?: number
-    servicesGenerated?: number
-    contentLength?: number
-    pushedToScopeStack?: boolean
-    [key: string]: any
-  }
 }
 
 interface RequestLogger {
   logRequest: (entry: Omit<RequestLogEntry, 'id' | 'timestamp'>) => Promise<void>
-  updateRequestStatus: (id: string, status: RequestLogEntry['status'], metadata?: any) => Promise<void>
   getRequestLogs: (limit?: number) => Promise<RequestLogEntry[]>
-  getAnalytics: () => Promise<{
-    totalRequests: number
-    completedRequests: number
-    failedRequests: number
-    popularTechnologies: Array<{ technology: string; count: number }>
-    averageDuration: number
-    requestsByDay: Array<{ date: string; count: number }>
-  }>
 }
 
 class FileRequestLogger implements RequestLogger {
@@ -57,16 +41,6 @@ class FileRequestLogger implements RequestLogger {
     }
   }
 
-  async updateRequestStatus(id: string, status: RequestLogEntry['status'], metadata?: any): Promise<void> {
-    const update = {
-      id,
-      timestamp: new Date().toISOString(),
-      status,
-      ...metadata
-    }
-    
-    console.log('📊 REQUEST UPDATE:', JSON.stringify(update, null, 2))
-  }
 
   async getRequestLogs(limit = 100): Promise<RequestLogEntry[]> {
     try {
@@ -82,50 +56,6 @@ class FileRequestLogger implements RequestLogger {
     return []
   }
 
-  async getAnalytics() {
-    const logs = await this.getRequestLogs(1000)
-    
-    const totalRequests = logs.length
-    const completedRequests = logs.filter(l => l.status === 'completed').length
-    const failedRequests = logs.filter(l => l.status === 'failed').length
-    
-    // Count technologies
-    const techCounts: { [key: string]: number } = {}
-    logs.forEach(log => {
-      if (log.technology) {
-        techCounts[log.technology] = (techCounts[log.technology] || 0) + 1
-      }
-    })
-    const popularTechnologies = Object.entries(techCounts)
-      .map(([technology, count]) => ({ technology, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10)
-
-    // Calculate average duration
-    const durationsMs = logs.filter(l => l.duration).map(l => l.duration!)
-    const averageDuration = durationsMs.length > 0 
-      ? durationsMs.reduce((a, b) => a + b, 0) / durationsMs.length 
-      : 0
-
-    // Group by day
-    const dayGroups: { [key: string]: number } = {}
-    logs.forEach(log => {
-      const date = log.timestamp.split('T')[0]
-      dayGroups[date] = (dayGroups[date] || 0) + 1
-    })
-    const requestsByDay = Object.entries(dayGroups)
-      .map(([date, count]) => ({ date, count }))
-      .sort((a, b) => a.date.localeCompare(b.date))
-
-    return {
-      totalRequests,
-      completedRequests,
-      failedRequests,
-      popularTechnologies,
-      averageDuration,
-      requestsByDay
-    }
-  }
 }
 
 // Singleton instance
@@ -138,55 +68,38 @@ export function getRequestLogger(): RequestLogger {
   return logger
 }
 
-// Helper to extract technology from user request
-export function extractTechnology(userRequest: string): string | undefined {
-  const request = userRequest.toLowerCase()
+
+// Helper to get user info from ScopeStack authentication
+export async function getScopeStackUserInfo(apiKey?: string, apiUrl?: string): Promise<{ userName?: string, accountSlug?: string }> {
+  if (!apiKey) return {}
   
-  // Common technology patterns
-  const techPatterns = [
-    { pattern: /react|nextjs|next\.js/i, tech: 'React/Next.js' },
-    { pattern: /vue|vuejs|vue\.js|nuxt/i, tech: 'Vue.js' },
-    { pattern: /angular/i, tech: 'Angular' },
-    { pattern: /svelte/i, tech: 'Svelte' },
-    { pattern: /node\.js|nodejs|express/i, tech: 'Node.js' },
-    { pattern: /python|django|flask|fastapi/i, tech: 'Python' },
-    { pattern: /java|spring/i, tech: 'Java' },
-    { pattern: /php|laravel/i, tech: 'PHP' },
-    { pattern: /ruby|rails/i, tech: 'Ruby' },
-    { pattern: /go|golang/i, tech: 'Go' },
-    { pattern: /rust/i, tech: 'Rust' },
-    { pattern: /kotlin/i, tech: 'Kotlin' },
-    { pattern: /swift|ios/i, tech: 'Swift/iOS' },
-    { pattern: /android/i, tech: 'Android' },
-    { pattern: /flutter|dart/i, tech: 'Flutter/Dart' },
-    { pattern: /react native/i, tech: 'React Native' },
-    { pattern: /docker|container/i, tech: 'Docker' },
-    { pattern: /kubernetes|k8s/i, tech: 'Kubernetes' },
-    { pattern: /aws|amazon web services/i, tech: 'AWS' },
-    { pattern: /azure/i, tech: 'Azure' },
-    { pattern: /gcp|google cloud/i, tech: 'Google Cloud' },
-    { pattern: /terraform/i, tech: 'Terraform' },
-    { pattern: /mongodb|mongo/i, tech: 'MongoDB' },
-    { pattern: /postgresql|postgres/i, tech: 'PostgreSQL' },
-    { pattern: /mysql/i, tech: 'MySQL' },
-    { pattern: /redis/i, tech: 'Redis' },
-    { pattern: /graphql/i, tech: 'GraphQL' },
-    { pattern: /api|rest/i, tech: 'API Development' },
-    { pattern: /machine learning|ml|ai/i, tech: 'Machine Learning' },
-  ]
-
-  for (const { pattern, tech } of techPatterns) {
-    if (pattern.test(request)) {
-      return tech
+  try {
+    const baseUrl = (apiUrl || 'https://api.scopestack.io').replace(/\/$/, '')
+    const response = await fetch(`${baseUrl}/v1/me`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Accept': 'application/vnd.api+json',
+      },
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      if (data?.data?.attributes) {
+        return {
+          userName: data.data.attributes.name,
+          accountSlug: data.data.attributes['account-slug']
+        }
+      }
     }
+  } catch (error) {
+    console.warn('Failed to get ScopeStack user info:', error)
   }
-
-  return undefined
+  
+  return {}
 }
 
 // Helper to generate session ID from request headers
 export function getSessionId(request: Request): string {
-  // Try to get a session identifier from headers or generate one
   const userAgent = request.headers.get('user-agent') || ''
   const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
   
