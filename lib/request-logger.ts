@@ -236,15 +236,30 @@ export function getRequestLogger(): RequestLogger {
 }
 
 
-// Helper to get user info from ScopeStack authentication
-export async function getScopeStackUserInfo(apiKey?: string, apiUrl?: string): Promise<{ userName?: string, accountSlug?: string }> {
-  if (!apiKey) return {}
+// Helper to get user info from ScopeStack authentication (supports both API keys and OAuth tokens)
+export async function getScopeStackUserInfo(authToken?: string, apiUrl?: string): Promise<{ userName?: string, accountSlug?: string }> {
+  // If no token provided, try to get from OAuth session storage (browser only)
+  if (!authToken && typeof window !== 'undefined') {
+    try {
+      const savedSession = localStorage.getItem('scopestack_session')
+      if (savedSession) {
+        const session = JSON.parse(savedSession)
+        if (session.accessToken && session.expiresAt > Date.now()) {
+          authToken = session.accessToken
+        }
+      }
+    } catch (error) {
+      // Ignore localStorage errors
+    }
+  }
+  
+  if (!authToken) return {}
   
   try {
     const baseUrl = (apiUrl || 'https://api.scopestack.io').replace(/\/$/, '')
     const response = await fetch(`${baseUrl}/v1/me`, {
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${authToken}`,
         'Accept': 'application/vnd.api+json',
       },
     })

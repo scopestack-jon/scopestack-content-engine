@@ -91,7 +91,9 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
     accountSlug: string
     accountId: string
     email: string
-    apiKey: string
+    accessToken: string
+    refreshToken: string
+    expiresAt: number
   } | null>(null)
 
   const toggleServiceExpanded = (index: number) => {
@@ -443,7 +445,7 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
         skipSurvey,
         skipDocument,
         workflow: scopeStackWorkflow,
-        scopeStackApiKey: accountInfo.apiKey,
+        scopeStackApiKey: accountInfo.accessToken,
         scopeStackAccountSlug: accountInfo.accountSlug,
         scopeStackApiUrl: scopeStackApiUrl || undefined,
       }
@@ -455,8 +457,8 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
         skipDocument,
         accountSlug: accountInfo.accountSlug,
         userName: accountInfo.userName,
-        hasApiKey: !!accountInfo.apiKey,
-        apiKeyLength: accountInfo.apiKey.length
+        hasApiKey: !!accountInfo.accessToken,
+        apiKeyLength: accountInfo.accessToken.length
       })
 
       setPushProgress({ step: "Connecting to ScopeStack...", details: "Sending request to API", status: 'loading' })

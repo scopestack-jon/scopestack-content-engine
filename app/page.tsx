@@ -217,8 +217,22 @@ export default function ScopeStackContentEngine() {
             analysis: localStorage.getItem("analysis_prompt"),
           },
           // Include ScopeStack credentials for user attribution
-          scopeStackApiKey: localStorage.getItem("scopestack_api_key"),
-          scopeStackApiUrl: localStorage.getItem("scopestack_api_url"),
+          scopeStackApiKey: (() => {
+            // Try OAuth session first, then fallback to legacy API key
+            const session = localStorage.getItem("scopestack_session")
+            if (session) {
+              try {
+                const parsed = JSON.parse(session)
+                if (parsed.accessToken && parsed.expiresAt > Date.now()) {
+                  return parsed.accessToken
+                }
+              } catch (e) {
+                // Fall through to legacy approach
+              }
+            }
+            return localStorage.getItem("scopestack_api_key")
+          })(),
+          scopeStackApiUrl: localStorage.getItem("scopestack_api_url") || "https://api.scopestack.io",
         }),
       })
 
