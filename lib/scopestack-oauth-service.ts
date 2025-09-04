@@ -102,8 +102,23 @@ class ScopeStackOAuthService {
   }
 
   private getRedirectUri(): string {
-    // Use 127.0.0.1 for local development (some OAuth providers prefer this over localhost)
-    return 'http://127.0.0.1:3001/api/oauth/scopestack/callback'
+    // ScopeStack requires HTTPS redirect URIs, so we need to use production URL
+    if (typeof window !== 'undefined') {
+      // Browser environment - use current origin
+      return `${window.location.origin}/api/oauth/scopestack/callback`
+    }
+    
+    // Server environment - determine URL based on environment
+    if (process.env.VERCEL_URL) {
+      return `https://${process.env.VERCEL_URL}/api/oauth/scopestack/callback`
+    }
+    
+    if (process.env.NODE_ENV === 'production') {
+      return 'https://your-production-domain.com/api/oauth/scopestack/callback'
+    }
+    
+    // For local development, you'll need to use ngrok or deploy to test OAuth
+    return 'https://your-vercel-app.vercel.app/api/oauth/scopestack/callback'
   }
 
   async authenticate(credentials: ScopeStackCredentials): Promise<ScopeStackSession> {
