@@ -7,8 +7,8 @@ export async function POST(request: NextRequest) {
 
     console.log('Generating OAuth authorization URL...');
     
-    // Use Postman's OAuth callback URL
-    const redirectUri = 'https://oauth.pstmn.io/v1/browser-callback';
+    // Use Vercel HTTPS callback URL
+    const redirectUri = 'https://scopestack-content-engine.vercel.app/api/oauth/scopestack/callback';
     
     // Generate the OAuth authorization URL
     const authUrl = scopeStackOAuth.getAuthorizationUrl(redirectUri, state);
