@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   title: 'ScopeStack Content Engine',
   description: 'Research-driven content generation for professional services scoping',
   generator: 'ScopeStack',
+  icons: {
+    icon: '/icon.svg',
+    apple: '/apple-icon.svg',
+  },
 }
 
 export default function RootLayout({

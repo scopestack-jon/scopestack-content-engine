@@ -9,6 +9,7 @@ import { ResearchProgress } from "./components/research-progress"
 import { ContentOutput } from "./components/content-output"
 import { SourceAttribution } from "./components/source-attribution"
 import { ErrorBoundary, ResearchErrorBoundary, ContentErrorBoundary } from "@/components/error-boundary"
+import { AuthGuard } from "./components/auth-guard"
 import { showErrorToast, showResearchErrorToast, showSuccessToast, useErrorHandler } from "@/components/error-toast"
 import { createAPIError, createResearchError, ErrorCode, ScopeStackError } from "@/lib/errors"
 import { withRetry } from "@/lib/retry"
@@ -135,36 +136,6 @@ export default function ScopeStackContentEngine() {
     })
   }, [])
 
-  // Handle OAuth success callback
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const oauthSuccess = urlParams.get('oauth_success');
-    const sessionData = urlParams.get('session_data');
-
-    if (oauthSuccess === 'true' && sessionData) {
-      try {
-        // Decode and store the OAuth session
-        const session = JSON.parse(atob(sessionData));
-        localStorage.setItem('scopestack_session', JSON.stringify(session));
-        
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-        
-        // Show success notification
-        console.log('OAuth authentication successful:', {
-          userName: session.userName,
-          accountSlug: session.accountSlug,
-          expiresAt: new Date(session.expiresAt).toLocaleString()
-        });
-        
-        // Optional: Show toast notification
-        // You could add a toast here if needed
-        
-      } catch (error) {
-        console.error('Failed to process OAuth session:', error);
-      }
-    }
-  }, []);
 
   // Save content whenever it changes and auto-collapse research
   useEffect(() => {
@@ -524,27 +495,21 @@ export default function ScopeStackContentEngine() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-scopestack-primary/5 to-scopestack-button/10 p-4">
+    <AuthGuard>
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div className="flex justify-start mb-4">
             <Button 
               onClick={handleClearContent} 
               variant="outline" 
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-800 w-full sm:w-auto"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-800"
               disabled={isProcessing}
               size="sm"
             >
               <RotateCcw className="h-4 w-4" />
               Reset
             </Button>
-            <Link href="/settings" className="w-full sm:w-auto">
-              <Button variant="outline" className="flex items-center gap-2 w-full" size="sm">
-                <Settings className="h-4 w-4" />
-                Settings
-              </Button>
-            </Link>
           </div>
           <div className="flex items-center justify-center gap-3 mb-4">
             <Image 
@@ -687,6 +652,6 @@ export default function ScopeStackContentEngine() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AuthGuard>
   )
 }

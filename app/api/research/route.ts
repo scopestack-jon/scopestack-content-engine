@@ -20,6 +20,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Input or request is required' }, { status: 400 });
     }
 
+    // Verify authentication - require either OAuth token or legacy API key
+    if (!scopeStackApiKey) {
+      return NextResponse.json({ 
+        error: 'Authentication required. Please sign in to ScopeStack to use the content engine.' 
+      }, { status: 401 });
+    }
+
+    // Additional validation: if it looks like an OAuth token, verify it's not expired
+    // OAuth tokens are much longer and contain JWT-like structure vs API keys
+    if (scopeStackApiKey.length > 500) {
+      try {
+        // Try to decode as base64 to check if it's a session token
+        const decoded = JSON.parse(atob(scopeStackApiKey));
+        if (decoded.expiresAt && decoded.expiresAt < Date.now()) {
+          return NextResponse.json({ 
+            error: 'Session expired. Please sign in again to continue.' 
+          }, { status: 401 });
+        }
+      } catch (e) {
+        // Not a valid session token format, continue with regular processing
+      }
+    }
+
     // Get user info from ScopeStack if credentials provided
     const { userName, accountSlug } = await getScopeStackUserInfo(scopeStackApiKey, scopeStackApiUrl);
     const sessionId = getSessionId(request);

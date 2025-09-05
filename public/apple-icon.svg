@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- White background -->
+  <rect width="64" height="64" rx="8" fill="white"/>
+  
+  <!-- ScopeStack S Logo -->
+  <g fill="#3B4371">
+    <!-- Top section of S -->
+    <path d="M 12 16 L 36 16 L 40 20 L 40 26 L 28 26 L 28 32 L 48 32 L 52 36 L 52 44 L 36 44 L 36 38 L 24 38 L 24 44 L 28 44 L 28 48 L 12 48 L 8 44 L 8 36 L 20 36 L 20 32 L 8 32 L 8 20 L 12 16 Z"/>
+    
+    <!-- Interlocking middle section -->
+    <path d="M 36 26 L 44 26 L 44 32 L 36 32 Z" opacity="0.8"/>
+  </g>
+</svg>

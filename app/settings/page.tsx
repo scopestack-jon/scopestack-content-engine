@@ -22,6 +22,7 @@ import {
   User,
 } from "lucide-react"
 import Link from "next/link"
+import { AuthGuard } from "../components/auth-guard"
 
 export default function SettingsPage() {
   const [openRouterKey, setOpenRouterKey] = useState("")
@@ -207,11 +208,12 @@ export default function SettingsPage() {
   const disconnectScopeStack = () => {
     localStorage.removeItem('scopestack_session')
     setScopeStackSession(null)
-    alert('Disconnected from ScopeStack successfully')
+    // Redirect to home page where AuthGuard will require re-authentication
+    window.location.href = '/'
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-scopestack-primary/5 to-scopestack-button/10 p-4">
+    <AuthGuard>
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
@@ -513,6 +515,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AuthGuard>
   )
 }
