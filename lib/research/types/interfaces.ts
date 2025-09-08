@@ -4,6 +4,8 @@ export interface Subservice {
   name: string;
   description: string;
   hours: number;
+  baseHours?: number;  // Base hours per unit
+  quantity?: number;   // Calculated quantity from questions
   serviceDescription?: string;
   keyAssumptions?: string;
   clientResponsibilities?: string;
@@ -14,6 +16,8 @@ export interface Service {
   name: string;
   description: string;
   hours: number;
+  baseHours?: number;  // Base hours per unit
+  quantity?: number;   // Calculated quantity from questions
   phase?: string;
   subservices?: Subservice[];
   serviceDescription?: string;

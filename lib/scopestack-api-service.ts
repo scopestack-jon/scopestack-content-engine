@@ -58,6 +58,7 @@ export interface ScopeStackService {
   name: string
   description: string
   hours: number
+  baseHours?: number  // Base hours per unit (before quantity multiplication)
   phase?: string
   position?: number
   serviceDescription?: string
@@ -74,6 +75,8 @@ export interface ScopeStackService {
     name: string
     description: string
     hours: number
+    baseHours?: number  // Base hours per unit for subservice
+    quantity?: number   // Calculated quantity for subservice
     serviceDescription?: string
     keyAssumptions?: string
     clientResponsibilities?: string
@@ -499,8 +502,8 @@ export class ScopeStackApiService {
             type: 'project-services',
             attributes: {
               name: service.name,
-              quantity: 1, // Always set quantity to 1
-              'override-hours': service.hours || service.quantity || 0, // Map unit hours to override-hours
+              quantity: service.quantity || 1, // Use the calculated quantity from service
+              'override-hours': service.baseHours || service.hours || 0, // Use base hours per unit
               'task-source': service.taskSource || 'custom',
               'service-type': service.serviceType || 'professional_services',
               'payment-frequency': service.paymentFrequency || 'one_time',
@@ -519,7 +522,7 @@ export class ScopeStackApiService {
           }
         }
 
-        console.log(`Adding service ${service.name} with quantity=1 and override-hours=${service.hours || 0}`)
+        console.log(`Adding service ${service.name} with quantity=${service.quantity || 1} and override-hours=${service.baseHours || service.hours || 0}`)
         console.log('Service request data:', JSON.stringify(requestData, null, 2))
         const response = await this.apiScoped!.post('/v1/project-services', requestData)
         const createdService = response.data.data
@@ -562,8 +565,8 @@ export class ScopeStackApiService {
             type: 'project-subservices',
             attributes: {
               name: subservice.name || `Subservice ${i + 1}`,
-              quantity: 1, // Always set quantity to 1
-              'override-hours': subservice.hours || 0, // Map unit hours to override-hours
+              quantity: subservice.quantity || 1, // Use the calculated quantity from subservice
+              'override-hours': subservice.baseHours || subservice.hours || 0, // Use base hours per unit
               'service-description': subservice.description || '',
               'languages': this.buildLanguagesObject(subservice),
               'task-source': 'custom',
@@ -579,7 +582,7 @@ export class ScopeStackApiService {
           }
         }
 
-        console.log(`Adding subservice ${subservice.name} with quantity=1 and override-hours=${subservice.hours || 0} to service ${parentServiceId}`)
+        console.log(`Adding subservice ${subservice.name} with quantity=${subservice.quantity || 1} and override-hours=${subservice.baseHours || subservice.hours || 0} to service ${parentServiceId}`)
         await this.apiScoped!.post('/v1/project-subservices', requestData)
         console.log(`Successfully added subservice ${subservice.name}`)
       } catch (error: any) {

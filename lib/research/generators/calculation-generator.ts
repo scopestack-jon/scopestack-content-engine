@@ -174,7 +174,9 @@ export class CalculationGenerator {
     }
     
     // Map question types to calculation formulas with service references
-    if (text.includes('mailbox') && text.includes('how many')) {
+    // Check for various mailbox-related patterns
+    if ((text.includes('mailbox') && (text.includes('how many') || text.includes('number'))) || 
+        text.includes('mailboxes')) {
       return {
         id: this.generateUniqueId('calc_mailbox'),
         name: `${question.text} → Affects ${serviceNames.join(', ')}`,
@@ -187,7 +189,9 @@ export class CalculationGenerator {
       };
     }
     
-    if (text.includes('user') && (text.includes('how many') || text.includes('number'))) {
+    // Match various user-related patterns including "hybrid" users, pilot users, etc
+    if ((text.includes('user') || text.includes('pilot')) && 
+        (text.includes('how many') || text.includes('number'))) {
       return {
         id: this.generateUniqueId('calc_user'),
         name: `${question.text} → Affects ${serviceNames.join(', ')}`,
@@ -234,7 +238,35 @@ export class CalculationGenerator {
         formula: "site_count × 16.0",
         unit: "hours",
         source: `Calculation: Number of sites × 16.0 hours per site deployment`,
-        mappedQuestions: [questionSlug]
+        mappedQuestions: [questionSlug],
+        mappedServices: serviceNames
+      };
+    }
+    
+    // Add support for domain and integration questions
+    if (text.includes('domain') && (text.includes('how many') || text.includes('number'))) {
+      return {
+        id: this.generateUniqueId('calc_domain'),
+        name: `${question.text} → Affects ${serviceNames.join(', ')}`,
+        value: "4.0",
+        formula: "domain_count × 4.0",
+        unit: "hours per domain",
+        source: `This question scales effort for: ${serviceNames.join(', ')}`,
+        mappedQuestions: [questionSlug],
+        mappedServices: serviceNames
+      };
+    }
+    
+    if (text.includes('integration') && (text.includes('how many') || text.includes('number'))) {
+      return {
+        id: this.generateUniqueId('calc_integration'),
+        name: `${question.text} → Affects ${serviceNames.join(', ')}`,
+        value: "8.0",
+        formula: "integration_count × 8.0",
+        unit: "hours per integration",
+        source: `This question scales effort for: ${serviceNames.join(', ')}`,
+        mappedQuestions: [questionSlug],
+        mappedServices: serviceNames
       };
     }
     
@@ -327,6 +359,73 @@ export class CalculationGenerator {
     });
     
     return calculations;
+  }
+
+  /**
+   * Apply calculations to services to set proper quantities based on question answers
+   */
+  applyCalculationsToServices(services: Service[], calculations: Calculation[], questionResponses: Record<string, any>): Service[] {
+    // Create a deep copy of services
+    const updatedServices = JSON.parse(JSON.stringify(services));
+    
+    console.log('🔢 Applying calculations to services...');
+    console.log('   Question responses:', questionResponses);
+    console.log('   Calculations count:', calculations.length);
+    
+    // Process each calculation
+    calculations.forEach(calc => {
+      if (!calc.mappedServices || calc.mappedServices.length === 0) return;
+      
+      // Find the question response value for this calculation
+      const questionSlug = calc.mappedQuestions?.[0];
+      if (!questionSlug) {
+        console.log(`   ⚠️ No question slug for calculation: ${calc.name}`);
+        return;
+      }
+      
+      const responseValue = questionResponses[questionSlug];
+      const quantity = typeof responseValue === 'number' ? responseValue : 
+                      (parseInt(responseValue) || 1);
+      
+      console.log(`   📊 Calc: ${calc.name}`);
+      console.log(`      Question: ${questionSlug} = ${responseValue} → quantity: ${quantity}`);
+      console.log(`      Maps to services: ${calc.mappedServices.join(', ')}`);
+      
+      // Apply the quantity to mapped services
+      calc.mappedServices.forEach(serviceName => {
+        updatedServices.forEach((service: Service) => {
+          if (service.name === serviceName || service.name.includes(serviceName)) {
+            // Set the service quantity based on the question response
+            console.log(`      ✅ Setting quantity ${quantity} on service: ${service.name}`);
+            service.quantity = quantity;
+            
+            // Also set baseHours if not already set
+            if (!service.baseHours && calc.value) {
+              service.baseHours = parseFloat(calc.value);
+            }
+            
+            // Apply to subservices as well
+            if (service.subservices) {
+              service.subservices.forEach((sub: any) => {
+                // Set quantity for subservices that match the calculation pattern
+                if (calc.formula?.includes('mailbox') && sub.name.toLowerCase().includes('mailbox')) {
+                  sub.quantity = quantity;
+                  sub.baseHours = sub.baseHours || parseFloat(calc.value);
+                } else if (calc.formula?.includes('user') && sub.name.toLowerCase().includes('user')) {
+                  sub.quantity = quantity;
+                  sub.baseHours = sub.baseHours || parseFloat(calc.value);
+                } else if (calc.formula?.includes('server') && sub.name.toLowerCase().includes('server')) {
+                  sub.quantity = quantity;
+                  sub.baseHours = sub.baseHours || parseFloat(calc.value);
+                }
+              });
+            }
+          }
+        });
+      });
+    });
+    
+    return updatedServices;
   }
 
   /**

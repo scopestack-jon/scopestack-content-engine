@@ -78,6 +78,49 @@ export class ResearchOrchestrator {
 
       const calculations = this.calculationGenerator.generateCalculationsFromQuestions(questions, services);
 
+      // Apply calculations to services to set proper quantities
+      // Create mock responses based on questions (for now, use default values)
+      const mockResponses: Record<string, any> = {};
+      questions.forEach(q => {
+        const slug = q.slug || q.text.toLowerCase().replace(/\s+/g, '_').substring(0, 50);
+        const text = q.text.toLowerCase();
+        
+        // Set default quantities based on question patterns
+        if (text.includes('mailbox')) {
+          mockResponses[slug] = 100; // Default 100 mailboxes
+        } else if (text.includes('user') || text.includes('pilot')) {
+          // Check specific user types
+          if (text.includes('pilot')) {
+            mockResponses[slug] = 10; // Small pilot group
+          } else if (text.includes('hybrid')) {
+            mockResponses[slug] = 20; // Some hybrid users
+          } else {
+            mockResponses[slug] = 50; // Default 50 users
+          }
+        } else if (text.includes('server')) {
+          mockResponses[slug] = 5; // Default 5 servers
+        } else if (text.includes('domain')) {
+          mockResponses[slug] = 3; // Default 3 domains
+        } else if (text.includes('integration')) {
+          mockResponses[slug] = 5; // Default 5 integrations
+        } else if (text.includes('storage') || text.includes('gb')) {
+          mockResponses[slug] = 10; // Default 10 GB per mailbox
+        } else if (text.includes('downtime') || text.includes('hours')) {
+          mockResponses[slug] = 4; // Default 4 hours downtime
+        } else if (q.type === 'number') {
+          mockResponses[slug] = 10; // Default number
+        } else {
+          mockResponses[slug] = q.options?.[0] || 'default';
+        }
+      });
+
+      // Apply the calculations to update service quantities
+      const servicesWithQuantities = this.calculationGenerator.applyCalculationsToServices(
+        services, 
+        calculations, 
+        mockResponses
+      );
+
       onProgress?.({
         type: 'step',
         stepId: 'calculations',
@@ -85,8 +128,8 @@ export class ResearchOrchestrator {
         progress: 90
       });
 
-      // Calculate total hours
-      const totalHours = this.calculationGenerator.calculateTotalHours(services, calculations);
+      // Calculate total hours using services with quantities
+      const totalHours = this.calculationGenerator.calculateTotalHours(servicesWithQuantities, calculations);
 
       onProgress?.({
         type: 'progress',
@@ -97,7 +140,7 @@ export class ResearchOrchestrator {
       const content: Partial<GeneratedContent> = {
         technology: extractTechnologyName(userRequest),
         questions,
-        services,
+        services: servicesWithQuantities, // Use services with calculated quantities
         calculations,
         sources: researchData.sources,
         totalHours

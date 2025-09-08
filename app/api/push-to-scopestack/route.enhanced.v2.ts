@@ -40,11 +40,19 @@ function transformServicesToScopeStack(services: Service[]): ScopeStackService[]
       serviceName = JSON.stringify(serviceName).replace(/[{}"]/g, '').replace(/,/g, ', ') || 'Unnamed Service'
     }
     
+    // Transform subservices if they exist
+    const transformedSubservices = service.subservices?.map(sub => ({
+      ...sub,
+      baseHours: sub.baseHours || sub.hours || 0,
+      quantity: sub.quantity || 1,
+    }))
+    
     return {
       name: serviceName,
       description: service.description || 'Service description',
       hours: service.hours || 0,
-      quantity: service.hours || 0, // Use hours as quantity
+      baseHours: service.baseHours || service.hours || 0, // Base hours per unit
+      quantity: service.quantity || 1, // Use actual quantity, default to 1
       phase: service.phase || 'Implementation',
       position: index + 1,
       serviceDescription: service.serviceDescription || service.description || 'Service description',
@@ -54,6 +62,7 @@ function transformServicesToScopeStack(services: Service[]): ScopeStackService[]
       serviceType: 'professional_services',
       paymentFrequency: 'one_time',
       taskSource: 'custom',
+      subservices: transformedSubservices,
     }
   })
 }
