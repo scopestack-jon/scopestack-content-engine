@@ -122,32 +122,23 @@ export class ResearchOrchestrator {
         mockResponses
       );
       
+      console.log('📊 Generated survey calculations:', surveyCalculations.map(c => `${c.calculation_id}: ${c.value}`));
+      
+      // Apply the calculation mapper to services and subservices
+      const servicesWithImprovedMapping = this.calculationMapper.applyCalculationsToServices(
+        services,
+        surveyCalculations
+      );
+      
       // Map calculations to service recommendations
       const serviceRecommendations = this.calculationMapper.mapCalculationsToServices(
         surveyCalculations,
-        services
+        servicesWithImprovedMapping
       );
-      
-      // Apply recommendations to update service quantities and base hours
-      const servicesWithRecommendations = services.map(service => {
-        const recommendation = serviceRecommendations.find(
-          r => r.serviceName === service.name
-        );
-        
-        if (recommendation) {
-          return {
-            ...service,
-            quantity: recommendation.quantity,
-            baseHours: recommendation.baseHours,
-            calculationIds: recommendation.calculationIds
-          };
-        }
-        return service;
-      });
       
       // Also apply the original calculation generator for backward compatibility
       const servicesWithQuantities = this.calculationGenerator.applyCalculationsToServices(
-        servicesWithRecommendations, 
+        servicesWithImprovedMapping, 
         calculations, 
         mockResponses
       );

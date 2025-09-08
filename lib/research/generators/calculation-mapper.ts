@@ -303,6 +303,165 @@ export class CalculationMapper {
   }
 
   /**
+   * Apply calculations to update service and subservice quantities
+   */
+  applyCalculationsToServices(
+    services: Service[],
+    calculations: SurveyCalculation[]
+  ): Service[] {
+    return services.map(service => {
+      const updatedService = { ...service };
+      
+      // Apply calculations to main service
+      const serviceRecommendation = this.createServiceRecommendation(service, calculations);
+      if (serviceRecommendation) {
+        updatedService.quantity = serviceRecommendation.quantity;
+        updatedService.baseHours = serviceRecommendation.baseHours;
+      }
+      
+      // Apply calculations to subservices
+      if (service.subservices) {
+        updatedService.subservices = service.subservices.map(subservice => {
+          const updatedSubservice = { ...subservice };
+          
+          // Map subservice to calculations based on name and type
+          this.applyCalculationsToSubservice(updatedSubservice, service, calculations);
+          
+          return updatedSubservice;
+        });
+      }
+      
+      return updatedService;
+    });
+  }
+
+  /**
+   * Apply specific calculations to a subservice
+   */
+  private applyCalculationsToSubservice(
+    subservice: any,
+    parentService: Service,
+    calculations: SurveyCalculation[]
+  ): void {
+    const subserviceName = subservice.name.toLowerCase();
+    const parentServiceName = parentService.name.toLowerCase();
+    
+    console.log(`    🔍 Checking subservice: "${subservice.name}" in service "${parentService.name}"`);
+    console.log(`    📋 Available calculations:`, calculations.map(c => c.calculation_id));
+    
+    // Mailbox-related subservices
+    if (subserviceName.includes('mailbox') || subserviceName.includes('migration') || 
+        subserviceName.includes('data') && parentServiceName.includes('migration')) {
+      
+      // Look for mailbox calculations with more flexible patterns
+      const mailboxCountCalc = calculations.find(c => 
+        c.calculation_id === 'mailbox_count_calculation' || 
+        c.calculation_id.includes('mailbox') || 
+        c.description?.toLowerCase().includes('mailbox')
+      );
+      
+      if (mailboxCountCalc) {
+        const quantity = Number(mailboxCountCalc.value) || 1;
+        subservice.quantity = quantity;
+        
+        // Different base hours for different types of mailbox operations
+        if (subserviceName.includes('migration') || subserviceName.includes('deployment')) {
+          subservice.baseHours = 0.5; // 0.5 hours per mailbox for migration
+        } else if (subserviceName.includes('configuration') || subserviceName.includes('setup')) {
+          subservice.baseHours = 0.25; // 0.25 hours per mailbox for configuration
+        } else if (subserviceName.includes('testing') || subserviceName.includes('validation')) {
+          subservice.baseHours = 0.1; // 0.1 hours per mailbox for testing
+        } else {
+          subservice.baseHours = 0.3; // Default for mailbox-related tasks
+        }
+        
+        console.log(`    📦 Setting subservice ${subservice.name}: quantity=${quantity}, baseHours=${subservice.baseHours}`);
+      }
+    }
+    
+    // User-related subservices
+    if (subserviceName.includes('user') || subserviceName.includes('training') || 
+        subserviceName.includes('knowledge') || subserviceName.includes('support')) {
+      
+      const userCountCalc = calculations.find(c => c.calculation_id === 'user_count_calculation');
+      if (userCountCalc) {
+        const quantity = Number(userCountCalc.value) || 1;
+        subservice.quantity = quantity;
+        
+        if (subserviceName.includes('training') || subserviceName.includes('knowledge')) {
+          subservice.baseHours = 1.5; // 1.5 hours per user for training
+        } else if (subserviceName.includes('support')) {
+          subservice.baseHours = 0.5; // 0.5 hours per user for support setup
+        } else {
+          subservice.baseHours = 1.0; // Default for user-related tasks
+        }
+        
+        console.log(`    👥 Setting subservice ${subservice.name}: quantity=${quantity}, baseHours=${subservice.baseHours}`);
+      }
+    }
+    
+    // Integration-related subservices
+    if (subserviceName.includes('integration') || subserviceName.includes('application') || 
+        subserviceName.includes('connector') || subserviceName.includes('third')) {
+      
+      const integrationCalc = calculations.find(c => c.calculation_id === 'integration_count_calculation');
+      if (integrationCalc) {
+        const quantity = Number(integrationCalc.value) || 1;
+        subservice.quantity = quantity;
+        subservice.baseHours = 4; // 4 hours per integration
+        
+        console.log(`    🔗 Setting subservice ${subservice.name}: quantity=${quantity}, baseHours=${subservice.baseHours}`);
+      }
+    }
+    
+    // Storage/Data-related subservices
+    if (subserviceName.includes('storage') || subserviceName.includes('data volume') || 
+        subserviceName.includes('archiv')) {
+      
+      const dataVolumeCalc = calculations.find(c => c.calculation_id === 'data_volume_calculation');
+      const totalDataCalc = calculations.find(c => c.calculation_id === 'total_migration_data_gb');
+      
+      const calc = dataVolumeCalc || totalDataCalc;
+      if (calc) {
+        const dataGB = Number(calc.value) || 1;
+        subservice.quantity = dataGB;
+        subservice.baseHours = 0.05; // 0.05 hours per GB
+        
+        console.log(`    💾 Setting subservice ${subservice.name}: quantity=${dataGB}GB, baseHours=${subservice.baseHours}`);
+      }
+    }
+    
+    // Security-related subservices
+    if (subserviceName.includes('security') || subserviceName.includes('compliance') || 
+        subserviceName.includes('permission') || subserviceName.includes('access')) {
+      
+      const securityCalc = calculations.find(c => c.calculation_id === 'security_level_lookup');
+      if (securityCalc) {
+        const securityMultiplier = Number(securityCalc.value) || 1.0;
+        // Apply security complexity to existing hours
+        subservice.baseHours = (subservice.baseHours || subservice.hours) * securityMultiplier;
+        
+        console.log(`    🔒 Applying security multiplier ${securityMultiplier} to ${subservice.name}`);
+      }
+    }
+    
+    // Testing/Validation subservices - scale based on overall complexity
+    if (subserviceName.includes('test') || subserviceName.includes('validation') || 
+        subserviceName.includes('verification') || subserviceName.includes('quality')) {
+      
+      const complexityCalc = calculations.find(c => c.calculation_id === 'project_complexity_score');
+      if (complexityCalc) {
+        const complexityScore = Number(complexityCalc.value) || 1;
+        const complexityMultiplier = Math.max(1, complexityScore / 10); // Scale complexity
+        
+        subservice.baseHours = (subservice.baseHours || subservice.hours) * complexityMultiplier;
+        
+        console.log(`    🧪 Applying complexity multiplier ${complexityMultiplier.toFixed(2)} to ${subservice.name}`);
+      }
+    }
+  }
+
+  /**
    * Create service recommendation based on calculations
    */
   private createServiceRecommendation(
