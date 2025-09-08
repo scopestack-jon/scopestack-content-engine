@@ -145,6 +145,8 @@ export class ContentValidator {
       questions: this.validateQuestions(content.questions || []),
       services: this.validateServices(content.services || []),
       calculations: this.validateCalculations(content.calculations || []),
+      surveyCalculations: content.surveyCalculations || [], // Pass through survey calculations
+      serviceRecommendations: content.serviceRecommendations || [], // Pass through service recommendations
       sources: this.validateSources(content.sources || []),
       totalHours: this.validateTotalHours(content.totalHours)
     };
@@ -294,6 +296,8 @@ export class ContentValidator {
       name: String(service.name || service.service || 'Service').trim(),
       description: String(service.description || 'Service description').trim(),
       hours: this.sanitizeHours(service.hours),
+      baseHours: service.baseHours || undefined, // Preserve calculated base hours
+      quantity: service.quantity || undefined,   // Preserve calculated quantities
       phase: String(service.phase || 'Implementation').trim(),
       subservices: Array.isArray(service.subservices) 
         ? service.subservices.map(this.sanitizeSubservice.bind(this)) 
@@ -310,6 +314,9 @@ export class ContentValidator {
       name: String(subservice.name || 'Subservice').trim(),
       description: String(subservice.description || 'Subservice description').trim(),
       hours: this.sanitizeHours(subservice.hours),
+      baseHours: subservice.baseHours || undefined, // Preserve calculated base hours
+      quantity: subservice.quantity || undefined,   // Preserve calculated quantities
+      calculationIds: subservice.calculationIds || undefined, // Preserve calculation mappings
       serviceDescription: String(subservice.serviceDescription || '').trim(),
       keyAssumptions: String(subservice.keyAssumptions || '').trim(),
       clientResponsibilities: String(subservice.clientResponsibilities || '').trim(),

@@ -136,12 +136,24 @@ export class ResearchOrchestrator {
         servicesWithImprovedMapping
       );
       
-      // Also apply the original calculation generator for backward compatibility
+      // Apply the original calculation generator for service-level quantities only
+      // NOTE: We skip this to preserve subservice mappings from CalculationMapper
       const servicesWithQuantities = this.calculationGenerator.applyCalculationsToServices(
-        servicesWithImprovedMapping, 
+        services, // Use original services to avoid overwriting subservice mappings
         calculations, 
         mockResponses
       );
+      
+      // Merge service quantities from old generator with subservice mappings from new mapper
+      const finalServices = servicesWithImprovedMapping.map((mappedService, index) => {
+        const serviceWithQuantity = servicesWithQuantities[index];
+        return {
+          ...mappedService,
+          quantity: serviceWithQuantity?.quantity || mappedService.quantity,
+          baseHours: serviceWithQuantity?.baseHours || mappedService.baseHours,
+          hours: serviceWithQuantity?.hours || mappedService.hours
+        };
+      });
 
       onProgress?.({
         type: 'step',
@@ -151,7 +163,7 @@ export class ResearchOrchestrator {
       });
 
       // Calculate total hours using services with quantities
-      const totalHours = this.calculationGenerator.calculateTotalHours(servicesWithQuantities, calculations);
+      const totalHours = this.calculationGenerator.calculateTotalHours(finalServices, calculations);
 
       onProgress?.({
         type: 'progress',
@@ -162,7 +174,7 @@ export class ResearchOrchestrator {
       const content: Partial<GeneratedContent> = {
         technology: extractTechnologyName(userRequest),
         questions,
-        services: servicesWithQuantities, // Use services with calculated quantities
+        services: finalServices, // Use final services with merged quantities and subservice mappings
         calculations,
         surveyCalculations, // Include ScopeStack-format calculations
         serviceRecommendations, // Include service recommendations
