@@ -5,6 +5,7 @@ import { getPerplexityEngine } from '../engines/perplexity-research';
 import { getQuestionGenerator } from '../generators/question-generator';
 import { getServiceGenerator } from '../generators/service-generator';
 import { getCalculationGenerator } from '../generators/calculation-generator';
+import { getCalculationMapper } from '../generators/calculation-mapper';
 import { getContentValidator } from '../validation/content-validator';
 import { GeneratedContent, ResearchData, StreamingEvent } from '../types/interfaces';
 import { extractTechnologyName } from '../utils/response-processor';
@@ -14,6 +15,7 @@ export class ResearchOrchestrator {
   private questionGenerator = getQuestionGenerator();
   private serviceGenerator = getServiceGenerator();
   private calculationGenerator = getCalculationGenerator();
+  private calculationMapper = getCalculationMapper();
   private validator = getContentValidator();
 
   /**
@@ -114,9 +116,38 @@ export class ResearchOrchestrator {
         }
       });
 
-      // Apply the calculations to update service quantities
+      // Use the improved calculation mapper for better service matching
+      const surveyCalculations = this.calculationMapper.generateCalculationsFromResponses(
+        questions,
+        mockResponses
+      );
+      
+      // Map calculations to service recommendations
+      const serviceRecommendations = this.calculationMapper.mapCalculationsToServices(
+        surveyCalculations,
+        services
+      );
+      
+      // Apply recommendations to update service quantities and base hours
+      const servicesWithRecommendations = services.map(service => {
+        const recommendation = serviceRecommendations.find(
+          r => r.serviceName === service.name
+        );
+        
+        if (recommendation) {
+          return {
+            ...service,
+            quantity: recommendation.quantity,
+            baseHours: recommendation.baseHours,
+            calculationIds: recommendation.calculationIds
+          };
+        }
+        return service;
+      });
+      
+      // Also apply the original calculation generator for backward compatibility
       const servicesWithQuantities = this.calculationGenerator.applyCalculationsToServices(
-        services, 
+        servicesWithRecommendations, 
         calculations, 
         mockResponses
       );
@@ -142,6 +173,8 @@ export class ResearchOrchestrator {
         questions,
         services: servicesWithQuantities, // Use services with calculated quantities
         calculations,
+        surveyCalculations, // Include ScopeStack-format calculations
+        serviceRecommendations, // Include service recommendations
         sources: researchData.sources,
         totalHours
       };

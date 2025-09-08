@@ -1,0 +1,444 @@
+// Improved Calculation Mapping System
+// Maps questions/answers to calculations and service recommendations
+// Following ScopeStack API structure
+
+import { Question, Service, Calculation } from '../types/interfaces';
+
+export interface SurveyCalculation {
+  calculation_id: string;
+  value: string | number;
+  formula?: string;
+  description?: string;
+}
+
+export interface ServiceRecommendation {
+  serviceId: string;
+  serviceName: string;
+  quantity: number;
+  baseHours: number;
+  calculationIds: string[]; // Which calculations affect this service
+}
+
+export class CalculationMapper {
+  /**
+   * Create calculation IDs based on question patterns
+   * Similar to ScopeStack's calculation_id format
+   */
+  generateCalculationId(question: Question): string {
+    const text = question.text.toLowerCase();
+    
+    // Map question patterns to calculation IDs
+    if (text.includes('mailbox')) {
+      if (text.includes('size') || text.includes('gb')) return 'mailbox_size_calculation';
+      if (text.includes('how many') || text.includes('number')) return 'mailbox_count_calculation';
+      if (text.includes('type')) return 'mailbox_type_lookup';
+    }
+    
+    if (text.includes('user')) {
+      if (text.includes('how many') || text.includes('number')) return 'user_count_calculation';
+      if (text.includes('hybrid')) return 'hybrid_user_calculation';
+      if (text.includes('pilot')) return 'pilot_user_calculation';
+      if (text.includes('training')) return 'training_requirement_calculation';
+    }
+    
+    if (text.includes('migration')) {
+      if (text.includes('approach') || text.includes('method')) return 'migration_approach_lookup';
+      if (text.includes('timeline') || text.includes('duration')) return 'migration_timeline_calculation';
+      if (text.includes('complexity')) return 'migration_complexity_factor';
+    }
+    
+    if (text.includes('storage') || text.includes('data')) {
+      if (text.includes('volume') || text.includes('gb') || text.includes('tb')) return 'data_volume_calculation';
+      if (text.includes('retention')) return 'data_retention_calculation';
+    }
+    
+    if (text.includes('integration') || text.includes('application')) {
+      if (text.includes('how many') || text.includes('number')) return 'integration_count_calculation';
+      if (text.includes('third-party')) return 'third_party_integration_calculation';
+      if (text.includes('custom')) return 'custom_integration_calculation';
+    }
+    
+    if (text.includes('domain')) {
+      if (text.includes('how many') || text.includes('number')) return 'domain_count_calculation';
+      if (text.includes('custom')) return 'custom_domain_calculation';
+    }
+    
+    if (text.includes('security')) {
+      if (text.includes('level') || text.includes('requirement')) return 'security_level_lookup';
+      if (text.includes('compliance')) return 'compliance_requirement_calculation';
+    }
+    
+    if (text.includes('downtime')) {
+      if (text.includes('window') || text.includes('hours')) return 'downtime_window_calculation';
+      if (text.includes('acceptable')) return 'acceptable_downtime_calculation';
+    }
+    
+    if (text.includes('location') || text.includes('site')) {
+      if (text.includes('how many') || text.includes('number')) return 'site_count_calculation';
+      if (text.includes('geographic')) return 'geographic_distribution_calculation';
+    }
+    
+    if (text.includes('environment')) {
+      if (text.includes('current') || text.includes('existing')) return 'environment_assessment_calculation';
+      if (text.includes('test') || text.includes('staging')) return 'environment_count_calculation';
+    }
+    
+    // Default calculation ID based on question slug
+    return question.slug || `custom_calculation_${Date.now()}`;
+  }
+
+  /**
+   * Generate calculations from survey responses
+   * Returns calculations in ScopeStack format
+   */
+  generateCalculationsFromResponses(
+    questions: Question[],
+    responses: Record<string, any>
+  ): SurveyCalculation[] {
+    const calculations: SurveyCalculation[] = [];
+    
+    questions.forEach(question => {
+      const calculationId = this.generateCalculationId(question);
+      const response = responses[question.slug || ''];
+      
+      if (response !== undefined) {
+        const calculation = this.createCalculation(calculationId, question, response);
+        if (calculation) {
+          calculations.push(calculation);
+        }
+      }
+    });
+    
+    // Add derived calculations (calculations based on multiple inputs)
+    calculations.push(...this.generateDerivedCalculations(calculations));
+    
+    return calculations;
+  }
+
+  /**
+   * Create a calculation based on question and response
+   */
+  private createCalculation(
+    calculationId: string,
+    question: Question,
+    response: any
+  ): SurveyCalculation | null {
+    const text = question.text.toLowerCase();
+    let value: string | number = response;
+    
+    // Handle different response types
+    if (typeof response === 'object' && response.value !== undefined) {
+      value = response.value;
+    } else if (typeof response === 'object' && response.key !== undefined) {
+      // Handle select options
+      value = this.mapSelectOptionToValue(calculationId, response.key);
+    }
+    
+    // Apply calculation formulas based on type
+    switch (calculationId) {
+      case 'mailbox_count_calculation':
+        return {
+          calculation_id: calculationId,
+          value: value,
+          formula: 'mailbox_count',
+          description: 'Number of mailboxes to migrate'
+        };
+        
+      case 'mailbox_size_calculation':
+        return {
+          calculation_id: calculationId,
+          value: value,
+          formula: 'avg_mailbox_size_gb',
+          description: 'Average mailbox size in GB'
+        };
+        
+      case 'user_count_calculation':
+        return {
+          calculation_id: calculationId,
+          value: value,
+          formula: 'user_count',
+          description: 'Total number of users'
+        };
+        
+      case 'data_volume_calculation':
+        return {
+          calculation_id: calculationId,
+          value: value,
+          formula: 'total_data_gb',
+          description: 'Total data volume in GB'
+        };
+        
+      case 'integration_count_calculation':
+        return {
+          calculation_id: calculationId,
+          value: value,
+          formula: 'integration_count',
+          description: 'Number of integrations'
+        };
+        
+      case 'domain_count_calculation':
+        return {
+          calculation_id: calculationId,
+          value: value,
+          formula: 'domain_count',
+          description: 'Number of domains'
+        };
+        
+      case 'site_count_calculation':
+        return {
+          calculation_id: calculationId,
+          value: value,
+          formula: 'site_count',
+          description: 'Number of sites/locations'
+        };
+        
+      case 'downtime_window_calculation':
+        return {
+          calculation_id: calculationId,
+          value: value,
+          formula: 'max_downtime_hours',
+          description: 'Maximum acceptable downtime in hours'
+        };
+        
+      case 'migration_approach_lookup':
+        return {
+          calculation_id: calculationId,
+          value: this.getMigrationComplexityValue(value),
+          formula: 'migration_complexity_factor',
+          description: 'Migration approach complexity factor'
+        };
+        
+      case 'security_level_lookup':
+        return {
+          calculation_id: calculationId,
+          value: this.getSecurityLevelValue(value),
+          formula: 'security_complexity_factor',
+          description: 'Security implementation complexity'
+        };
+        
+      default:
+        return {
+          calculation_id: calculationId,
+          value: value,
+          description: `Calculation for ${question.text}`
+        };
+    }
+  }
+
+  /**
+   * Generate derived calculations based on other calculations
+   */
+  private generateDerivedCalculations(calculations: SurveyCalculation[]): SurveyCalculation[] {
+    const derived: SurveyCalculation[] = [];
+    
+    // Calculate total migration effort
+    const mailboxCount = this.findCalculationValue(calculations, 'mailbox_count_calculation');
+    const avgSize = this.findCalculationValue(calculations, 'mailbox_size_calculation');
+    
+    if (mailboxCount && avgSize) {
+      derived.push({
+        calculation_id: 'total_migration_data_gb',
+        value: (Number(mailboxCount) * Number(avgSize)).toString(),
+        formula: 'mailbox_count × avg_mailbox_size',
+        description: 'Total data to migrate in GB'
+      });
+      
+      // Migration rate calculation (GB per hour)
+      const migrationRate = 10; // 10 GB per hour baseline
+      derived.push({
+        calculation_id: 'migration_duration_hours',
+        value: ((Number(mailboxCount) * Number(avgSize)) / migrationRate).toFixed(2),
+        formula: 'total_data_gb / migration_rate',
+        description: 'Estimated migration duration in hours'
+      });
+    }
+    
+    // Calculate complexity score
+    const integrations = this.findCalculationValue(calculations, 'integration_count_calculation');
+    const domains = this.findCalculationValue(calculations, 'domain_count_calculation');
+    const sites = this.findCalculationValue(calculations, 'site_count_calculation');
+    
+    const complexityScore = 
+      (Number(integrations) || 0) * 2 +
+      (Number(domains) || 0) * 1.5 +
+      (Number(sites) || 0) * 3;
+    
+    if (complexityScore > 0) {
+      derived.push({
+        calculation_id: 'project_complexity_score',
+        value: complexityScore.toFixed(2),
+        formula: '(integrations × 2) + (domains × 1.5) + (sites × 3)',
+        description: 'Overall project complexity score'
+      });
+    }
+    
+    // Add overhead calculation
+    derived.push({
+      calculation_id: 'project_management_overhead',
+      value: '0.15',
+      formula: 'total_effort × 0.15',
+      description: 'Project management overhead (15%)'
+    });
+    
+    return derived;
+  }
+
+  /**
+   * Map calculations to service recommendations
+   */
+  mapCalculationsToServices(
+    calculations: SurveyCalculation[],
+    services: Service[]
+  ): ServiceRecommendation[] {
+    const recommendations: ServiceRecommendation[] = [];
+    
+    services.forEach(service => {
+      const recommendation = this.createServiceRecommendation(service, calculations);
+      if (recommendation) {
+        recommendations.push(recommendation);
+      }
+    });
+    
+    return recommendations;
+  }
+
+  /**
+   * Create service recommendation based on calculations
+   */
+  private createServiceRecommendation(
+    service: Service,
+    calculations: SurveyCalculation[]
+  ): ServiceRecommendation | null {
+    const serviceName = service.name.toLowerCase();
+    const relatedCalculations: string[] = [];
+    let quantity = 1;
+    let baseHours = service.hours;
+    
+    // Map service to relevant calculations
+    if (serviceName.includes('migration')) {
+      const mailboxCalc = calculations.find(c => c.calculation_id === 'mailbox_count_calculation');
+      if (mailboxCalc) {
+        relatedCalculations.push(mailboxCalc.calculation_id);
+        quantity = Number(mailboxCalc.value) || 1;
+        baseHours = 0.5; // 0.5 hours per mailbox
+      }
+      
+      const dataCalc = calculations.find(c => c.calculation_id === 'total_migration_data_gb');
+      if (dataCalc) {
+        relatedCalculations.push(dataCalc.calculation_id);
+      }
+      
+      const complexityCalc = calculations.find(c => c.calculation_id === 'migration_approach_lookup');
+      if (complexityCalc) {
+        relatedCalculations.push(complexityCalc.calculation_id);
+        baseHours = baseHours * Number(complexityCalc.value);
+      }
+    }
+    
+    if (serviceName.includes('training') || serviceName.includes('knowledge')) {
+      const userCalc = calculations.find(c => c.calculation_id === 'user_count_calculation');
+      if (userCalc) {
+        relatedCalculations.push(userCalc.calculation_id);
+        quantity = Number(userCalc.value) || 1;
+        baseHours = 2; // 2 hours per user for training
+      }
+    }
+    
+    if (serviceName.includes('integration')) {
+      const integrationCalc = calculations.find(c => c.calculation_id === 'integration_count_calculation');
+      if (integrationCalc) {
+        relatedCalculations.push(integrationCalc.calculation_id);
+        quantity = Number(integrationCalc.value) || 1;
+        baseHours = 8; // 8 hours per integration
+      }
+    }
+    
+    if (serviceName.includes('security')) {
+      const securityCalc = calculations.find(c => c.calculation_id === 'security_level_lookup');
+      if (securityCalc) {
+        relatedCalculations.push(securityCalc.calculation_id);
+        baseHours = baseHours * Number(securityCalc.value);
+      }
+    }
+    
+    if (serviceName.includes('testing') || serviceName.includes('validation')) {
+      const complexityCalc = calculations.find(c => c.calculation_id === 'project_complexity_score');
+      if (complexityCalc) {
+        relatedCalculations.push(complexityCalc.calculation_id);
+        const complexityFactor = Math.max(1, Number(complexityCalc.value) / 10);
+        baseHours = baseHours * complexityFactor;
+      }
+    }
+    
+    // Apply project management overhead to all services
+    const overheadCalc = calculations.find(c => c.calculation_id === 'project_management_overhead');
+    if (overheadCalc) {
+      relatedCalculations.push(overheadCalc.calculation_id);
+    }
+    
+    return {
+      serviceId: `service_${service.name.replace(/\s+/g, '_').toLowerCase()}`,
+      serviceName: service.name,
+      quantity: quantity,
+      baseHours: baseHours,
+      calculationIds: relatedCalculations
+    };
+  }
+
+  /**
+   * Helper functions
+   */
+  private findCalculationValue(calculations: SurveyCalculation[], calculationId: string): string | null {
+    const calc = calculations.find(c => c.calculation_id === calculationId);
+    return calc ? calc.value.toString() : null;
+  }
+
+  private mapSelectOptionToValue(calculationId: string, optionKey: string): number {
+    // Map select option keys to numeric values for calculations
+    const mappings: Record<string, Record<string, number>> = {
+      migration_approach_lookup: {
+        'Cutover': 1.0,
+        'Staged': 1.2,
+        'Hybrid': 1.5,
+        'Minimal': 0.8
+      },
+      security_level_lookup: {
+        'Basic': 1.0,
+        'Standard': 1.3,
+        'Enhanced': 1.6,
+        'Maximum': 2.0
+      }
+    };
+    
+    return mappings[calculationId]?.[optionKey] || 1.0;
+  }
+
+  private getMigrationComplexityValue(approach: any): number {
+    const approachStr = typeof approach === 'string' ? approach.toLowerCase() : 
+                       (approach.key || approach.value || '').toLowerCase();
+    
+    if (approachStr.includes('cutover')) return 1.0;
+    if (approachStr.includes('staged')) return 1.2;
+    if (approachStr.includes('hybrid')) return 1.5;
+    if (approachStr.includes('minimal')) return 0.8;
+    
+    return 1.0;
+  }
+
+  private getSecurityLevelValue(level: any): number {
+    const levelStr = typeof level === 'string' ? level.toLowerCase() :
+                    (level.key || level.value || '').toLowerCase();
+    
+    if (levelStr.includes('basic')) return 1.0;
+    if (levelStr.includes('standard')) return 1.3;
+    if (levelStr.includes('enhanced')) return 1.6;
+    if (levelStr.includes('maximum')) return 2.0;
+    
+    return 1.0;
+  }
+}
+
+// Export singleton instance
+export function getCalculationMapper() {
+  return new CalculationMapper();
+}

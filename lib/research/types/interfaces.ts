@@ -68,6 +68,8 @@ export interface GeneratedContent {
   questions: Question[];
   services: Service[];
   calculations: Calculation[];
+  surveyCalculations?: any[]; // ScopeStack-format calculations
+  serviceRecommendations?: any[]; // Service recommendations with calculation mappings
   sources: ResearchSource[];
   totalHours: number;
 }
