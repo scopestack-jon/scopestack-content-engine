@@ -3,6 +3,7 @@ import './globals.css'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { ErrorToastProvider } from '@/components/error-toast'
 import { Toaster } from '@/components/ui/sonner'
+import { Analytics } from '@vercel/analytics/next'
 
 export const metadata: Metadata = {
   title: 'ScopeStack Content Engine',
@@ -39,6 +40,7 @@ export default function RootLayout({
             />
           </ErrorToastProvider>
         </ErrorBoundary>
+        <Analytics />
       </body>
     </html>
   )
