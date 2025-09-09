@@ -1742,6 +1742,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                                       <tr>
                                         <th className="text-left p-3 text-sm font-medium text-gray-700">Component</th>
                                         <th className="text-left p-3 text-sm font-medium text-gray-700">Description</th>
+                                        <th className="text-center p-3 text-sm font-medium text-gray-700">Qty</th>
                                         <th className="text-center p-3 text-sm font-medium text-gray-700">Hours</th>
                                         <th className="text-center p-3 text-sm font-medium text-gray-700">Mapping</th>
                                       </tr>
@@ -1757,6 +1758,13 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                                           <td className="p-3">
                                             <div className="text-sm text-gray-600 max-w-md">
                                               {sub.description || 'No description available'}
+                                            </div>
+                                          </td>
+                                          <td className="p-3 text-center">
+                                            <div className="flex items-center justify-center">
+                                              <Badge variant="secondary" size="sm" className="bg-blue-100 text-blue-800">
+                                                {typeof sub.quantity === 'number' ? sub.quantity : 1}
+                                              </Badge>
                                             </div>
                                           </td>
                                           <td className="p-3 text-center">
