@@ -109,6 +109,14 @@ export async function POST(request: NextRequest) {
                 progress: event.progress,
                 model: "claude-3.5-sonnet"
               });
+            } else if (event.type === 'step' && event.stepId === 'content') {
+              sendSSE({
+                type: "step",
+                stepId: "content",
+                status: event.status, 
+                progress: event.progress,
+                model: "claude-3.5-sonnet"
+              });
             } else if (event.type === 'step' && event.stepId === 'calculations') {
               sendSSE({
                 type: "step",
@@ -161,6 +169,12 @@ export async function POST(request: NextRequest) {
               sendSSE({
                 type: "error",
                 error: event.error
+              });
+            } else if (event.type === 'progress') {
+              sendSSE({
+                type: "progress",
+                progress: event.progress,
+                sources: event.sources || []
               });
             }
           });
