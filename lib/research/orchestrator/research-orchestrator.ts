@@ -130,7 +130,8 @@ export class ResearchOrchestrator {
       // Apply the calculation mapper to services and subservices
       const servicesWithImprovedMapping = this.calculationMapper.applyCalculationsToServices(
         services,
-        surveyCalculations
+        surveyCalculations,
+        enhancedCalculations // Also pass regular calculations for additional mapping
       );
       
       // Map calculations to service recommendations

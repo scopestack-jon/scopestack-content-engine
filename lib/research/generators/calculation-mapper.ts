@@ -307,7 +307,8 @@ export class CalculationMapper {
    */
   applyCalculationsToServices(
     services: Service[],
-    calculations: SurveyCalculation[]
+    calculations: SurveyCalculation[],
+    regularCalculations?: any[] // Also accept regular calculations for additional mapping
   ): Service[] {
     return services.map(service => {
       const updatedService = { ...service };
@@ -325,7 +326,7 @@ export class CalculationMapper {
           const updatedSubservice = { ...subservice };
           
           // Map subservice to calculations based on name and type
-          this.applyCalculationsToSubservice(updatedSubservice, service, calculations);
+          this.applyCalculationsToSubservice(updatedSubservice, service, calculations, regularCalculations);
           
           return updatedSubservice;
         });
@@ -341,7 +342,8 @@ export class CalculationMapper {
   private applyCalculationsToSubservice(
     subservice: any,
     parentService: Service,
-    calculations: SurveyCalculation[]
+    calculations: SurveyCalculation[],
+    regularCalculations?: any[]
   ): void {
     const subserviceName = subservice.name.toLowerCase();
     const parentServiceName = parentService.name.toLowerCase();
@@ -513,6 +515,57 @@ export class CalculationMapper {
         subservice.baseHours = (subservice.baseHours || subservice.hours) * complexityMultiplier;
         
         console.log(`    🧪 Applying complexity multiplier ${complexityMultiplier.toFixed(2)} to ${subservice.name}`);
+      }
+    }
+    
+    // Also check regular calculations for additional quantity mapping
+    if (regularCalculations && regularCalculations.length > 0 && !subservice.quantity) {
+      console.log(`    📐 Checking regular calculations for ${subservice.name}`);
+      
+      // Find relevant regular calculations for this subservice
+      const relevantCalc = regularCalculations.find(calc => {
+        const calcName = (calc.name || '').toLowerCase();
+        const calcSource = (calc.source || '').toLowerCase();
+        
+        // Match calculation to subservice based on keywords
+        if (subserviceName.includes('user') && (calcName.includes('user') || calcSource.includes('user'))) {
+          return true;
+        }
+        if (subserviceName.includes('mailbox') && (calcName.includes('mailbox') || calcSource.includes('mailbox'))) {
+          return true;
+        }
+        if (subserviceName.includes('integration') && (calcName.includes('integration') || calcSource.includes('integration'))) {
+          return true;
+        }
+        if (subserviceName.includes('data') && (calcName.includes('data') || calcSource.includes('data'))) {
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (relevantCalc && relevantCalc.value) {
+        const quantity = Number(relevantCalc.value) || 1;
+        subservice.quantity = quantity;
+        
+        // Set appropriate base hours based on subservice type
+        if (!subservice.baseHours) {
+          if (subserviceName.includes('training')) {
+            subservice.baseHours = 1.5;
+          } else if (subserviceName.includes('integration')) {
+            subservice.baseHours = 4.0;
+          } else if (subserviceName.includes('migration')) {
+            subservice.baseHours = 0.5;
+          } else {
+            subservice.baseHours = 1.0;
+          }
+        }
+        
+        console.log(`    📐 Applied regular calculation "${relevantCalc.name}": quantity=${quantity}, baseHours=${subservice.baseHours}`);
+        
+        // Add mapped calculations for UI display
+        subservice.mappedQuestions = [relevantCalc.name || relevantCalc.source || 'Regular calculation'];
+        subservice.calculationIds = [relevantCalc.id || 'regular_calc'];
       }
     }
   }
