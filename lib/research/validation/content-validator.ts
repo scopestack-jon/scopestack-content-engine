@@ -317,6 +317,7 @@ export class ContentValidator {
       baseHours: subservice.baseHours || undefined, // Preserve calculated base hours
       quantity: subservice.quantity || undefined,   // Preserve calculated quantities
       calculationIds: subservice.calculationIds || undefined, // Preserve calculation mappings
+      mappedQuestions: subservice.mappedQuestions || undefined, // Preserve mapped questions for UI display
       serviceDescription: String(subservice.serviceDescription || '').trim(),
       keyAssumptions: String(subservice.keyAssumptions || '').trim(),
       clientResponsibilities: String(subservice.clientResponsibilities || '').trim(),

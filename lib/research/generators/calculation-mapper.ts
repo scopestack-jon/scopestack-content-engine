@@ -369,6 +369,13 @@ export class CalculationMapper {
         }
         
         console.log(`    👥 Setting subservice ${subservice.name}: quantity=${quantity}, baseHours=${subservice.baseHours}`);
+        
+        // Add mapped questions for UI display
+        const relatedCalc = calculations.find(c => c.calculation_id === 'user_count_calculation');
+        if (relatedCalc && relatedCalc.description) {
+          subservice.mappedQuestions = [relatedCalc.description];
+          subservice.calculationIds = [relatedCalc.calculation_id];
+        }
       }
     }
     
@@ -383,6 +390,13 @@ export class CalculationMapper {
         subservice.baseHours = 4; // 4 hours per integration
         
         console.log(`    🔗 Setting subservice ${subservice.name}: quantity=${quantity}, baseHours=${subservice.baseHours}`);
+        
+        // Add mapped questions for UI display
+        const relatedCalc = calculations.find(c => c.calculation_id === 'integration_count_calculation');
+        if (relatedCalc && relatedCalc.description) {
+          subservice.mappedQuestions = [relatedCalc.description];
+          subservice.calculationIds = [relatedCalc.calculation_id];
+        }
       }
     }
     
@@ -435,6 +449,13 @@ export class CalculationMapper {
         }
         
         console.log(`    📦 Setting subservice ${subservice.name}: quantity=${quantity}, baseHours=${subservice.baseHours}`);
+        
+        // Add mapped questions for UI display
+        const relatedCalc = calculations.find(c => c.calculation_id.includes('mailbox') || c.calculation_id.includes('size'));
+        if (relatedCalc && relatedCalc.description) {
+          subservice.mappedQuestions = [relatedCalc.description];
+          subservice.calculationIds = [relatedCalc.calculation_id];
+        }
       }
     }
     
