@@ -124,6 +124,9 @@ export class ResearchOrchestrator {
       
       console.log('📊 Generated survey calculations:', surveyCalculations.map(c => `${c.calculation_id}: ${c.value}`));
       
+      // Enhance calculations with better formulas and question mappings after survey calculations are available
+      const enhancedCalculations = this.enhanceCalculationsWithSurveyData(calculations, questions, surveyCalculations);
+      
       // Apply the calculation mapper to services and subservices
       const servicesWithImprovedMapping = this.calculationMapper.applyCalculationsToServices(
         services,
@@ -140,7 +143,7 @@ export class ResearchOrchestrator {
       // NOTE: We skip this to preserve subservice mappings from CalculationMapper
       const servicesWithQuantities = this.calculationGenerator.applyCalculationsToServices(
         services, // Use original services to avoid overwriting subservice mappings
-        calculations, 
+        enhancedCalculations, // Use enhanced calculations with better formulas
         mockResponses
       );
       
@@ -163,7 +166,7 @@ export class ResearchOrchestrator {
       });
 
       // Calculate total hours using services with quantities
-      const totalHours = this.calculationGenerator.calculateTotalHours(finalServices, calculations);
+      const totalHours = this.calculationGenerator.calculateTotalHours(finalServices, enhancedCalculations);
 
       onProgress?.({
         type: 'progress',
@@ -175,7 +178,7 @@ export class ResearchOrchestrator {
         technology: extractTechnologyName(userRequest),
         questions,
         services: finalServices, // Use final services with merged quantities and subservice mappings
-        calculations,
+        calculations: enhancedCalculations, // Use enhanced calculations with better formulas and question mappings
         surveyCalculations, // Include ScopeStack-format calculations
         serviceRecommendations, // Include service recommendations
         sources: researchData.sources,
@@ -210,6 +213,100 @@ export class ResearchOrchestrator {
       // Re-throw error instead of providing empty fallback
       throw new Error(`Research-driven content generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Enhance calculations with better formulas and question mappings
+   */
+  private enhanceCalculationsWithSurveyData(
+    calculations: Calculation[], 
+    questions: Question[], 
+    surveyCalculations: any[]
+  ): Calculation[] {
+    // Create mapping from question slugs to question text
+    const questionMap = new Map<string, string>();
+    questions.forEach(q => {
+      const slug = q.slug || q.text.toLowerCase().replace(/\s+/g, '_').substring(0, 50);
+      questionMap.set(slug, q.text);
+      
+      // Also try exact text matching for better mapping
+      const textSlug = q.text.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 50);
+      questionMap.set(textSlug, q.text);
+    });
+
+    // Create mapping from generic variables to actual survey calculation IDs
+    const variableMap = new Map<string, string>();
+    surveyCalculations.forEach(calc => {
+      const id = calc.calculation_id;
+      const desc = (calc.description || '').toLowerCase();
+      
+      if (id.includes('mailbox') || desc.includes('mailbox')) {
+        variableMap.set('mailbox_count', id);
+      } else if (id.includes('user_count') || desc.includes('number of users') || desc.includes('total users')) {
+        variableMap.set('user_count', id);
+        variableMap.set('test_cases', id); // Test cases often scale with user count in ServiceNow
+      } else if (id.includes('integration') || desc.includes('integration') || desc.includes('system')) {
+        variableMap.set('integration_count', id);
+        variableMap.set('test_cases', id); // Test cases often scale with integrations
+      } else if (id.includes('data') || desc.includes('data') || desc.includes('volume')) {
+        variableMap.set('data_volume', id);
+        variableMap.set('storage_gb', id);
+      }
+    });
+
+    return calculations.map(calc => {
+      const enhanced = { ...calc };
+      
+      // Fix formula by replacing generic variables with actual calculation IDs
+      if (enhanced.formula) {
+        let updatedFormula = enhanced.formula;
+        variableMap.forEach((actualId, genericVar) => {
+          updatedFormula = updatedFormula.replace(new RegExp(genericVar, 'g'), actualId);
+        });
+        
+        // Clean up template variables that don't have actual values
+        updatedFormula = updatedFormula.replace(/\s*\+\s*\${subservice\.hours}/g, ''); // Remove subservice.hours placeholder
+        updatedFormula = updatedFormula.replace(/\s*\+\s*\${[^}]+}/g, ''); // Remove any other template variables
+        
+        enhanced.formula = updatedFormula;
+      }
+
+      // Enhance mapped questions with actual question text
+      if (enhanced.mappedQuestions && enhanced.mappedQuestions.length > 0) {
+        const enhancedQuestions: string[] = [];
+        
+        enhanced.mappedQuestions.forEach(slug => {
+          // Try different matching strategies
+          let questionText = questionMap.get(slug);
+          
+          if (!questionText) {
+            // Try fuzzy matching - find question that contains similar words
+            const slugWords = slug.toLowerCase().split('_');
+            const matchingQuestion = questions.find(q => {
+              const questionWords = q.text.toLowerCase().split(/\s+/);
+              return slugWords.some(slugWord => 
+                slugWord.length > 3 && questionWords.some(qWord => qWord.includes(slugWord))
+              );
+            });
+            
+            if (matchingQuestion) {
+              questionText = matchingQuestion.text;
+            }
+          }
+          
+          if (questionText) {
+            enhancedQuestions.push(questionText);
+          } else {
+            // Keep the slug as fallback but make it more readable
+            enhancedQuestions.push(slug.replace(/_/g, ' '));
+          }
+        });
+        
+        enhanced.mappedQuestions = enhancedQuestions;
+      }
+      
+      return enhanced;
+    });
   }
 
   /**
