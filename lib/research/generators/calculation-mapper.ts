@@ -310,6 +310,7 @@ export class CalculationMapper {
     calculations: SurveyCalculation[],
     regularCalculations?: any[] // Also accept regular calculations for additional mapping
   ): Service[] {
+    
     return services.map(service => {
       const updatedService = { ...service };
       

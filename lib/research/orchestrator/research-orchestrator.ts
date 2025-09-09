@@ -140,24 +140,9 @@ export class ResearchOrchestrator {
         servicesWithImprovedMapping
       );
       
-      // Apply the original calculation generator for service-level quantities only
-      // NOTE: We skip this to preserve subservice mappings from CalculationMapper
-      const servicesWithQuantities = this.calculationGenerator.applyCalculationsToServices(
-        services, // Use original services to avoid overwriting subservice mappings
-        enhancedCalculations, // Use enhanced calculations with better formulas
-        mockResponses
-      );
-      
-      // Merge service quantities from old generator with subservice mappings from new mapper
-      const finalServices = servicesWithImprovedMapping.map((mappedService, index) => {
-        const serviceWithQuantity = servicesWithQuantities[index];
-        return {
-          ...mappedService,
-          quantity: serviceWithQuantity?.quantity || mappedService.quantity,
-          baseHours: serviceWithQuantity?.baseHours || mappedService.baseHours,
-          hours: serviceWithQuantity?.hours || mappedService.hours
-        };
-      });
+      // Use CalculationMapper results directly - DO NOT override with old calculation generator
+      // The CalculationMapper already handles both service and subservice quantities properly
+      const finalServices = servicesWithImprovedMapping;
 
       onProgress?.({
         type: 'step',
