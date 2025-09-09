@@ -115,7 +115,7 @@ export class OptimizedAPIClient {
     prompt,
     cacheKey,
     timeoutMs = 45000, // Reduced from 120s to 45s
-    retries = 2 // Reduced from 3 to 2
+    retries = 3 // Increased back to 3 for better resilience with 503 errors
   }: {
     model: string
     prompt: string
@@ -180,7 +180,20 @@ export class OptimizedAPIClient {
         clearTimeout(timeoutId)
         
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+          let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          
+          // Provide better error messages for common status codes
+          if (response.status === 503) {
+            errorMessage = "Service temporarily unavailable. The AI service is experiencing high load. Please try again in a few moments.";
+          } else if (response.status === 429) {
+            errorMessage = "Rate limit exceeded. Please wait a moment before trying again.";
+          } else if (response.status === 401) {
+            errorMessage = "API authentication failed. Please check your API key configuration.";
+          } else if (response.status === 500 || response.status === 502 || response.status === 504) {
+            errorMessage = `Server error (${response.status}). The service is temporarily experiencing issues.`;
+          }
+          
+          throw new Error(errorMessage);
         }
         
         const data = await response.json()
@@ -189,16 +202,24 @@ export class OptimizedAPIClient {
       } catch (error: any) {
         console.error(`API call attempt ${attempt + 1} failed:`, error.message)
         
-        if (attempt === retries) {
+        // For 503 errors, always retry with longer delay
+        const is503Error = error.message?.includes('503') || error.message?.includes('temporarily unavailable');
+        const shouldRetry = attempt < retries || (is503Error && attempt < retries + 1);
+        
+        if (!shouldRetry) {
           throw error
         }
         
-        // Exponential backoff with jitter
-        const baseDelay = Math.pow(2, attempt) * 1000
+        // Longer delay for 503 errors
+        let baseDelay = Math.pow(2, attempt) * 1000;
+        if (is503Error) {
+          baseDelay = Math.max(baseDelay, 5000); // At least 5 seconds for 503
+        }
+        
         const jitter = Math.random() * 1000
         const delay = baseDelay + jitter
         
-        console.log(`Retrying after ${delay}ms...`)
+        console.log(`Retrying after ${Math.round(delay)}ms (attempt ${attempt + 1}/${retries})...`)
         await setTimeoutPromise(delay)
       }
     }
