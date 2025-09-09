@@ -372,19 +372,18 @@ export class CalculationMapper {
         
         console.log(`    👥 Setting subservice ${subservice.name}: quantity=${quantity}, baseHours=${subservice.baseHours}`);
         
-        // Add mapped questions for UI display
-        const relatedCalc = calculations.find(c => 
+        // Add mapped calculations for UI display - show actual IDs
+        const relatedCalcs = calculations.filter(c => 
           c.calculation_id === 'user_count_calculation' ||
           c.calculation_id.includes('user') ||
           c.description?.toLowerCase().includes('user')
         );
         
-        if (relatedCalc && relatedCalc.description) {
-          subservice.mappedQuestions = [relatedCalc.description];
-          subservice.calculationIds = [relatedCalc.calculation_id];
+        if (relatedCalcs.length > 0) {
+          subservice.mappedQuestions = relatedCalcs.map(c => c.calculation_id);
+          subservice.calculationIds = relatedCalcs.map(c => c.calculation_id);
         } else {
-          // Fallback: use a generic user-related description
-          subservice.mappedQuestions = [`${quantity} users`];
+          subservice.mappedQuestions = ['user_count_calculation'];
           subservice.calculationIds = ['user_count_calculation'];
         }
       }
@@ -402,19 +401,18 @@ export class CalculationMapper {
         
         console.log(`    🔗 Setting subservice ${subservice.name}: quantity=${quantity}, baseHours=${subservice.baseHours}`);
         
-        // Add mapped questions for UI display
-        const relatedCalc = calculations.find(c => 
+        // Add mapped calculations for UI display - show actual IDs
+        const relatedCalcs = calculations.filter(c => 
           c.calculation_id === 'integration_count_calculation' ||
           c.calculation_id.includes('integration') ||
           c.description?.toLowerCase().includes('integration')
         );
         
-        if (relatedCalc && relatedCalc.description) {
-          subservice.mappedQuestions = [relatedCalc.description];
-          subservice.calculationIds = [relatedCalc.calculation_id];
+        if (relatedCalcs.length > 0) {
+          subservice.mappedQuestions = relatedCalcs.map(c => c.calculation_id);
+          subservice.calculationIds = relatedCalcs.map(c => c.calculation_id);
         } else {
-          // Fallback: use a generic integration-related description
-          subservice.mappedQuestions = [`${quantity} integrations`];
+          subservice.mappedQuestions = ['integration_count_calculation'];
           subservice.calculationIds = ['integration_count_calculation'];
         }
       }
@@ -437,56 +435,98 @@ export class CalculationMapper {
       }
     }
     
-    // Default: Most migration-related subservices scale with mailbox count
+    // Default: Map ALL available calculations to subservices for comprehensive coverage
     else {
-      // Look for mailbox calculations with more flexible patterns
-      const mailboxCountCalc = calculations.find(c => 
-        c.calculation_id === 'mailbox_count_calculation' || 
-        c.calculation_id.includes('mailbox') || 
-        c.description?.toLowerCase().includes('mailbox')
-      );
+      console.log(`    🔄 Default mapping for subservice: "${subservice.name}"`);
       
-      if (mailboxCountCalc) {
-        const quantity = Number(mailboxCountCalc.value) || 1;
-        subservice.quantity = quantity;
+      // Try to map multiple calculations to this subservice for better coverage
+      const applicableCalculations: any[] = [];
+      let primaryQuantity = 1;
+      let mappedSlugs: string[] = [];
+      
+      // Check each calculation for relevance
+      calculations.forEach(calc => {
+        const calcId = calc.calculation_id.toLowerCase();
+        const calcDesc = (calc.description || '').toLowerCase();
         
-        // Different base hours for different types of operations
-        if (subserviceName.includes('migration') || subserviceName.includes('deployment') || 
-            subserviceName.includes('execution')) {
-          subservice.baseHours = 0.5; // 0.5 hours per mailbox for migration/deployment
-        } else if (subserviceName.includes('configuration') || subserviceName.includes('setup')) {
-          subservice.baseHours = 0.25; // 0.25 hours per mailbox for configuration
-        } else if (subserviceName.includes('testing') || subserviceName.includes('validation') || 
-                   subserviceName.includes('verification')) {
-          subservice.baseHours = 0.1; // 0.1 hours per mailbox for testing
-        } else if (subserviceName.includes('assessment') || subserviceName.includes('analysis') ||
-                   subserviceName.includes('planning') || subserviceName.includes('design')) {
-          subservice.baseHours = 0.3; // 0.3 hours per mailbox for planning/analysis
-        } else if (subserviceName.includes('documentation') || subserviceName.includes('report')) {
-          subservice.baseHours = 0.2; // 0.2 hours per mailbox for documentation
-        } else {
-          subservice.baseHours = 0.25; // Conservative default for any mailbox-related task
+        // Broader matching - most subservices can be influenced by multiple factors
+        if (calcId.includes('mailbox') || calcDesc.includes('mailbox')) {
+          applicableCalculations.push({ calc, priority: 1, type: 'mailbox' });
+          primaryQuantity = Math.max(primaryQuantity, Number(calc.value) || 1);
+          mappedSlugs.push(calc.calculation_id);
         }
-        
-        console.log(`    📦 Setting subservice ${subservice.name}: quantity=${quantity}, baseHours=${subservice.baseHours}`);
-        
-        // Add mapped questions for UI display - find the most relevant calculation
-        const relatedCalc = calculations.find(c => 
-          c.calculation_id.includes('mailbox') || 
+        if (calcId.includes('user') || calcDesc.includes('user')) {
+          applicableCalculations.push({ calc, priority: 2, type: 'user' });
+          if (subserviceName.includes('user') || subserviceName.includes('training')) {
+            primaryQuantity = Math.max(primaryQuantity, Number(calc.value) || 1);
+            mappedSlugs.push(calc.calculation_id);
+          }
+        }
+        if (calcId.includes('integration') || calcDesc.includes('integration')) {
+          applicableCalculations.push({ calc, priority: 3, type: 'integration' });
+          if (subserviceName.includes('integration')) {
+            primaryQuantity = Math.max(primaryQuantity, Number(calc.value) || 1);
+            mappedSlugs.push(calc.calculation_id);
+          }
+        }
+        if (calcId.includes('data') || calcId.includes('volume') || calcDesc.includes('data')) {
+          applicableCalculations.push({ calc, priority: 4, type: 'data' });
+          if (subserviceName.includes('data') || subserviceName.includes('storage')) {
+            primaryQuantity = Math.max(primaryQuantity, Number(calc.value) || 1);
+            mappedSlugs.push(calc.calculation_id);
+          }
+        }
+        if (calcId.includes('complexity') || calcId.includes('score')) {
+          applicableCalculations.push({ calc, priority: 5, type: 'complexity' });
+          mappedSlugs.push(calc.calculation_id);
+        }
+      });
+      
+      // If no specific matches, use the primary calculation (usually mailbox count)
+      if (applicableCalculations.length === 0 || primaryQuantity === 1) {
+        const primaryCalc = calculations.find(c => 
           c.calculation_id === 'mailbox_count_calculation' ||
-          c.calculation_id.includes('size') ||
-          c.description?.toLowerCase().includes('mailbox')
+          c.calculation_id.includes('mailbox')
         );
-        
-        if (relatedCalc && relatedCalc.description) {
-          subservice.mappedQuestions = [relatedCalc.description];
-          subservice.calculationIds = [relatedCalc.calculation_id];
-        } else {
-          // Fallback: use a generic mailbox-related description
-          subservice.mappedQuestions = [`${quantity} mailboxes to migrate`];
-          subservice.calculationIds = ['mailbox_count_calculation'];
+        if (primaryCalc) {
+          primaryQuantity = Number(primaryCalc.value) || 1;
+          mappedSlugs = [primaryCalc.calculation_id];
+          applicableCalculations.push({ calc: primaryCalc, priority: 1, type: 'mailbox' });
         }
       }
+      
+      subservice.quantity = primaryQuantity;
+      
+      // Set base hours based on subservice type and complexity
+      let baseHours = 0.25; // Default
+      if (subserviceName.includes('migration') || subserviceName.includes('deployment')) {
+        baseHours = 0.5;
+      } else if (subserviceName.includes('training') || subserviceName.includes('knowledge')) {
+        baseHours = 1.5;
+      } else if (subserviceName.includes('integration')) {
+        baseHours = 4.0;
+      } else if (subserviceName.includes('testing') || subserviceName.includes('validation')) {
+        baseHours = 0.1;
+      } else if (subserviceName.includes('planning') || subserviceName.includes('design')) {
+        baseHours = 0.3;
+      }
+      
+      // Apply complexity multiplier if available
+      const complexityCalc = applicableCalculations.find(ac => ac.type === 'complexity');
+      if (complexityCalc) {
+        const complexityScore = Number(complexityCalc.calc.value) || 1;
+        const complexityMultiplier = Math.max(1.0, complexityScore / 10);
+        baseHours = baseHours * complexityMultiplier;
+        console.log(`    🧮 Applied complexity multiplier ${complexityMultiplier.toFixed(2)} to ${subservice.name}`);
+      }
+      
+      subservice.baseHours = baseHours;
+      
+      console.log(`    📦 Setting subservice ${subservice.name}: quantity=${primaryQuantity}, baseHours=${baseHours.toFixed(2)}`);
+      
+      // Display actual calculation IDs instead of "1 questions"
+      subservice.mappedQuestions = mappedSlugs.length > 0 ? mappedSlugs : ['no_calculations_mapped'];
+      subservice.calculationIds = mappedSlugs;
     }
     
     // Security-related subservices
@@ -563,9 +603,10 @@ export class CalculationMapper {
         
         console.log(`    📐 Applied regular calculation "${relevantCalc.name}": quantity=${quantity}, baseHours=${subservice.baseHours}`);
         
-        // Add mapped calculations for UI display
-        subservice.mappedQuestions = [relevantCalc.name || relevantCalc.source || 'Regular calculation'];
-        subservice.calculationIds = [relevantCalc.id || 'regular_calc'];
+        // Add mapped calculations for UI display - show actual calculation ID/name
+        const calcName = relevantCalc.id || relevantCalc.name || 'regular_calc';
+        subservice.mappedQuestions = [calcName];
+        subservice.calculationIds = [calcName];
       }
     }
   }

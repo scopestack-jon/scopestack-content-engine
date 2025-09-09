@@ -1592,7 +1592,10 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                                     {getCalculationName(calculation).replace(/\[object Object\]/g, getTechnologyName(content.technology))}
                                   </div>
                                   <div className="text-sm text-gray-500">
-                                    {calculation.mappedQuestions?.length || 0} questions mapped
+                                    {calculation.mappedQuestions && calculation.mappedQuestions.length > 0 ? 
+                                      `${calculation.mappedQuestions.length} calculations mapped` : 
+                                      'No mappings'
+                                    }
                                   </div>
                                 </div>
                               </div>
@@ -1781,9 +1784,16 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                                           </td>
                                           <td className="p-3 text-center">
                                             {sub.mappedQuestions && sub.mappedQuestions.length > 0 ? (
-                                              <Badge variant="secondary" size="sm">
-                                                {sub.mappedQuestions.length} questions
-                                              </Badge>
+                                              <div className="flex flex-col gap-1 items-center">
+                                                {sub.mappedQuestions.slice(0, 2).map((calcId, idx) => (
+                                                  <Badge key={idx} variant="secondary" size="sm" className="text-xs max-w-[100px] truncate" title={calcId}>
+                                                    {calcId}
+                                                  </Badge>
+                                                ))}
+                                                {sub.mappedQuestions.length > 2 && (
+                                                  <span className="text-xs text-gray-500">+{sub.mappedQuestions.length - 2} more</span>
+                                                )}
+                                              </div>
                                             ) : (
                                               <span className="text-xs text-gray-400">None</span>
                                             )}
