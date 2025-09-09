@@ -371,10 +371,19 @@ export class CalculationMapper {
         console.log(`    👥 Setting subservice ${subservice.name}: quantity=${quantity}, baseHours=${subservice.baseHours}`);
         
         // Add mapped questions for UI display
-        const relatedCalc = calculations.find(c => c.calculation_id === 'user_count_calculation');
+        const relatedCalc = calculations.find(c => 
+          c.calculation_id === 'user_count_calculation' ||
+          c.calculation_id.includes('user') ||
+          c.description?.toLowerCase().includes('user')
+        );
+        
         if (relatedCalc && relatedCalc.description) {
           subservice.mappedQuestions = [relatedCalc.description];
           subservice.calculationIds = [relatedCalc.calculation_id];
+        } else {
+          // Fallback: use a generic user-related description
+          subservice.mappedQuestions = [`${quantity} users`];
+          subservice.calculationIds = ['user_count_calculation'];
         }
       }
     }
@@ -392,10 +401,19 @@ export class CalculationMapper {
         console.log(`    🔗 Setting subservice ${subservice.name}: quantity=${quantity}, baseHours=${subservice.baseHours}`);
         
         // Add mapped questions for UI display
-        const relatedCalc = calculations.find(c => c.calculation_id === 'integration_count_calculation');
+        const relatedCalc = calculations.find(c => 
+          c.calculation_id === 'integration_count_calculation' ||
+          c.calculation_id.includes('integration') ||
+          c.description?.toLowerCase().includes('integration')
+        );
+        
         if (relatedCalc && relatedCalc.description) {
           subservice.mappedQuestions = [relatedCalc.description];
           subservice.calculationIds = [relatedCalc.calculation_id];
+        } else {
+          // Fallback: use a generic integration-related description
+          subservice.mappedQuestions = [`${quantity} integrations`];
+          subservice.calculationIds = ['integration_count_calculation'];
         }
       }
     }
@@ -450,11 +468,21 @@ export class CalculationMapper {
         
         console.log(`    📦 Setting subservice ${subservice.name}: quantity=${quantity}, baseHours=${subservice.baseHours}`);
         
-        // Add mapped questions for UI display
-        const relatedCalc = calculations.find(c => c.calculation_id.includes('mailbox') || c.calculation_id.includes('size'));
+        // Add mapped questions for UI display - find the most relevant calculation
+        const relatedCalc = calculations.find(c => 
+          c.calculation_id.includes('mailbox') || 
+          c.calculation_id === 'mailbox_count_calculation' ||
+          c.calculation_id.includes('size') ||
+          c.description?.toLowerCase().includes('mailbox')
+        );
+        
         if (relatedCalc && relatedCalc.description) {
           subservice.mappedQuestions = [relatedCalc.description];
           subservice.calculationIds = [relatedCalc.calculation_id];
+        } else {
+          // Fallback: use a generic mailbox-related description
+          subservice.mappedQuestions = [`${quantity} mailboxes to migrate`];
+          subservice.calculationIds = ['mailbox_count_calculation'];
         }
       }
     }
