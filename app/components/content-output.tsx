@@ -1221,7 +1221,29 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                 {questionResponses.size > 0 && (
                   <Badge variant="default" className="flex items-center gap-1 bg-scopestack-button text-white text-xs">
                     <Calculator className="h-3 w-3" />
-                    {content.totalHours || 0} adjusted hours
+                    {(() => {
+                      // Calculate actual total hours from all services and subservices
+                      let calculatedTotal = 0;
+                      if (content.services && Array.isArray(content.services)) {
+                        content.services.forEach(service => {
+                          const subservices = getSubservices(service);
+                          if (subservices && subservices.length > 0) {
+                            // Sum up all subservice hours
+                            subservices.forEach(sub => {
+                              const quantity = sub.quantity || 1;
+                              const baseHours = sub.baseHours || sub.hours || 0;
+                              calculatedTotal += quantity * baseHours;
+                            });
+                          } else {
+                            // No subservices, use service hours
+                            const quantity = service.quantity || 1;
+                            const baseHours = service.baseHours || service.hours || 0;
+                            calculatedTotal += quantity * baseHours;
+                          }
+                        });
+                      }
+                      return Math.round(calculatedTotal) || content.totalHours || 0;
+                    })()} adjusted hours
                   </Badge>
                 )}
                 <Badge variant="outline" className="flex items-center gap-1 bg-white/20 text-white border-white/30 text-xs">
@@ -1725,7 +1747,24 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                               <div className="flex items-center gap-2 text-sm text-gray-500">
                                 <span>{getSubservices(service).length} components</span>
                                 <Badge variant="outline" size="sm">
-                                  {typeof service.hours === 'number' ? `${service.hours}h` : 'TBD'}
+                                  {(() => {
+                                    // Calculate total hours for service including all subservices
+                                    const serviceQuantity = service.quantity || 1;
+                                    const serviceBaseHours = service.baseHours || service.hours || 0;
+                                    let serviceTotalHours = serviceQuantity * serviceBaseHours;
+                                    
+                                    // Add subservice hours
+                                    const subservices = getSubservices(service);
+                                    if (subservices && subservices.length > 0) {
+                                      serviceTotalHours = subservices.reduce((total, sub) => {
+                                        const subQuantity = sub.quantity || 1;
+                                        const subBaseHours = sub.baseHours || sub.hours || 0;
+                                        return total + (subQuantity * subBaseHours);
+                                      }, 0);
+                                    }
+                                    
+                                    return serviceTotalHours > 0 ? `${serviceTotalHours}h` : 'TBD';
+                                  })()}
                                 </Badge>
                               </div>
                             </div>
@@ -1773,11 +1812,17 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                                           <td className="p-3 text-center">
                                             <div className="flex items-center justify-center gap-2">
                                               <Badge variant="outline" size="sm">
-                                                {typeof sub.hours === 'number' ? `${sub.hours}h` : 'TBD'}
+                                                {(() => {
+                                                  // Calculate actual hours: quantity × baseHours
+                                                  const quantity = sub.quantity || 1;
+                                                  const baseHours = sub.baseHours || sub.hours || 0;
+                                                  const totalHours = quantity * baseHours;
+                                                  return totalHours > 0 ? `${totalHours}h` : 'TBD';
+                                                })()}
                                               </Badge>
-                                              {sub.calculationSlug && (
-                                                <Badge variant="secondary" size="sm" className="text-xs">
-                                                  Dynamic
+                                              {sub.baseHours && sub.quantity && sub.quantity !== 1 && (
+                                                <Badge variant="secondary" size="sm" className="text-xs" title={`${sub.quantity} × ${sub.baseHours}h`}>
+                                                  {sub.quantity} × {sub.baseHours}h
                                                 </Badge>
                                               )}
                                             </div>
