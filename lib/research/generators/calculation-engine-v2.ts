@@ -240,17 +240,18 @@ export class CalculationEngineV2 {
    */
   private evaluateExpression(expression: string, variables: Record<string, any>): any {
     try {
-      // Create a safe evaluation context with undefined for missing variables
-      const context = { ...variables, Math };
-      
-      // Find all variable names referenced in the expression (only those that exist in variables)
-      const referencedVariables = Object.keys(variables).filter(varName => 
-        new RegExp(`\\b${varName}\\b`).test(expression)
+      // Find all possible variable names in the expression
+      const allVariableNames = expression.match(/\b[a-zA-Z_]\w*\b/g) || [];
+      const potentialVariables = allVariableNames.filter(name => 
+        name !== 'Math' && name !== 'true' && name !== 'false' && name !== 'null' && name !== 'undefined'
       );
       
-      // Replace variable names in expression, using undefined for missing variables
+      // Create a safe evaluation context with all variables (defined and undefined)
+      const context = { Math };
+      
+      // Replace variable names in expression
       let evaluableExpression = expression;
-      referencedVariables.forEach(varName => {
+      potentialVariables.forEach(varName => {
         const value = variables[varName];
         let replacementValue: string;
         
@@ -273,6 +274,9 @@ export class CalculationEngineV2 {
           new RegExp(`\\b${varName}\\b`, 'g'),
           replacementValue
         );
+        
+        // Add to context for function evaluation
+        context[varName] = value;
       });
       
       console.log(`    Evaluating: ${expression} -> ${evaluableExpression}`);
