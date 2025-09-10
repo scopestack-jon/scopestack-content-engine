@@ -19,6 +19,7 @@ export class CalculationEngineV2 {
     questions: Question[],
     responses: Map<string, any> | Record<string, any>
   ): Service[] {
+    console.log('🔧🔧🔧 V2 CALCULATION ENGINE CALLED 🔧🔧🔧');
     console.log('🔧 Applying responses to services using calculation rules...');
     
     // Convert responses to a more accessible format
@@ -89,6 +90,7 @@ export class CalculationEngineV2 {
     
     // Update mapped questions
     updatedService.mappedQuestions = this.getMappedQuestions(service, responseMap);
+    console.log(`  🔗 ${service.name} mappedQuestions:`, updatedService.mappedQuestions);
     
     return updatedService;
   }
@@ -126,6 +128,7 @@ export class CalculationEngineV2 {
     
     // Update mapped questions
     updated.mappedQuestions = this.getMappedQuestions(subservice, responseMap);
+    console.log(`    🔗 ${subservice.name} mappedQuestions:`, updated.mappedQuestions);
     
     return updated;
   }

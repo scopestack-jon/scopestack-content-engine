@@ -41,6 +41,7 @@ export class ResearchOrchestratorV2 {
     onProgress?: (event: StreamingEvent) => void
   ): Promise<GeneratedContent> {
     try {
+      console.log('🚀🚀🚀 USING V2 ORCHESTRATOR - SERVICE-FIRST FLOW 🚀🚀🚀');
       console.log('🚀 Starting service-first orchestration v2...');
       
       // Step 1: Research
