@@ -102,8 +102,17 @@ IMPORTANT: Every subservice should have either calculationRules OR quantityDrive
    */
   private parseAndEnhanceServices(response: string, technology: string): Service[] {
     try {
+      console.log('🔍 Service Generator V2 - Raw AI Response:');
+      console.log('📝 Response length:', response.length);
+      console.log('📝 First 200 chars:', response.substring(0, 200));
+      console.log('📝 Last 200 chars:', response.substring(response.length - 200));
+      
       // Clean response - remove markdown code blocks if present
       let cleaned = response.trim();
+      
+      if (!cleaned) {
+        throw new Error('Empty response received from AI');
+      }
       
       // Remove markdown code blocks
       if (cleaned.startsWith('```json') || cleaned.startsWith('```')) {
@@ -115,10 +124,14 @@ IMPORTANT: Every subservice should have either calculationRules OR quantityDrive
       const jsonEnd = cleaned.lastIndexOf(']');
       
       if (jsonStart === -1 || jsonEnd === -1) {
+        console.error('❌ No JSON array markers found in cleaned response:');
+        console.error('📝 Cleaned response:', cleaned.substring(0, 500));
         throw new Error('No valid JSON array found in response');
       }
       
       cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+      console.log('✅ Extracted JSON length:', cleaned.length);
+      console.log('✅ Extracted JSON preview:', cleaned.substring(0, 200) + '...');
       
       const services = JSON.parse(cleaned);
       

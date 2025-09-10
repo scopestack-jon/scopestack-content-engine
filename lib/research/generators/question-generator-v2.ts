@@ -310,16 +310,32 @@ Return ONLY valid JSON array:
 ]`;
 
     try {
+      console.log('🔍 Question Generator V2 - Calling AI for context questions...');
+      console.log('📋 Uncovered scaling types:', uncoveredTypes.length);
+      
       const response = await this.client.generateWithTimeout(
         prompt,
         30000,
         'anthropic/claude-3.5-sonnet'
       );
       
+      console.log('📝 Question AI Response length:', response.length);
+      console.log('📝 Question AI Response preview:', response.substring(0, 300));
+      
       const cleaned = response.replace(/```json|```/g, '').trim();
-      return JSON.parse(cleaned);
+      console.log('🧹 Cleaned question response:', cleaned.substring(0, 200));
+      
+      if (!cleaned) {
+        console.error('❌ Empty response from question AI');
+        return [];
+      }
+      
+      const questions = JSON.parse(cleaned);
+      console.log('✅ Successfully parsed', questions.length, 'context questions');
+      return questions;
     } catch (error) {
-      console.error('Failed to generate context questions:', error);
+      console.error('❌ Failed to generate context questions:', error);
+      console.error('📝 Error details:', error instanceof Error ? error.message : error);
       return [];
     }
   }
