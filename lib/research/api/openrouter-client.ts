@@ -13,6 +13,17 @@ export class OpenRouterClient {
   }
 
   /**
+   * Generate text with timeout handling (alias for compatibility)
+   */
+  async generateWithTimeout(
+    prompt: string,
+    timeout: number = API_TIMEOUT,
+    model: string = 'anthropic/claude-3.5-sonnet'
+  ): Promise<string> {
+    return this.generateTextWithTimeout(model, prompt, timeout);
+  }
+
+  /**
    * Generate text with timeout handling
    */
   async generateTextWithTimeout(
