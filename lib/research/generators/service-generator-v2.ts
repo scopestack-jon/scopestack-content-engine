@@ -55,7 +55,9 @@ Requirements:
    - description: Brief description
    - hours: Estimated hours
    - baseHours: Base hours per unit
-   - Optional: scalingFactors, quantityDriver, calculationRules
+   - scalingFactors: Array of factors that scale this subservice
+   - quantityDriver: Primary scaling factor for this subservice
+   - calculationRules: Object with quantity/multiplier formulas specific to this subservice
 
 4. Use these common scaling factors where appropriate:
    - user_count: Number of users
@@ -70,10 +72,19 @@ Requirements:
 
 Return ONLY a valid JSON array with all 5 services. No markdown, no explanations.
 
-Example calculation rules:
+Example calculation rules for SERVICES:
 - quantity: "user_count || 100"
 - multiplier: "complexity === 'high' ? 1.5 : 1.0"
-- quantity: "Math.ceil(site_count / 10)"`;
+- quantity: "Math.ceil(site_count / 10)"
+
+Example calculation rules for SUBSERVICES:
+- quantity: "user_count || 1" (for user-based subservices)
+- quantity: "mailbox_count || 1" (for mailbox migration subservices)
+- quantity: "Math.ceil(data_volume_gb / 100)" (for data processing subservices)
+- multiplier: "site_count > 1 ? 1.5 : 1.0" (for multi-site complexity)
+- quantityDriver: "integration_count" (for integration-related subservices)
+
+IMPORTANT: Every subservice should have either calculationRules OR quantityDriver. Do not leave subservices without scaling logic.`;
 
       const response = await this.client.generateWithTimeout(
         prompt,
