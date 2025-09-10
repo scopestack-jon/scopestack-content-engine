@@ -240,10 +240,11 @@ export class CalculationEngineV2 {
    */
   private evaluateExpression(expression: string, variables: Record<string, any>): any {
     try {
-      // Find all possible variable names in the expression
+      // Find all possible variable names in the expression, excluding reserved words and Math functions
       const allVariableNames = expression.match(/\b[a-zA-Z_]\w*\b/g) || [];
+      const reservedWords = ['Math', 'true', 'false', 'null', 'undefined', 'ceil', 'floor', 'round', 'min', 'max', 'abs'];
       const potentialVariables = allVariableNames.filter(name => 
-        name !== 'Math' && name !== 'true' && name !== 'false' && name !== 'null' && name !== 'undefined'
+        !reservedWords.includes(name)
       );
       
       // Create a safe evaluation context with all variables (defined and undefined)
