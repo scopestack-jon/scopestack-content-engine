@@ -15,6 +15,8 @@ import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ScopeStackAuthModal } from "./scopestack-auth-modal"
+import { getCalculationEngineV2 } from '../../lib/research/generators/calculation-engine-v2'
+import { useV2Orchestration } from '../../lib/research/config/feature-flags'
 
 interface GeneratedContent {
   technology: string
@@ -138,6 +140,48 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
 
   // Calculate service impact based on question responses
   const calculateServiceImpact = () => {
+    if (!content?.services || !content?.questions) return
+    
+    const useV2 = useV2Orchestration()
+    
+    if (useV2) {
+      // Use V2 calculation engine with explicit mapping
+      console.log('🔧 Using V2 calculation engine for question responses')
+      try {
+        const calculationEngine = getCalculationEngineV2()
+        
+        // Convert questionResponses Map to object for V2 engine
+        const responsesObject: Record<string, any> = {}
+        questionResponses.forEach((value, key) => {
+          responsesObject[key] = value
+        })
+        
+        const updatedServices = calculationEngine.applyResponsesToServices(
+          content.services,
+          content.questions,
+          responsesObject
+        )
+        
+        console.log('✅ V2 calculation engine applied:', {
+          originalServices: content.services.length,
+          updatedServices: updatedServices.length,
+          responses: Object.keys(responsesObject)
+        })
+        
+        setModifiedServices(updatedServices)
+      } catch (error) {
+        console.error('❌ V2 calculation engine error:', error)
+        // Fall back to V1 if V2 fails
+        calculateServiceImpactV1()
+      }
+    } else {
+      // Use legacy V1 calculation logic
+      calculateServiceImpactV1()
+    }
+  }
+
+  // Legacy V1 calculation logic (as fallback)
+  const calculateServiceImpactV1 = () => {
     if (!content?.services) return
     
     let updatedServices = [...content.services]
