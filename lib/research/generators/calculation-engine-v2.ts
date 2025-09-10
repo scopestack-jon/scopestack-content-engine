@@ -1,0 +1,379 @@
+// Rule-Based Calculation Engine v2
+// Applies question responses to services using explicit calculation rules
+
+import { Service, Question, Calculation } from '../types/interfaces';
+
+export interface QuestionResponse {
+  questionId: string;
+  mappingKey: string;
+  value: any;
+}
+
+export class CalculationEngineV2 {
+  
+  /**
+   * Apply question responses to services using their calculation rules
+   */
+  applyResponsesToServices(
+    services: Service[],
+    questions: Question[],
+    responses: Map<string, any> | Record<string, any>
+  ): Service[] {
+    console.log('🔧 Applying responses to services using calculation rules...');
+    
+    // Convert responses to a more accessible format
+    const responseMap = this.buildResponseMap(questions, responses);
+    console.log('📊 Response map:', responseMap);
+    
+    // Apply calculations to each service
+    return services.map(service => this.calculateService(service, responseMap));
+  }
+
+  /**
+   * Build a map of factor keys to their values from responses
+   */
+  private buildResponseMap(
+    questions: Question[],
+    responses: Map<string, any> | Record<string, any>
+  ): Record<string, any> {
+    const responseMap: Record<string, any> = {};
+    
+    questions.forEach(question => {
+      const key = question.mappingKey || question.slug || question.id || '';
+      let value: any;
+      
+      if (responses instanceof Map) {
+        value = responses.get(question.id || '') || 
+                responses.get(question.slug || '') ||
+                question.defaultValue;
+      } else {
+        value = responses[question.id || ''] || 
+                responses[question.slug || ''] ||
+                question.defaultValue;
+      }
+      
+      responseMap[key] = value;
+    });
+    
+    return responseMap;
+  }
+
+  /**
+   * Calculate quantities and multipliers for a service
+   */
+  private calculateService(service: Service, responseMap: Record<string, any>): Service {
+    const updatedService = { ...service };
+    
+    // Apply service-level calculations
+    if (service.calculationRules) {
+      const { quantity, multiplier } = this.evaluateRules(
+        service.calculationRules,
+        responseMap,
+        service.name
+      );
+      
+      updatedService.quantity = quantity;
+      
+      // Apply multiplier to base hours
+      if (multiplier !== 1 && service.baseHours) {
+        updatedService.hours = Math.round(service.baseHours * multiplier * 100) / 100;
+      }
+    }
+    
+    // Apply calculations to subservices
+    if (service.subservices) {
+      updatedService.subservices = service.subservices.map(sub => 
+        this.calculateSubservice(sub, responseMap)
+      );
+    }
+    
+    // Update mapped questions
+    updatedService.mappedQuestions = this.getMappedQuestions(service, responseMap);
+    
+    return updatedService;
+  }
+
+  /**
+   * Calculate quantities and multipliers for a subservice
+   */
+  private calculateSubservice(subservice: any, responseMap: Record<string, any>): any {
+    const updated = { ...subservice };
+    
+    if (subservice.calculationRules) {
+      const { quantity, multiplier, included } = this.evaluateRules(
+        subservice.calculationRules,
+        responseMap,
+        subservice.name
+      );
+      
+      // Apply quantity
+      updated.quantity = quantity;
+      
+      // Apply multiplier to base hours
+      if (multiplier !== 1 && subservice.baseHours) {
+        updated.hours = Math.round(subservice.baseHours * multiplier * 100) / 100;
+      }
+      
+      // Handle inclusion/exclusion
+      if (!included) {
+        updated.quantity = 0;
+        updated.hours = 0;
+      }
+    } else if (subservice.quantityDriver) {
+      // Simple quantity driver without rules
+      updated.quantity = responseMap[subservice.quantityDriver] || 1;
+    }
+    
+    // Update mapped questions
+    updated.mappedQuestions = this.getMappedQuestions(subservice, responseMap);
+    
+    return updated;
+  }
+
+  /**
+   * Evaluate calculation rules with the response values
+   */
+  private evaluateRules(
+    rules: any,
+    responseMap: Record<string, any>,
+    serviceName: string
+  ): { quantity: number; multiplier: number; included: boolean } {
+    let quantity = 1;
+    let multiplier = 1;
+    let included = true;
+    
+    try {
+      // Evaluate quantity rule
+      if (rules.quantity) {
+        quantity = this.evaluateExpression(rules.quantity, responseMap);
+        console.log(`  📐 ${serviceName} quantity: ${rules.quantity} = ${quantity}`);
+      }
+      
+      // Evaluate multiplier rule
+      if (rules.multiplier) {
+        multiplier = this.evaluateExpression(rules.multiplier, responseMap);
+        console.log(`  ✖️ ${serviceName} multiplier: ${rules.multiplier} = ${multiplier}`);
+      }
+      
+      // Evaluate inclusion rule
+      if (rules.included) {
+        included = this.evaluateExpression(rules.included, responseMap);
+        console.log(`  ✅ ${serviceName} included: ${rules.included} = ${included}`);
+      }
+      
+    } catch (error) {
+      console.error(`Error evaluating rules for ${serviceName}:`, error);
+    }
+    
+    return { quantity, multiplier, included };
+  }
+
+  /**
+   * Safely evaluate an expression with variable substitution
+   */
+  private evaluateExpression(expression: string, variables: Record<string, any>): any {
+    try {
+      // Create a safe evaluation context
+      const context = { ...variables, Math };
+      
+      // Replace variable names in expression
+      let evaluableExpression = expression;
+      Object.keys(variables).forEach(key => {
+        const value = variables[key];
+        const quotedValue = typeof value === 'string' ? `"${value}"` : value;
+        // Replace variable references with actual values
+        evaluableExpression = evaluableExpression.replace(
+          new RegExp(`\\b${key}\\b`, 'g'),
+          quotedValue
+        );
+      });
+      
+      console.log(`    Evaluating: ${expression} -> ${evaluableExpression}`);
+      
+      // Use Function constructor for safe evaluation
+      const func = new Function(...Object.keys(context), `return ${evaluableExpression}`);
+      const result = func(...Object.values(context));
+      
+      return result;
+      
+    } catch (error) {
+      console.error(`Failed to evaluate expression: ${expression}`, error);
+      // Return safe defaults
+      if (expression.includes('||')) {
+        // Try to extract default value after ||
+        const parts = expression.split('||');
+        if (parts.length > 1) {
+          const defaultValue = parts[parts.length - 1].trim();
+          return isNaN(Number(defaultValue)) ? 1 : Number(defaultValue);
+        }
+      }
+      return 1;
+    }
+  }
+
+  /**
+   * Get list of questions that map to this service/subservice
+   */
+  private getMappedQuestions(
+    item: Service | any,
+    responseMap: Record<string, any>
+  ): string[] {
+    const mapped: string[] = [];
+    
+    // Add scaling factors
+    if (item.scalingFactors) {
+      mapped.push(...item.scalingFactors);
+    }
+    
+    // Add quantity driver
+    if (item.quantityDriver) {
+      mapped.push(item.quantityDriver);
+    }
+    
+    // Add any factors referenced in calculation rules
+    if (item.calculationRules) {
+      const rulesText = JSON.stringify(item.calculationRules);
+      Object.keys(responseMap).forEach(key => {
+        if (rulesText.includes(key) && !mapped.includes(key)) {
+          mapped.push(key);
+        }
+      });
+    }
+    
+    return mapped;
+  }
+
+  /**
+   * Generate calculations from the applied rules
+   */
+  generateCalculations(
+    services: Service[],
+    questions: Question[],
+    responseMap: Record<string, any>
+  ): Calculation[] {
+    const calculations: Calculation[] = [];
+    let calcId = 1;
+    
+    // Create a calculation for each unique factor
+    const factors = new Set<string>();
+    questions.forEach(q => {
+      if (q.mappingKey) factors.add(q.mappingKey);
+    });
+    
+    factors.forEach(factor => {
+      const value = responseMap[factor];
+      const affectedServices = this.findServicesUsingFactor(factor, services);
+      
+      calculations.push({
+        id: `calc_${calcId++}`,
+        name: factor.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        value: value || 0,
+        unit: this.getUnitForFactor(factor),
+        source: 'User Input',
+        mappedServices: affectedServices
+      });
+    });
+    
+    // Add derived calculations
+    const totalHours = this.calculateTotalHours(services);
+    calculations.push({
+      id: `calc_${calcId++}`,
+      name: 'Total Project Hours',
+      value: totalHours,
+      unit: 'hours',
+      source: 'Calculated',
+      formula: 'Sum of all service hours × quantities'
+    });
+    
+    return calculations;
+  }
+
+  /**
+   * Find services that use a specific factor
+   */
+  private findServicesUsingFactor(factor: string, services: Service[]): string[] {
+    const using: string[] = [];
+    
+    services.forEach(service => {
+      let uses = false;
+      
+      // Check service level
+      if (service.scalingFactors?.includes(factor) || 
+          service.quantityDriver === factor ||
+          JSON.stringify(service.calculationRules || {}).includes(factor)) {
+        uses = true;
+      }
+      
+      // Check subservices
+      service.subservices?.forEach(sub => {
+        if (sub.scalingFactors?.includes(factor) || 
+            sub.quantityDriver === factor ||
+            JSON.stringify(sub.calculationRules || {}).includes(factor)) {
+          uses = true;
+        }
+      });
+      
+      if (uses) {
+        using.push(service.name);
+      }
+    });
+    
+    return using;
+  }
+
+  /**
+   * Get appropriate unit for a factor
+   */
+  private getUnitForFactor(factor: string): string {
+    const units: Record<string, string> = {
+      user_count: 'users',
+      mailbox_count: 'mailboxes',
+      site_count: 'sites',
+      data_volume_gb: 'GB',
+      integration_count: 'integrations',
+      admin_count: 'administrators',
+      training_groups: 'groups',
+      system_count: 'systems',
+      test_scenarios: 'scenarios',
+      documentation_sets: 'sets'
+    };
+    
+    return units[factor] || 'units';
+  }
+
+  /**
+   * Calculate total hours across all services
+   */
+  private calculateTotalHours(services: Service[]): number {
+    let total = 0;
+    
+    services.forEach(service => {
+      const serviceQuantity = service.quantity || 1;
+      const serviceHours = service.hours || 0;
+      
+      if (service.subservices && service.subservices.length > 0) {
+        // Sum subservice hours
+        service.subservices.forEach(sub => {
+          const subQuantity = sub.quantity || 1;
+          const subHours = sub.baseHours || sub.hours || 0;
+          total += Math.round((subQuantity * subHours) * 100) / 100;
+        });
+      } else {
+        // Use service hours
+        total += Math.round((serviceQuantity * serviceHours) * 100) / 100;
+      }
+    });
+    
+    return Math.round(total * 100) / 100;
+  }
+}
+
+// Export singleton
+let calculationEngineV2Instance: CalculationEngineV2 | null = null;
+
+export function getCalculationEngineV2(): CalculationEngineV2 {
+  if (!calculationEngineV2Instance) {
+    calculationEngineV2Instance = new CalculationEngineV2();
+  }
+  return calculationEngineV2Instance;
+}

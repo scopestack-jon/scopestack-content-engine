@@ -3,6 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getResearchOrchestrator } from '../../../lib/research/orchestrator/research-orchestrator';
+import { getResearchOrchestratorV2 } from '../../../lib/research/orchestrator/research-orchestrator-v2';
+import { useV2Orchestration } from '../../../lib/research/config/feature-flags';
 import { getRequestLogger, getScopeStackUserInfo, getSessionId } from '../../../lib/request-logger';
 
 export async function POST(request: NextRequest) {
@@ -51,7 +53,11 @@ export async function POST(request: NextRequest) {
 
     console.log('🔍 Starting research for:', userRequest);
     
-    const orchestrator = getResearchOrchestrator();
+    // Use v2 orchestrator if enabled
+    const useV2 = useV2Orchestration();
+    console.log(`📌 Using ${useV2 ? 'V2 (service-first)' : 'V1 (legacy)'} orchestrator`);
+    
+    const orchestrator = useV2 ? getResearchOrchestratorV2() : getResearchOrchestrator();
     
     // Validate request
     const validation = orchestrator.validateRequest(userRequest);

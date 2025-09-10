@@ -1,6 +1,7 @@
 // Type definitions for research and content generation
 
 export interface Subservice {
+  id?: string;  // Unique identifier for direct mapping
   name: string;
   description: string;
   hours: number;
@@ -10,9 +11,19 @@ export interface Subservice {
   keyAssumptions?: string;
   clientResponsibilities?: string;
   outOfScope?: string;
+  // New scaling metadata
+  scalingFactors?: string[];  // ["user_count", "data_volume", "site_count"]
+  quantityDriver?: string;     // Primary driver e.g., "user_count"
+  calculationRules?: {
+    quantity?: string;         // e.g., "user_count || 1"
+    multiplier?: string;       // e.g., "complexity === 'high' ? 1.5 : 1.0"
+    included?: string;         // e.g., "needs_integration === true"
+  };
+  mappedQuestions?: string[];  // Question IDs that affect this subservice
 }
 
 export interface Service {
+  id?: string;  // Unique identifier for direct mapping
   name: string;
   description: string;
   hours: number;
@@ -24,6 +35,15 @@ export interface Service {
   keyAssumptions?: string;
   clientResponsibilities?: string;
   outOfScope?: string;
+  // New scaling metadata
+  scalingFactors?: string[];  // ["user_count", "data_volume", "site_count"]
+  quantityDriver?: string;     // Primary driver e.g., "user_count"
+  calculationRules?: {
+    quantity?: string;         // e.g., "user_count || 1"
+    multiplier?: string;       // e.g., "complexity === 'high' ? 1.5 : 1.0"
+    included?: string;         // e.g., "needs_integration === true"
+  };
+  mappedQuestions?: string[];  // Question IDs that affect this service
 }
 
 export interface ResearchSource {
@@ -50,6 +70,11 @@ export interface Question {
   type: 'multiple_choice' | 'text' | 'number' | 'boolean';
   options?: string[];
   required: boolean;
+  // New mapping metadata
+  impacts?: string[];           // Service/subservice IDs this question affects
+  calculationType?: 'quantity' | 'multiplier' | 'include_exclude';
+  mappingKey?: string;          // Standardized key e.g., "user_count", "complexity"
+  defaultValue?: any;           // Default value if not answered
 }
 
 export interface Calculation {
