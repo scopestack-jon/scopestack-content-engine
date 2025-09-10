@@ -163,6 +163,7 @@ export class QuestionGeneratorV2 {
       const question: Question = {
         id: `q_${questionId++}`,
         text: template.text,
+        question: template.text, // Set both for UI compatibility
         type: template.type,
         options: template.options,
         required: true,
@@ -193,8 +194,9 @@ export class QuestionGeneratorV2 {
         questions.push({
           ...cq,
           id: `q_${questionId++}`,
+          question: cq.text || cq.question, // Ensure question field is set
           impacts: impacted,
-          slug: cq.slug || this.generateSlug(cq.text)
+          slug: cq.slug || this.generateSlug(cq.text || cq.question || '')
         });
       });
       
