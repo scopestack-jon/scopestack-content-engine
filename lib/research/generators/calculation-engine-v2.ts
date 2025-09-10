@@ -327,27 +327,40 @@ export class CalculationEngineV2 {
     const calculations: Calculation[] = [];
     let calcId = 1;
     
-    // Create a calculation for each unique factor
+    // Create a calculation for each unique factor that actually affects services
     const factors = new Set<string>();
     questions.forEach(q => {
       if (q.mappingKey) factors.add(q.mappingKey);
     });
     
+    console.log(`📊 Evaluating ${factors.size} scaling factors for calculation generation`);
+    
+    let calculationsCreated = 0;
+    let calculationsSkipped = 0;
+    
     factors.forEach(factor => {
       const value = responseMap[factor];
       const affectedServices = this.findServicesUsingFactor(factor, services);
       
-      calculations.push({
-        id: `calc_${calcId++}`,
-        name: factor.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        value: value || 0,
-        unit: this.getUnitForFactor(factor),
-        source: 'User Input',
-        mappedServices: affectedServices,
-        mappedQuestions: [factor], // UI expects this field
-        slug: factor, // UI expects this field  
-        resultType: 'quantity' // UI expects this field
-      });
+      // Only create calculation if this factor actually affects subservices
+      if (affectedServices.length > 0) {
+        console.log(`✅ Creating calculation for ${factor} (affects ${affectedServices.length} services)`);
+        calculations.push({
+          id: `calc_${calcId++}`,
+          name: factor.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          value: value || 0,
+          unit: this.getUnitForFactor(factor),
+          source: 'User Input',
+          mappedServices: affectedServices,
+          mappedQuestions: [factor], // UI expects this field
+          slug: factor, // UI expects this field  
+          resultType: 'quantity' // UI expects this field
+        });
+        calculationsCreated++;
+      } else {
+        console.log(`⏭️ Skipping calculation for ${factor} (no services use it)`);
+        calculationsSkipped++;
+      }
     });
     
     // Add derived calculations
@@ -363,6 +376,8 @@ export class CalculationEngineV2 {
       slug: 'total_project_hours',
       resultType: 'total'
     });
+    
+    console.log(`📈 Generated ${calculationsCreated} calculations, skipped ${calculationsSkipped} unused factors`);
     
     return calculations;
   }
