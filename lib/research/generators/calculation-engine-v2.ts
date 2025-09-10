@@ -26,6 +26,12 @@ export class CalculationEngineV2 {
     const responseMap = this.buildResponseMap(questions, responses);
     console.log('📊 Response map:', responseMap);
     
+    // Check if this is initial state (no user responses provided)
+    const hasUserResponses = Object.keys(responseMap).some(key => 
+      responseMap[key] !== undefined && responseMap[key] !== null
+    );
+    console.log('🎯 Has user responses:', hasUserResponses);
+    
     // Apply calculations to each service
     return services.map(service => this.calculateService(service, responseMap));
   }
@@ -39,21 +45,38 @@ export class CalculationEngineV2 {
   ): Record<string, any> {
     const responseMap: Record<string, any> = {};
     
+    // Check if this is initial state (no user responses provided)
+    const hasAnyResponses = responses instanceof Map ? 
+      responses.size > 0 : 
+      Object.keys(responses).length > 0;
+    
     questions.forEach(question => {
       const key = question.mappingKey || question.slug || question.id || '';
       let value: any;
       
       if (responses instanceof Map) {
         value = responses.get(question.id || '') || 
-                responses.get(question.slug || '') ||
-                question.defaultValue;
+                responses.get(question.slug || '');
+        
+        // Only apply default values if we have some user responses
+        // This prevents default values from being applied on initial load
+        if (value === undefined && hasAnyResponses) {
+          value = question.defaultValue;
+        }
       } else {
         value = responses[question.id || ''] || 
-                responses[question.slug || ''] ||
-                question.defaultValue;
+                responses[question.slug || ''];
+                
+        // Only apply default values if we have some user responses
+        if (value === undefined && hasAnyResponses) {
+          value = question.defaultValue;
+        }
       }
       
-      responseMap[key] = value;
+      // Only set the value if it's defined (not undefined/null)
+      if (value !== undefined && value !== null) {
+        responseMap[key] = value;
+      }
     });
     
     return responseMap;
@@ -217,18 +240,33 @@ export class CalculationEngineV2 {
    */
   private evaluateExpression(expression: string, variables: Record<string, any>): any {
     try {
-      // Create a safe evaluation context
+      // Create a safe evaluation context with undefined for missing variables
       const context = { ...variables, Math };
       
-      // Replace variable names in expression
+      // Find all variable names referenced in the expression
+      const variableNames = expression.match(/\b[a-zA-Z_]\w*\b/g) || [];
+      const referencedVariables = variableNames.filter(name => 
+        name !== 'Math' && name !== 'true' && name !== 'false' && name !== 'null' && name !== 'undefined'
+      );
+      
+      // Replace variable names in expression, using undefined for missing variables
       let evaluableExpression = expression;
-      Object.keys(variables).forEach(key => {
-        const value = variables[key];
-        const quotedValue = typeof value === 'string' ? `"${value}"` : value;
+      referencedVariables.forEach(varName => {
+        const value = variables[varName];
+        let replacementValue: string;
+        
+        if (value === undefined || value === null) {
+          replacementValue = 'undefined';
+        } else if (typeof value === 'string') {
+          replacementValue = `"${value}"`;
+        } else {
+          replacementValue = String(value);
+        }
+        
         // Replace variable references with actual values
         evaluableExpression = evaluableExpression.replace(
-          new RegExp(`\\b${key}\\b`, 'g'),
-          quotedValue
+          new RegExp(`\\b${varName}\\b`, 'g'),
+          replacementValue
         );
       });
       

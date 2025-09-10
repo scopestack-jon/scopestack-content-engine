@@ -112,25 +112,22 @@ export class ResearchOrchestratorV2 {
         progress: 80
       });
 
-      // Build default responses from question defaults
-      const defaultResponses: Record<string, any> = {};
-      questions.forEach(q => {
-        const key = q.mappingKey || q.slug || q.id || '';
-        defaultResponses[key] = q.defaultValue;
-      });
+      // Start with empty responses (quantities should default to 1 until user provides input)
+      const emptyResponses: Record<string, any> = {};
+      // Don't apply question defaults immediately - wait for user input
 
-      // Apply calculations to services
+      // Apply calculations to services (with empty responses initially)
       const calculatedServices = this.calculationEngine.applyResponsesToServices(
         services,
         questions,
-        defaultResponses
+        emptyResponses
       );
 
       // Generate calculation objects
       const calculations = this.calculationEngine.generateCalculations(
         calculatedServices,
         questions,
-        defaultResponses
+        emptyResponses
       );
       console.log(`✅ Generated ${calculations.length} calculations`);
 
