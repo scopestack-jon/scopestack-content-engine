@@ -3,6 +3,7 @@
 
 import { OpenRouterClient } from '../api/openrouter-client';
 import { Service, Question, ResearchData } from '../types/interfaces';
+import { extractTechnologyName } from '../utils/response-processor';
 
 export class QuestionGeneratorV2 {
   constructor(private client: OpenRouterClient) {}
@@ -27,83 +28,102 @@ export class QuestionGeneratorV2 {
   }
 
   /**
-   * Map scaling factors to question types and formats
+   * Map scaling factors to question types and formats with context
    */
-  private getQuestionTemplateForFactor(factor: string): any {
+  private getQuestionTemplateForFactor(
+    factor: string, 
+    technology: string, 
+    researchContext: any,
+    services: Service[]
+  ): any {
+    // Find which services use this factor for more specific questions
+    const relatedServices = this.findServicesUsingFactor(factor, services);
+    const serviceContext = relatedServices.slice(0, 2).join(', ');
+    
     const templates: Record<string, any> = {
       user_count: {
-        text: "How many users will be using the system?",
+        text: `How many users will be migrated to the ${technology} system?`,
         type: "number",
         calculationType: "quantity",
-        defaultValue: 100
+        defaultValue: 100,
+        context: `Affects ${serviceContext}`
       },
       mailbox_count: {
-        text: "How many mailboxes need to be migrated?",
+        text: `How many ${technology} mailboxes need to be migrated and configured?`,
         type: "number",
         calculationType: "quantity",
-        defaultValue: 100
+        defaultValue: 100,
+        context: `Impacts data migration and user provisioning`
       },
       site_count: {
-        text: "How many sites or locations are involved?",
+        text: `How many physical sites will require ${technology} deployment?`,
         type: "number",
         calculationType: "quantity",
-        defaultValue: 1
+        defaultValue: 1,
+        context: `Each site requires separate installation and configuration`
       },
       data_volume_gb: {
-        text: "What is the total data volume in GB?",
+        text: `What is the total data volume (in GB) to be migrated to ${technology}?`,
         type: "number",
         calculationType: "quantity",
-        defaultValue: 100
+        defaultValue: 100,
+        context: `Impacts migration duration and storage requirements`
       },
       integration_count: {
-        text: "How many third-party systems need to be integrated?",
+        text: `How many existing systems need to be integrated with ${technology}?`,
         type: "number",
         calculationType: "quantity",
-        defaultValue: 1
+        defaultValue: 1,
+        context: `Each integration requires custom development and testing`
       },
       complexity: {
-        text: "What is the overall project complexity?",
+        text: `What is the overall ${technology} implementation complexity?`,
         type: "multiple_choice",
-        options: ["Low", "Medium", "High"],
+        options: ["Low - Standard setup", "Medium - Some customization", "High - Extensive customization"],
         calculationType: "multiplier",
-        defaultValue: "Medium"
+        defaultValue: "Medium - Some customization"
       },
       security_level: {
-        text: "What level of security is required?",
+        text: `What level of security compliance is required for ${technology}?`,
         type: "multiple_choice",
-        options: ["Basic", "Standard", "Enhanced"],
+        options: ["Basic - Standard security", "Standard - Industry compliance", "Enhanced - High security/regulatory"],
         calculationType: "multiplier",
-        defaultValue: "Standard"
+        defaultValue: "Standard - Industry compliance"
       },
       admin_count: {
-        text: "How many administrators need to be trained?",
+        text: `How many administrators will manage the ${technology} system?`,
         type: "number",
         calculationType: "quantity",
-        defaultValue: 2
+        defaultValue: 2,
+        context: `Each admin needs specialized training and documentation`
       },
       training_groups: {
-        text: "How many training groups are needed?",
+        text: `How many separate training sessions are needed for ${technology} users?`,
         type: "number",
         calculationType: "quantity",
-        defaultValue: 1
+        defaultValue: 1,
+        context: `Based on user roles, locations, or departments`
       },
       system_count: {
-        text: "How many existing systems need assessment?",
+        text: `How many existing systems need to be assessed for ${technology} compatibility?`,
         type: "number",
         calculationType: "quantity",
-        defaultValue: 1
+        defaultValue: 1,
+        context: `Each system requires analysis and testing`
       },
       test_scenarios: {
-        text: "How many test scenarios need to be validated?",
+        text: `How many unique test scenarios need validation for ${technology}?`,
         type: "number",
         calculationType: "quantity",
-        defaultValue: 10
+        defaultValue: 10,
+        context: `Includes functional, integration, and performance tests`
       },
       documentation_sets: {
-        text: "How many documentation sets are required?",
+        text: `How many different documentation packages are required for ${technology}?`,
         type: "number",
         calculationType: "quantity",
-        defaultValue: 1
+        defaultValue: 1,
+        context: `Typically includes admin guides, user manuals, and technical docs`
       }
     };
     
@@ -113,6 +133,34 @@ export class QuestionGeneratorV2 {
       calculationType: "quantity",
       defaultValue: 1
     };
+  }
+
+  /**
+   * Find service names that use a specific scaling factor
+   */
+  private findServicesUsingFactor(factor: string, services: Service[]): string[] {
+    const using: string[] = [];
+    
+    services.forEach(service => {
+      if (service.scalingFactors?.includes(factor) || 
+          service.quantityDriver === factor ||
+          JSON.stringify(service.calculationRules || {}).includes(factor)) {
+        using.push(service.name);
+      }
+      
+      // Check subservices too
+      service.subservices?.forEach(sub => {
+        if (sub.scalingFactors?.includes(factor) || 
+            sub.quantityDriver === factor ||
+            JSON.stringify(sub.calculationRules || {}).includes(factor)) {
+          if (!using.includes(service.name)) {
+            using.push(service.name);
+          }
+        }
+      });
+    });
+    
+    return using;
   }
 
   /**
@@ -148,6 +196,9 @@ export class QuestionGeneratorV2 {
   ): Promise<Question[]> {
     console.log('🎯 Generating questions from services with explicit mapping...');
     
+    // Extract technology for more specific questions
+    const technology = extractTechnologyName(userRequest);
+    
     // Extract all unique scaling factors from services
     const scalingFactors = this.extractScalingFactors(services);
     console.log('📊 Unique scaling factors found:', Array.from(scalingFactors));
@@ -155,9 +206,9 @@ export class QuestionGeneratorV2 {
     const questions: Question[] = [];
     let questionId = 1;
     
-    // Generate questions for each scaling factor
+    // Generate questions for each scaling factor with technology context
     scalingFactors.forEach(factor => {
-      const template = this.getQuestionTemplateForFactor(factor);
+      const template = this.getQuestionTemplateForFactor(factor, technology, researchData, services);
       const impactedServices = this.findImpactedServices(factor, services);
       
       const question: Question = {
@@ -175,7 +226,7 @@ export class QuestionGeneratorV2 {
       };
       
       questions.push(question);
-      console.log(`✅ Generated question for ${factor} impacting ${impactedServices.length} services`);
+      console.log(`✅ Generated specific question for ${factor} impacting ${impactedServices.length} services`);
     });
     
     // Add context-specific questions based on research if needed
