@@ -25,7 +25,7 @@ export class CalculationMapper {
    * Similar to ScopeStack's calculation_id format
    */
   generateCalculationId(question: Question): string {
-    const text = question.text.toLowerCase();
+    const text = (question.text || '').toLowerCase();
     
     // Map question patterns to calculation IDs
     if (text.includes('mailbox')) {
@@ -83,8 +83,20 @@ export class CalculationMapper {
       if (text.includes('test') || text.includes('staging')) return 'environment_count_calculation';
     }
     
-    // Default calculation ID based on question slug
-    return question.slug || `custom_calculation_${Date.now()}`;
+    // Generate a meaningful calculation ID from question text if no pattern matches
+    if (question.slug && question.slug !== '#no-slug' && question.slug !== 'unknown') {
+      return question.slug;
+    }
+    
+    // Generate ID from question text
+    const questionText = question.text || 'unknown_question';
+    const cleanText = questionText
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '') // Remove special chars
+      .replace(/\s+/g, '_') // Replace spaces with underscores
+      .substring(0, 50); // Limit length
+    
+    return `custom_${cleanText}_calculation`;
   }
 
   /**
