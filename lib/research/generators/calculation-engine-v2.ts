@@ -243,10 +243,9 @@ export class CalculationEngineV2 {
       // Create a safe evaluation context with undefined for missing variables
       const context = { ...variables, Math };
       
-      // Find all variable names referenced in the expression
-      const variableNames = expression.match(/\b[a-zA-Z_]\w*\b/g) || [];
-      const referencedVariables = variableNames.filter(name => 
-        name !== 'Math' && name !== 'true' && name !== 'false' && name !== 'null' && name !== 'undefined'
+      // Find all variable names referenced in the expression (only those that exist in variables)
+      const referencedVariables = Object.keys(variables).filter(varName => 
+        new RegExp(`\\b${varName}\\b`).test(expression)
       );
       
       // Replace variable names in expression, using undefined for missing variables
@@ -258,12 +257,18 @@ export class CalculationEngineV2 {
         if (value === undefined || value === null) {
           replacementValue = 'undefined';
         } else if (typeof value === 'string') {
-          replacementValue = `"${value}"`;
+          // Convert string numbers to actual numbers
+          const numValue = Number(value);
+          if (!isNaN(numValue)) {
+            replacementValue = String(numValue);
+          } else {
+            replacementValue = `"${value}"`;
+          }
         } else {
           replacementValue = String(value);
         }
         
-        // Replace variable references with actual values
+        // Replace variable references with actual values using word boundaries
         evaluableExpression = evaluableExpression.replace(
           new RegExp(`\\b${varName}\\b`, 'g'),
           replacementValue
