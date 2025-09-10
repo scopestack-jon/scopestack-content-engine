@@ -29,58 +29,58 @@ export class CalculationMapper {
     
     // Map question patterns to calculation IDs
     if (text.includes('mailbox')) {
-      if (text.includes('size') || text.includes('gb')) return 'mailbox_size_calculation';
-      if (text.includes('how many') || text.includes('number')) return 'mailbox_count_calculation';
-      if (text.includes('type')) return 'mailbox_type_lookup';
+      if (text.includes('size') || text.includes('gb')) return 'mailbox_size';
+      if (text.includes('how many') || text.includes('number')) return 'mailbox_count';
+      if (text.includes('type')) return 'mailbox_type';
     }
     
     if (text.includes('user')) {
-      if (text.includes('how many') || text.includes('number')) return 'user_count_calculation';
-      if (text.includes('hybrid')) return 'hybrid_user_calculation';
-      if (text.includes('pilot')) return 'pilot_user_calculation';
-      if (text.includes('training')) return 'training_requirement_calculation';
+      if (text.includes('how many') || text.includes('number')) return 'user_count';
+      if (text.includes('hybrid')) return 'hybrid_user';
+      if (text.includes('pilot')) return 'pilot_user';
+      if (text.includes('training')) return 'training_req';
     }
     
     if (text.includes('migration')) {
-      if (text.includes('approach') || text.includes('method')) return 'migration_approach_lookup';
-      if (text.includes('timeline') || text.includes('duration')) return 'migration_timeline_calculation';
-      if (text.includes('complexity')) return 'migration_complexity_factor';
+      if (text.includes('approach') || text.includes('method')) return 'migration_app';
+      if (text.includes('timeline') || text.includes('duration')) return 'migration_time';
+      if (text.includes('complexity')) return 'migration_comp';
     }
     
     if (text.includes('storage') || text.includes('data')) {
-      if (text.includes('volume') || text.includes('gb') || text.includes('tb')) return 'data_volume_calculation';
-      if (text.includes('retention')) return 'data_retention_calculation';
+      if (text.includes('volume') || text.includes('gb') || text.includes('tb')) return 'data_volume';
+      if (text.includes('retention')) return 'data_retention';
     }
     
     if (text.includes('integration') || text.includes('application')) {
-      if (text.includes('how many') || text.includes('number')) return 'integration_count_calculation';
-      if (text.includes('third-party')) return 'third_party_integration_calculation';
-      if (text.includes('custom')) return 'custom_integration_calculation';
+      if (text.includes('how many') || text.includes('number')) return 'integration_ct';
+      if (text.includes('third-party')) return 'third_party_int';
+      if (text.includes('custom')) return 'custom_int';
     }
     
     if (text.includes('domain')) {
-      if (text.includes('how many') || text.includes('number')) return 'domain_count_calculation';
-      if (text.includes('custom')) return 'custom_domain_calculation';
+      if (text.includes('how many') || text.includes('number')) return 'domain_count';
+      if (text.includes('custom')) return 'custom_domain';
     }
     
     if (text.includes('security')) {
-      if (text.includes('level') || text.includes('requirement')) return 'security_level_lookup';
-      if (text.includes('compliance')) return 'compliance_requirement_calculation';
+      if (text.includes('level') || text.includes('requirement')) return 'security_level';
+      if (text.includes('compliance')) return 'compliance_req';
     }
     
     if (text.includes('downtime')) {
-      if (text.includes('window') || text.includes('hours')) return 'downtime_window_calculation';
-      if (text.includes('acceptable')) return 'acceptable_downtime_calculation';
+      if (text.includes('window') || text.includes('hours')) return 'downtime_window';
+      if (text.includes('acceptable')) return 'acceptable_down';
     }
     
     if (text.includes('location') || text.includes('site')) {
-      if (text.includes('how many') || text.includes('number')) return 'site_count_calculation';
-      if (text.includes('geographic')) return 'geographic_distribution_calculation';
+      if (text.includes('how many') || text.includes('number')) return 'site_count';
+      if (text.includes('geographic')) return 'geographic_dist';
     }
     
     if (text.includes('environment')) {
-      if (text.includes('current') || text.includes('existing')) return 'environment_assessment_calculation';
-      if (text.includes('test') || text.includes('staging')) return 'environment_count_calculation';
+      if (text.includes('current') || text.includes('existing')) return 'environment_ass';
+      if (text.includes('test') || text.includes('staging')) return 'environment_ct';
     }
     
     // Generate a meaningful calculation ID from question text if no pattern matches
@@ -88,15 +88,15 @@ export class CalculationMapper {
       return question.slug;
     }
     
-    // Generate ID from question text
+    // Generate ID from question text (max 15 characters)
     const questionText = question.text || 'unknown_question';
     const cleanText = questionText
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, '') // Remove special chars
       .replace(/\s+/g, '_') // Replace spaces with underscores
-      .substring(0, 50); // Limit length
+      .substring(0, 15); // Limit to 15 characters
     
-    return `custom_${cleanText}_calculation`;
+    return cleanText || 'custom_calc';
   }
 
   /**
@@ -148,7 +148,7 @@ export class CalculationMapper {
     
     // Apply calculation formulas based on type
     switch (calculationId) {
-      case 'mailbox_count_calculation':
+      case 'mailbox_count':
         return {
           calculation_id: calculationId,
           value: value,
@@ -156,7 +156,7 @@ export class CalculationMapper {
           description: 'Number of mailboxes to migrate'
         };
         
-      case 'mailbox_size_calculation':
+      case 'mailbox_size':
         return {
           calculation_id: calculationId,
           value: value,
@@ -164,7 +164,7 @@ export class CalculationMapper {
           description: 'Average mailbox size in GB'
         };
         
-      case 'user_count_calculation':
+      case 'user_count':
         return {
           calculation_id: calculationId,
           value: value,
@@ -172,7 +172,7 @@ export class CalculationMapper {
           description: 'Total number of users'
         };
         
-      case 'data_volume_calculation':
+      case 'data_volume':
         return {
           calculation_id: calculationId,
           value: value,
@@ -180,7 +180,7 @@ export class CalculationMapper {
           description: 'Total data volume in GB'
         };
         
-      case 'integration_count_calculation':
+      case 'integration_ct':
         return {
           calculation_id: calculationId,
           value: value,
@@ -188,7 +188,7 @@ export class CalculationMapper {
           description: 'Number of integrations'
         };
         
-      case 'domain_count_calculation':
+      case 'domain_count':
         return {
           calculation_id: calculationId,
           value: value,
@@ -196,7 +196,7 @@ export class CalculationMapper {
           description: 'Number of domains'
         };
         
-      case 'site_count_calculation':
+      case 'site_count':
         return {
           calculation_id: calculationId,
           value: value,
@@ -204,7 +204,7 @@ export class CalculationMapper {
           description: 'Number of sites/locations'
         };
         
-      case 'downtime_window_calculation':
+      case 'downtime_window':
         return {
           calculation_id: calculationId,
           value: value,
@@ -212,7 +212,7 @@ export class CalculationMapper {
           description: 'Maximum acceptable downtime in hours'
         };
         
-      case 'migration_approach_lookup':
+      case 'migration_app':
         return {
           calculation_id: calculationId,
           value: this.getMigrationComplexityValue(value),
@@ -220,7 +220,7 @@ export class CalculationMapper {
           description: 'Migration approach complexity factor'
         };
         
-      case 'security_level_lookup':
+      case 'security_level':
         return {
           calculation_id: calculationId,
           value: this.getSecurityLevelValue(value),
@@ -244,8 +244,8 @@ export class CalculationMapper {
     const derived: SurveyCalculation[] = [];
     
     // Calculate total migration effort
-    const mailboxCount = this.findCalculationValue(calculations, 'mailbox_count_calculation');
-    const avgSize = this.findCalculationValue(calculations, 'mailbox_size_calculation');
+    const mailboxCount = this.findCalculationValue(calculations, 'mailbox_count');
+    const avgSize = this.findCalculationValue(calculations, 'mailbox_size');
     
     if (mailboxCount && avgSize) {
       derived.push({
@@ -266,9 +266,9 @@ export class CalculationMapper {
     }
     
     // Calculate complexity score
-    const integrations = this.findCalculationValue(calculations, 'integration_count_calculation');
-    const domains = this.findCalculationValue(calculations, 'domain_count_calculation');
-    const sites = this.findCalculationValue(calculations, 'site_count_calculation');
+    const integrations = this.findCalculationValue(calculations, 'integration_ct');
+    const domains = this.findCalculationValue(calculations, 'domain_count');
+    const sites = this.findCalculationValue(calculations, 'site_count');
     
     const complexityScore = 
       (Number(integrations) || 0) * 2 +
@@ -370,7 +370,7 @@ export class CalculationMapper {
                            subserviceName.includes('support') && !subserviceName.includes('migration');
     
     if (isUserSpecific) {
-      const userCountCalc = calculations.find(c => c.calculation_id === 'user_count_calculation');
+      const userCountCalc = calculations.find(c => c.calculation_id === 'user_count');
       if (userCountCalc) {
         const quantity = Number(userCountCalc.value) || 1;
         subservice.quantity = quantity;
@@ -387,7 +387,7 @@ export class CalculationMapper {
         
         // Add mapped calculations for UI display - show actual IDs
         const relatedCalcs = calculations.filter(c => 
-          c.calculation_id === 'user_count_calculation' ||
+          c.calculation_id === 'user_count' ||
           c.calculation_id.includes('user') ||
           c.description?.toLowerCase().includes('user')
         );
@@ -396,8 +396,8 @@ export class CalculationMapper {
           subservice.mappedQuestions = relatedCalcs.map(c => c.calculation_id);
           subservice.calculationIds = relatedCalcs.map(c => c.calculation_id);
         } else {
-          subservice.mappedQuestions = ['user_count_calculation'];
-          subservice.calculationIds = ['user_count_calculation'];
+          subservice.mappedQuestions = ['user_count'];
+          subservice.calculationIds = ['user_count'];
         }
       }
     }
@@ -406,7 +406,7 @@ export class CalculationMapper {
     else if (subserviceName.includes('integration') || subserviceName.includes('application') || 
              subserviceName.includes('connector') || subserviceName.includes('third')) {
       
-      const integrationCalc = calculations.find(c => c.calculation_id === 'integration_count_calculation');
+      const integrationCalc = calculations.find(c => c.calculation_id === 'integration_ct');
       if (integrationCalc) {
         const quantity = Number(integrationCalc.value) || 1;
         subservice.quantity = quantity;
@@ -416,7 +416,7 @@ export class CalculationMapper {
         
         // Add mapped calculations for UI display - show actual IDs
         const relatedCalcs = calculations.filter(c => 
-          c.calculation_id === 'integration_count_calculation' ||
+          c.calculation_id === 'integration_ct' ||
           c.calculation_id.includes('integration') ||
           c.description?.toLowerCase().includes('integration')
         );
@@ -425,8 +425,8 @@ export class CalculationMapper {
           subservice.mappedQuestions = relatedCalcs.map(c => c.calculation_id);
           subservice.calculationIds = relatedCalcs.map(c => c.calculation_id);
         } else {
-          subservice.mappedQuestions = ['integration_count_calculation'];
-          subservice.calculationIds = ['integration_count_calculation'];
+          subservice.mappedQuestions = ['integration_ct'];
+          subservice.calculationIds = ['integration_ct'];
         }
       }
     }
@@ -435,7 +435,7 @@ export class CalculationMapper {
     else if (subserviceName.includes('storage') || subserviceName.includes('data volume') || 
              subserviceName.includes('archiv')) {
       
-      const dataVolumeCalc = calculations.find(c => c.calculation_id === 'data_volume_calculation');
+      const dataVolumeCalc = calculations.find(c => c.calculation_id === 'data_volume');
       const totalDataCalc = calculations.find(c => c.calculation_id === 'total_migration_data_gb');
       
       const calc = dataVolumeCalc || totalDataCalc;
@@ -498,7 +498,7 @@ export class CalculationMapper {
       // If no specific matches, use the primary calculation (usually mailbox count)
       if (applicableCalculations.length === 0 || primaryQuantity === 1) {
         const primaryCalc = calculations.find(c => 
-          c.calculation_id === 'mailbox_count_calculation' ||
+          c.calculation_id === 'mailbox_count' ||
           c.calculation_id.includes('mailbox')
         );
         if (primaryCalc) {
@@ -546,7 +546,7 @@ export class CalculationMapper {
     if (subserviceName.includes('security') || subserviceName.includes('compliance') || 
         subserviceName.includes('permission') || subserviceName.includes('access')) {
       
-      const securityCalc = calculations.find(c => c.calculation_id === 'security_level_lookup');
+      const securityCalc = calculations.find(c => c.calculation_id === 'security_level');
       if (securityCalc) {
         const securityMultiplier = Number(securityCalc.value) || 1.0;
         // Apply security complexity to existing hours
@@ -638,7 +638,7 @@ export class CalculationMapper {
     
     // Map service to relevant calculations
     if (serviceName.includes('migration')) {
-      const mailboxCalc = calculations.find(c => c.calculation_id === 'mailbox_count_calculation');
+      const mailboxCalc = calculations.find(c => c.calculation_id === 'mailbox_count');
       if (mailboxCalc) {
         relatedCalculations.push(mailboxCalc.calculation_id);
         quantity = Number(mailboxCalc.value) || 1;
@@ -650,7 +650,7 @@ export class CalculationMapper {
         relatedCalculations.push(dataCalc.calculation_id);
       }
       
-      const complexityCalc = calculations.find(c => c.calculation_id === 'migration_approach_lookup');
+      const complexityCalc = calculations.find(c => c.calculation_id === 'migration_app');
       if (complexityCalc) {
         relatedCalculations.push(complexityCalc.calculation_id);
         baseHours = baseHours * Number(complexityCalc.value);
@@ -658,7 +658,7 @@ export class CalculationMapper {
     }
     
     if (serviceName.includes('training') || serviceName.includes('knowledge')) {
-      const userCalc = calculations.find(c => c.calculation_id === 'user_count_calculation');
+      const userCalc = calculations.find(c => c.calculation_id === 'user_count');
       if (userCalc) {
         relatedCalculations.push(userCalc.calculation_id);
         quantity = Number(userCalc.value) || 1;
@@ -667,7 +667,7 @@ export class CalculationMapper {
     }
     
     if (serviceName.includes('integration')) {
-      const integrationCalc = calculations.find(c => c.calculation_id === 'integration_count_calculation');
+      const integrationCalc = calculations.find(c => c.calculation_id === 'integration_ct');
       if (integrationCalc) {
         relatedCalculations.push(integrationCalc.calculation_id);
         quantity = Number(integrationCalc.value) || 1;
@@ -676,7 +676,7 @@ export class CalculationMapper {
     }
     
     if (serviceName.includes('security')) {
-      const securityCalc = calculations.find(c => c.calculation_id === 'security_level_lookup');
+      const securityCalc = calculations.find(c => c.calculation_id === 'security_level');
       if (securityCalc) {
         relatedCalculations.push(securityCalc.calculation_id);
         baseHours = baseHours * Number(securityCalc.value);
@@ -718,13 +718,13 @@ export class CalculationMapper {
   private mapSelectOptionToValue(calculationId: string, optionKey: string): number {
     // Map select option keys to numeric values for calculations
     const mappings: Record<string, Record<string, number>> = {
-      migration_approach_lookup: {
+      migration_app: {
         'Cutover': 1.0,
         'Staged': 1.2,
         'Hybrid': 1.5,
         'Minimal': 0.8
       },
-      security_level_lookup: {
+      security_level: {
         'Basic': 1.0,
         'Standard': 1.3,
         'Enhanced': 1.6,
