@@ -65,17 +65,24 @@ export class CalculationEngineV2 {
   private calculateService(service: Service, responseMap: Record<string, any>): Service {
     const updatedService = { ...service };
     
-    // Apply service-level calculations
+    // Services always have quantity = 1 (they represent phases, not scalable units)
+    // Only subservices should scale based on question responses
+    updatedService.quantity = 1;
+    console.log(`  📌 Service ${service.name} quantity set to 1 (services don't scale)`);
+    
+    // Apply service-level calculations only if explicitly defined (fallback)
     if (service.calculationRules) {
+      console.log(`  ⚠️ Service ${service.name} has calculation rules but services shouldn't scale`);
       const { quantity, multiplier } = this.evaluateRules(
         service.calculationRules,
         responseMap,
         service.name
       );
       
-      updatedService.quantity = quantity;
+      // Override - services should not scale
+      updatedService.quantity = 1;
       
-      // Apply multiplier to base hours
+      // Apply multiplier to base hours only if needed
       if (multiplier !== 1 && service.baseHours) {
         updatedService.hours = Math.round(service.baseHours * multiplier * 100) / 100;
       }

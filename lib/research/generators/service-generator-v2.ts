@@ -41,13 +41,11 @@ Requirements:
    - name: Service name specific to ${technology}
    - description: Brief description
    - serviceDescription: Detailed professional description
-   - hours: Total hours estimate
-   - baseHours: Base hours per unit
+   - hours: Total hours estimate (will be sum of subservice hours)
+   - baseHours: Base hours per unit (set to total hours)
    - phase: PMBOK phase name
-   - scalingFactors: Array of factors that scale this service (e.g., ["user_count", "site_count"])
-   - quantityDriver: Primary scaling factor
-   - calculationRules: Object with quantity/multiplier formulas
-   - subservices: Array of 4-5 subservices
+   - quantity: Always 1 (services represent phases, not scalable units)
+   - subservices: Array of 4-5 subservices with scaling logic
 
 3. Each subservice MUST include:
    - id: Unique identifier (e.g., "sub_init_001")
@@ -72,12 +70,10 @@ Requirements:
 
 Return ONLY a valid JSON array with all 5 services. No markdown, no explanations.
 
-Example calculation rules for SERVICES:
-- quantity: "user_count || 100"
-- multiplier: "complexity === 'high' ? 1.5 : 1.0"
-- quantity: "Math.ceil(site_count / 10)"
+SERVICES should NOT have calculation rules - they always have quantity: 1
+Services represent project phases, not scalable units.
 
-Example calculation rules for SUBSERVICES:
+Example calculation rules for SUBSERVICES ONLY:
 - quantity: "user_count || 1" (for user-based subservices)
 - quantity: "mailbox_count || 1" (for mailbox migration subservices)
 - quantity: "Math.ceil(data_volume_gb / 100)" (for data processing subservices)
