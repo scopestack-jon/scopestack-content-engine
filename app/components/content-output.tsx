@@ -1232,13 +1232,13 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                             subservices.forEach(sub => {
                               const quantity = sub.quantity || 1;
                               const baseHours = sub.baseHours || sub.hours || 0;
-                              calculatedTotal += quantity * baseHours;
+                              calculatedTotal += Math.round((quantity * baseHours) * 100) / 100;
                             });
                           } else {
                             // No subservices, use service hours
                             const quantity = service.quantity || 1;
                             const baseHours = service.baseHours || service.hours || 0;
-                            calculatedTotal += quantity * baseHours;
+                            calculatedTotal += Math.round((quantity * baseHours) * 100) / 100;
                           }
                         });
                       }
@@ -1751,7 +1751,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                                     // Calculate total hours for service including all subservices
                                     const serviceQuantity = service.quantity || 1;
                                     const serviceBaseHours = service.baseHours || service.hours || 0;
-                                    let serviceTotalHours = serviceQuantity * serviceBaseHours;
+                                    let serviceTotalHours = Math.round((serviceQuantity * serviceBaseHours) * 100) / 100;
                                     
                                     // Add subservice hours
                                     const subservices = getSubservices(service);
@@ -1759,8 +1759,9 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                                       serviceTotalHours = subservices.reduce((total, sub) => {
                                         const subQuantity = sub.quantity || 1;
                                         const subBaseHours = sub.baseHours || sub.hours || 0;
-                                        return total + (subQuantity * subBaseHours);
+                                        return total + Math.round((subQuantity * subBaseHours) * 100) / 100;
                                       }, 0);
+                                      serviceTotalHours = Math.round(serviceTotalHours * 100) / 100;
                                     }
                                     
                                     return serviceTotalHours > 0 ? `${serviceTotalHours}h` : 'TBD';
@@ -1816,7 +1817,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                                                   // Calculate actual hours: quantity × baseHours
                                                   const quantity = sub.quantity || 1;
                                                   const baseHours = sub.baseHours || sub.hours || 0;
-                                                  const totalHours = quantity * baseHours;
+                                                  const totalHours = Math.round((quantity * baseHours) * 100) / 100;
                                                   return totalHours > 0 ? `${totalHours}h` : 'TBD';
                                                 })()}
                                               </Badge>
