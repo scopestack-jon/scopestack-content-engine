@@ -142,7 +142,11 @@ export class CalculationEngineV2 {
       updated.quantity = responseMap[subservice.quantityDriver] || 1;
       console.log(`    ➡️ Using quantityDriver ${subservice.quantityDriver}: ${updated.quantity}`);
     } else {
-      console.log(`    ⚠️ No calculation rules or quantity driver found, keeping default quantity: ${updated.quantity || 1}`);
+      // Ensure quantity is always set, even if no rules
+      if (!updated.quantity) {
+        updated.quantity = 1;
+      }
+      console.log(`    ⚠️ No calculation rules or quantity driver found, setting default quantity: ${updated.quantity}`);
     }
     
     // Update mapped questions

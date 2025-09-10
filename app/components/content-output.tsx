@@ -1867,6 +1867,19 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                                                   const quantity = sub.quantity || 1;
                                                   const baseHours = sub.baseHours || sub.hours || 0;
                                                   const totalHours = Math.round((quantity * baseHours) * 100) / 100;
+                                                  
+                                                  // Debug logging for quantity display
+                                                  if (sub.name && (sub.quantity > 1 || !sub.quantity)) {
+                                                    console.log(`📊 ${sub.name}:`, {
+                                                      quantity: sub.quantity,
+                                                      baseHours: sub.baseHours,
+                                                      hours: sub.hours,
+                                                      totalHours,
+                                                      hasCalculationRules: !!sub.calculationRules,
+                                                      hasQuantityDriver: !!sub.quantityDriver
+                                                    });
+                                                  }
+                                                  
                                                   return totalHours > 0 ? `${totalHours}h` : 'TBD';
                                                 })()}
                                               </Badge>
