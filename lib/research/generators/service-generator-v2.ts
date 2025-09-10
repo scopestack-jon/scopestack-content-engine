@@ -23,318 +23,57 @@ export class ServiceGeneratorV2 {
         userRequest: userRequest
       };
       
-      const prompt = `Generate exactly 5 professional services for "${userRequest}" with scaling metadata.
+      const prompt = `Generate exactly 5 professional services for "${userRequest}" implementation with scaling metadata.
 
-Research: ${researchContext.summary}
+Research Context: ${researchContext.summary}
 Key Insights: ${researchContext.insights.slice(0, 3).join(', ')}
 
-MANDATORY STRUCTURE:
-1. Initiation Phase - stakeholder analysis, requirements
-2. Planning Phase - architecture design, project planning  
-3. Execution Phase - implementation, deployment
-4. Monitoring Phase - testing, quality assurance
-5. Closing Phase - knowledge transfer, documentation
+Requirements:
+1. Generate EXACTLY 5 services, one for each PMBOK phase:
+   - Initiation Phase: Requirements gathering, stakeholder analysis
+   - Planning Phase: Architecture design, project planning
+   - Execution Phase: Implementation, deployment, configuration
+   - Monitoring Phase: Testing, quality assurance, performance monitoring
+   - Closing Phase: Knowledge transfer, documentation, handover
 
-IMPORTANT: Each service MUST include scaling metadata that defines:
-- scalingFactors: Array of factors that scale this service (user_count, mailbox_count, site_count, data_volume_gb, integration_count, etc.)
-- quantityDriver: The PRIMARY factor that drives quantity
-- calculationRules: Rules for calculating quantity/multiplier
+2. Each service MUST include:
+   - id: Unique identifier (e.g., "svc_init_001")
+   - name: Service name specific to ${technology}
+   - description: Brief description
+   - serviceDescription: Detailed professional description
+   - hours: Total hours estimate
+   - baseHours: Base hours per unit
+   - phase: PMBOK phase name
+   - scalingFactors: Array of factors that scale this service (e.g., ["user_count", "site_count"])
+   - quantityDriver: Primary scaling factor
+   - calculationRules: Object with quantity/multiplier formulas
+   - subservices: Array of 4-5 subservices
 
-Return ONLY valid JSON (no markdown or explanations):
-[
-  {
-    "id": "svc_initiation_001",
-    "name": "${technology} Project Initiation & Requirements",
-    "description": "Stakeholder analysis and requirements gathering",
-    "serviceDescription": "Comprehensive stakeholder engagement and requirements documentation for ${technology} implementation",
-    "hours": 24,
-    "baseHours": 24,
-    "phase": "Initiation",
-    "scalingFactors": ["site_count", "complexity"],
-    "quantityDriver": "site_count",
-    "calculationRules": {
-      "quantity": "site_count || 1",
-      "multiplier": "complexity === 'high' ? 1.5 : 1.0"
-    },
-    "subservices": [
-      {
-        "id": "sub_init_001",
-        "name": "Stakeholder Analysis Workshop",
-        "description": "Identify and engage key stakeholders",
-        "hours": 8,
-        "baseHours": 2,
-        "scalingFactors": ["site_count"],
-        "quantityDriver": "site_count",
-        "calculationRules": {
-          "quantity": "site_count || 1"
-        }
-      },
-      {
-        "id": "sub_init_002",
-        "name": "Requirements Documentation",
-        "description": "Document technical and business requirements",
-        "hours": 8,
-        "baseHours": 8
-      },
-      {
-        "id": "sub_init_003",
-        "name": "Current State Assessment",
-        "description": "Analyze existing environment",
-        "hours": 4,
-        "baseHours": 1,
-        "scalingFactors": ["system_count"],
-        "quantityDriver": "system_count",
-        "calculationRules": {
-          "quantity": "system_count || 1"
-        }
-      },
-      {
-        "id": "sub_init_004",
-        "name": "Success Criteria Definition",
-        "description": "Define measurable success metrics",
-        "hours": 4,
-        "baseHours": 4
-      }
-    ]
-  },
-  {
-    "id": "svc_planning_002",
-    "name": "${technology} Architecture & Design",
-    "description": "Technical architecture and implementation planning",
-    "serviceDescription": "Detailed technical design and architecture planning for ${technology} deployment",
-    "hours": 40,
-    "baseHours": 40,
-    "phase": "Planning",
-    "scalingFactors": ["integration_count", "complexity"],
-    "quantityDriver": "integration_count",
-    "calculationRules": {
-      "quantity": "1",
-      "multiplier": "(integration_count > 5 ? 1.5 : 1.0) * (complexity === 'high' ? 1.3 : 1.0)"
-    },
-    "subservices": [
-      {
-        "id": "sub_plan_001",
-        "name": "Solution Architecture Design",
-        "description": "Design overall technical architecture",
-        "hours": 16,
-        "baseHours": 16
-      },
-      {
-        "id": "sub_plan_002",
-        "name": "Integration Planning",
-        "description": "Plan system integrations",
-        "hours": 8,
-        "baseHours": 2,
-        "scalingFactors": ["integration_count"],
-        "quantityDriver": "integration_count",
-        "calculationRules": {
-          "quantity": "integration_count || 1"
-        }
-      },
-      {
-        "id": "sub_plan_003",
-        "name": "Security Design",
-        "description": "Design security architecture",
-        "hours": 8,
-        "baseHours": 8,
-        "calculationRules": {
-          "multiplier": "security_level === 'enhanced' ? 1.5 : 1.0"
-        }
-      },
-      {
-        "id": "sub_plan_004",
-        "name": "Migration Strategy",
-        "description": "Define migration approach",
-        "hours": 8,
-        "baseHours": 0.01,
-        "scalingFactors": ["data_volume_gb"],
-        "quantityDriver": "data_volume_gb",
-        "calculationRules": {
-          "quantity": "data_volume_gb || 100"
-        }
-      }
-    ]
-  },
-  {
-    "id": "svc_execution_003",
-    "name": "${technology} Implementation & Deployment",
-    "description": "Core implementation and deployment services",
-    "serviceDescription": "Hands-on implementation and deployment of ${technology} solution",
-    "hours": 80,
-    "baseHours": 80,
-    "phase": "Execution",
-    "scalingFactors": ["user_count", "mailbox_count", "site_count"],
-    "quantityDriver": "user_count",
-    "calculationRules": {
-      "quantity": "1",
-      "multiplier": "user_count > 1000 ? (user_count / 1000) : 1.0"
-    },
-    "subservices": [
-      {
-        "id": "sub_exec_001",
-        "name": "Core System Installation",
-        "description": "Install and configure base system",
-        "hours": 16,
-        "baseHours": 8,
-        "scalingFactors": ["site_count"],
-        "quantityDriver": "site_count",
-        "calculationRules": {
-          "quantity": "site_count || 1"
-        }
-      },
-      {
-        "id": "sub_exec_002",
-        "name": "User Migration Services",
-        "description": "Migrate users to new system",
-        "hours": 24,
-        "baseHours": 0.25,
-        "scalingFactors": ["user_count", "mailbox_count"],
-        "quantityDriver": "user_count",
-        "calculationRules": {
-          "quantity": "user_count || mailbox_count || 100"
-        }
-      },
-      {
-        "id": "sub_exec_003",
-        "name": "Data Migration",
-        "description": "Migrate existing data",
-        "hours": 24,
-        "baseHours": 0.1,
-        "scalingFactors": ["data_volume_gb"],
-        "quantityDriver": "data_volume_gb",
-        "calculationRules": {
-          "quantity": "data_volume_gb || 100"
-        }
-      },
-      {
-        "id": "sub_exec_004",
-        "name": "Integration Implementation",
-        "description": "Implement system integrations",
-        "hours": 16,
-        "baseHours": 4,
-        "scalingFactors": ["integration_count"],
-        "quantityDriver": "integration_count",
-        "calculationRules": {
-          "quantity": "integration_count || 1"
-        }
-      }
-    ]
-  },
-  {
-    "id": "svc_monitoring_004",
-    "name": "${technology} Testing & Quality Assurance",
-    "description": "Comprehensive testing and validation",
-    "serviceDescription": "Thorough testing and quality assurance for ${technology} deployment",
-    "hours": 32,
-    "baseHours": 32,
-    "phase": "Monitoring",
-    "scalingFactors": ["test_scenarios", "site_count"],
-    "quantityDriver": "test_scenarios",
-    "calculationRules": {
-      "quantity": "1",
-      "multiplier": "site_count > 5 ? 1.5 : 1.0"
-    },
-    "subservices": [
-      {
-        "id": "sub_mon_001",
-        "name": "Functional Testing",
-        "description": "Test core functionality",
-        "hours": 8,
-        "baseHours": 8
-      },
-      {
-        "id": "sub_mon_002",
-        "name": "Integration Testing",
-        "description": "Test system integrations",
-        "hours": 8,
-        "baseHours": 2,
-        "scalingFactors": ["integration_count"],
-        "quantityDriver": "integration_count",
-        "calculationRules": {
-          "quantity": "integration_count || 1"
-        }
-      },
-      {
-        "id": "sub_mon_003",
-        "name": "Performance Testing",
-        "description": "Validate system performance",
-        "hours": 8,
-        "baseHours": 0.01,
-        "scalingFactors": ["user_count"],
-        "quantityDriver": "user_count",
-        "calculationRules": {
-          "quantity": "user_count || 100"
-        }
-      },
-      {
-        "id": "sub_mon_004",
-        "name": "User Acceptance Testing",
-        "description": "Facilitate UAT sessions",
-        "hours": 8,
-        "baseHours": 2,
-        "scalingFactors": ["site_count"],
-        "quantityDriver": "site_count",
-        "calculationRules": {
-          "quantity": "site_count || 1"
-        }
-      }
-    ]
-  },
-  {
-    "id": "svc_closing_005",
-    "name": "${technology} Knowledge Transfer & Closing",
-    "description": "Documentation and knowledge transfer",
-    "serviceDescription": "Comprehensive knowledge transfer and project closure for ${technology}",
-    "hours": 24,
-    "baseHours": 24,
-    "phase": "Closing",
-    "scalingFactors": ["training_groups", "documentation_sets"],
-    "quantityDriver": "training_groups",
-    "calculationRules": {
-      "quantity": "1"
-    },
-    "subservices": [
-      {
-        "id": "sub_close_001",
-        "name": "Administrator Training",
-        "description": "Train system administrators",
-        "hours": 8,
-        "baseHours": 4,
-        "scalingFactors": ["admin_count"],
-        "quantityDriver": "admin_count",
-        "calculationRules": {
-          "quantity": "Math.ceil((admin_count || 2) / 5)"
-        }
-      },
-      {
-        "id": "sub_close_002",
-        "name": "End User Training",
-        "description": "Train end users",
-        "hours": 8,
-        "baseHours": 2,
-        "scalingFactors": ["training_groups"],
-        "quantityDriver": "training_groups",
-        "calculationRules": {
-          "quantity": "training_groups || Math.ceil((user_count || 100) / 20)"
-        }
-      },
-      {
-        "id": "sub_close_003",
-        "name": "Documentation Delivery",
-        "description": "Deliver technical documentation",
-        "hours": 4,
-        "baseHours": 4
-      },
-      {
-        "id": "sub_close_004",
-        "name": "Project Handover",
-        "description": "Final handover and closure",
-        "hours": 4,
-        "baseHours": 4
-      }
-    ]
-  }
-]`;
+3. Each subservice MUST include:
+   - id: Unique identifier (e.g., "sub_init_001")
+   - name: Subservice name
+   - description: Brief description
+   - hours: Estimated hours
+   - baseHours: Base hours per unit
+   - Optional: scalingFactors, quantityDriver, calculationRules
+
+4. Use these common scaling factors where appropriate:
+   - user_count: Number of users
+   - mailbox_count: Number of mailboxes
+   - site_count: Number of locations
+   - data_volume_gb: Data in GB
+   - integration_count: Number of integrations
+   - complexity: Project complexity (low/medium/high)
+   - security_level: Security requirements
+   - admin_count: Number of administrators
+   - training_groups: Number of training groups
+
+Return ONLY a valid JSON array with all 5 services. No markdown, no explanations.
+
+Example calculation rules:
+- quantity: "user_count || 100"
+- multiplier: "complexity === 'high' ? 1.5 : 1.0"
+- quantity: "Math.ceil(site_count / 10)"`;
 
       const response = await this.client.generateWithTimeout(
         prompt,
@@ -356,11 +95,31 @@ Return ONLY valid JSON (no markdown or explanations):
    */
   private parseAndEnhanceServices(response: string, technology: string): Service[] {
     try {
-      // Clean response and parse JSON
-      const cleaned = response.replace(/```json|```/g, '').trim();
+      // Clean response - remove markdown code blocks if present
+      let cleaned = response.trim();
+      
+      // Remove markdown code blocks
+      if (cleaned.startsWith('```json') || cleaned.startsWith('```')) {
+        cleaned = cleaned.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+      }
+      
+      // Find JSON array in response
+      const jsonStart = cleaned.indexOf('[');
+      const jsonEnd = cleaned.lastIndexOf(']');
+      
+      if (jsonStart === -1 || jsonEnd === -1) {
+        throw new Error('No valid JSON array found in response');
+      }
+      
+      cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+      
       const services = JSON.parse(cleaned);
       
-      // Enhance each service with generated IDs if missing
+      // Validate and enhance each service
+      if (!Array.isArray(services)) {
+        throw new Error('Response is not an array');
+      }
+      
       return services.map((service: Service, sIndex: number) => ({
         ...service,
         id: service.id || `svc_${sIndex + 1}`,
@@ -372,6 +131,7 @@ Return ONLY valid JSON (no markdown or explanations):
       
     } catch (error) {
       console.error('Failed to parse services v2:', error);
+      console.error('Raw response:', response.substring(0, 500));
       throw new Error('Failed to parse service generation response');
     }
   }
