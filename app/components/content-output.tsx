@@ -1663,8 +1663,10 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                                     {getCalculationName(calculation).replace(/\[object Object\]/g, getTechnologyName(content.technology))}
                                   </div>
                                   <div className="text-sm text-gray-500">
-                                    {calculation.mappedQuestions && calculation.mappedQuestions.length > 0 ? 
-                                      `${calculation.mappedQuestions.length} calculations mapped` : 
+                                    {calculation.mappedServices && calculation.mappedServices.length > 0 ? 
+                                      `Affects ${calculation.mappedServices.length} service${calculation.mappedServices.length === 1 ? '' : 's'}` : 
+                                      calculation.mappedQuestions && calculation.mappedQuestions.length > 0 ?
+                                      `${calculation.mappedQuestions.length} question${calculation.mappedQuestions.length === 1 ? '' : 's'} mapped` :
                                       'No mappings'
                                     }
                                   </div>

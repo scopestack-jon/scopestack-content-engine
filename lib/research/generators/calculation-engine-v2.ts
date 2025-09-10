@@ -343,7 +343,10 @@ export class CalculationEngineV2 {
         value: value || 0,
         unit: this.getUnitForFactor(factor),
         source: 'User Input',
-        mappedServices: affectedServices
+        mappedServices: affectedServices,
+        mappedQuestions: [factor], // UI expects this field
+        slug: factor, // UI expects this field  
+        resultType: 'quantity' // UI expects this field
       });
     });
     
@@ -355,7 +358,10 @@ export class CalculationEngineV2 {
       value: totalHours,
       unit: 'hours',
       source: 'Calculated',
-      formula: 'Sum of all service hours × quantities'
+      formula: 'Sum of all service hours × quantities',
+      mappedQuestions: [], // No specific questions for total
+      slug: 'total_project_hours',
+      resultType: 'total'
     });
     
     return calculations;
@@ -367,22 +373,26 @@ export class CalculationEngineV2 {
   private findServicesUsingFactor(factor: string, services: Service[]): string[] {
     const using: string[] = [];
     
+    console.log(`🔍 Finding services using factor: ${factor}`);
+    
     services.forEach(service => {
       let uses = false;
       
-      // Check service level
+      // Check service level (should be rare now since services don't scale)
       if (service.scalingFactors?.includes(factor) || 
           service.quantityDriver === factor ||
           JSON.stringify(service.calculationRules || {}).includes(factor)) {
         uses = true;
+        console.log(`  📋 Service ${service.name} uses ${factor} at service level`);
       }
       
-      // Check subservices
+      // Check subservices (this is where most scaling factors should be)
       service.subservices?.forEach(sub => {
         if (sub.scalingFactors?.includes(factor) || 
             sub.quantityDriver === factor ||
             JSON.stringify(sub.calculationRules || {}).includes(factor)) {
           uses = true;
+          console.log(`  📋 Service ${service.name} uses ${factor} in subservice: ${sub.name}`);
         }
       });
       
@@ -391,6 +401,7 @@ export class CalculationEngineV2 {
       }
     });
     
+    console.log(`✅ Factor ${factor} is used by services:`, using);
     return using;
   }
 
