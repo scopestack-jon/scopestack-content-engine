@@ -125,11 +125,11 @@ export class CalculationEngineV2 {
       updated.quantity = quantity;
       console.log(`    ➡️ Set quantity to: ${quantity}`);
       
-      // Apply multiplier to base hours
-      if (multiplier !== 1 && subservice.baseHours) {
-        updated.hours = Math.round(subservice.baseHours * multiplier * 100) / 100;
-        console.log(`    ➡️ Applied multiplier ${multiplier} to baseHours ${subservice.baseHours} = ${updated.hours}`);
-      }
+      // Calculate final hours: quantity × baseHours (with multiplier if applicable)
+      const baseHours = subservice.baseHours || subservice.hours || 0;
+      const finalHours = Math.round(quantity * baseHours * multiplier * 100) / 100;
+      updated.hours = finalHours;
+      console.log(`    💰 Final hours: ${quantity} × ${baseHours} × ${multiplier} = ${finalHours}h`);
       
       // Handle inclusion/exclusion
       if (!included) {
@@ -141,18 +141,35 @@ export class CalculationEngineV2 {
       // Simple quantity driver without rules
       updated.quantity = responseMap[subservice.quantityDriver] || 1;
       console.log(`    ➡️ Using quantityDriver ${subservice.quantityDriver}: ${updated.quantity}`);
+      
+      // Calculate final hours for quantity driver case
+      const baseHours = subservice.baseHours || subservice.hours || 0;
+      updated.hours = Math.round(updated.quantity * baseHours * 100) / 100;
+      console.log(`    💰 Final hours: ${updated.quantity} × ${baseHours} = ${updated.hours}h`);
+      
     } else {
       // Check if subservice has multiple scaling factors we can combine
       const combinedQuantity = this.calculateCombinedQuantity(subservice, responseMap);
       if (combinedQuantity > 1) {
         updated.quantity = combinedQuantity;
         console.log(`    ➕ Calculated combined quantity from scaling factors: ${combinedQuantity}`);
+        
+        // Calculate final hours for combined quantity case
+        const baseHours = subservice.baseHours || subservice.hours || 0;
+        updated.hours = Math.round(combinedQuantity * baseHours * 100) / 100;
+        console.log(`    💰 Final hours: ${combinedQuantity} × ${baseHours} = ${updated.hours}h`);
+        
       } else {
         // Ensure quantity is always set, even if no rules
         if (!updated.quantity) {
           updated.quantity = 1;
         }
         console.log(`    ⚠️ No calculation rules or quantity driver found, setting default quantity: ${updated.quantity}`);
+        
+        // For default case, hours = baseHours (no scaling)
+        const baseHours = subservice.baseHours || subservice.hours || 0;
+        updated.hours = baseHours;
+        console.log(`    💰 Default hours (no scaling): ${updated.hours}h`);
       }
     }
     
