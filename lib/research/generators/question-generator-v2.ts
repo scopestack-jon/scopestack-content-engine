@@ -229,7 +229,7 @@ export class QuestionGeneratorV2 {
       console.log(`✅ Generated specific question for ${factor} impacting ${impactedServices.length} services`);
     });
     
-    // Add context-specific questions based on research if needed
+    // Add context-specific questions based on research with systematic scaling factor coverage
     try {
       const contextQuestions = await this.generateContextSpecificQuestions(
         userRequest,
@@ -270,21 +270,42 @@ export class QuestionGeneratorV2 {
   ): Promise<Question[]> {
     const existingFactors = existingQuestions.map(q => q.mappingKey);
     
-    const prompt = `Based on research about "${userRequest}", generate 2-3 additional scoping questions that are NOT covered by these factors: ${existingFactors.join(', ')}
+    // Define systematic scaling factor types we want to ensure coverage for
+    const scalingTypes = [
+      { category: 'Scale/Volume', factors: ['user_count', 'mailbox_count', 'data_volume_gb', 'device_count'] },
+      { category: 'Complexity', factors: ['complexity', 'security_level', 'integration_complexity'] },  
+      { category: 'Geography/Distribution', factors: ['site_count', 'location_count', 'region_count'] },
+      { category: 'Integration/Dependencies', factors: ['integration_count', 'system_count', 'third_party_count'] },
+      { category: 'Support/Training', factors: ['admin_count', 'training_groups', 'support_level'] },
+      { category: 'Timeline/Approach', factors: ['migration_approach', 'downtime_tolerance', 'rollout_strategy'] }
+    ];
+    
+    // Find which scaling types are not yet covered
+    const uncoveredTypes = scalingTypes.filter(type => 
+      !type.factors.some(factor => existingFactors.includes(factor))
+    );
+    
+    const prompt = `Based on research about "${userRequest}", generate exactly 3-4 scoping questions that cover these UNCOVERED scaling dimensions:
+
+${uncoveredTypes.map(type => `${type.category}: ${type.factors.join(', ')}`).join('\n')}
 
 Research insights: ${researchData.keyInsights.slice(0, 3).join(', ')}
 
-Generate questions specific to ${userRequest} that would affect project scope.
+Requirements:
+1. Generate questions specific to "${userRequest}" using the research context
+2. Each question should target one of the uncovered scaling dimensions above
+3. Questions should be practical and affect project scope/effort
+4. Use appropriate question types (number for quantities, multiple_choice for complexity/approach)
 
 Return ONLY valid JSON array:
 [
   {
-    "text": "specific question text",
-    "type": "multiple_choice" or "number",
-    "options": ["option1", "option2"] (if multiple_choice),
-    "mappingKey": "unique_factor_name",
+    "text": "specific question about ${userRequest}",
+    "type": "multiple_choice" or "number", 
+    "options": ["option1", "option2", "option3"] (if multiple_choice),
+    "mappingKey": "factor_from_uncovered_list_above",
     "calculationType": "quantity" or "multiplier" or "include_exclude",
-    "defaultValue": "default value"
+    "defaultValue": "appropriate default"
   }
 ]`;
 
