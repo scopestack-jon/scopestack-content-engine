@@ -125,11 +125,13 @@ export class CalculationEngineV2 {
       updated.quantity = quantity;
       console.log(`    ➡️ Set quantity to: ${quantity}`);
       
-      // Calculate final hours: quantity × baseHours (with multiplier if applicable)
+      // Keep baseHours for unit display, but apply multiplier if needed
       const baseHours = subservice.baseHours || subservice.hours || 0;
-      const finalHours = Math.round(quantity * baseHours * multiplier * 100) / 100;
-      updated.hours = finalHours;
-      console.log(`    💰 Final hours: ${quantity} × ${baseHours} × ${multiplier} = ${finalHours}h`);
+      if (multiplier !== 1) {
+        updated.hours = Math.round(baseHours * multiplier * 100) / 100;
+        console.log(`    💰 Unit hours with multiplier: ${baseHours} × ${multiplier} = ${updated.hours}h per unit`);
+      }
+      console.log(`    📊 Quantity: ${quantity}, Unit Hours: ${updated.hours || baseHours}h`);
       
       // Handle inclusion/exclusion
       if (!included) {
@@ -142,10 +144,8 @@ export class CalculationEngineV2 {
       updated.quantity = responseMap[subservice.quantityDriver] || 1;
       console.log(`    ➡️ Using quantityDriver ${subservice.quantityDriver}: ${updated.quantity}`);
       
-      // Calculate final hours for quantity driver case
-      const baseHours = subservice.baseHours || subservice.hours || 0;
-      updated.hours = Math.round(updated.quantity * baseHours * 100) / 100;
-      console.log(`    💰 Final hours: ${updated.quantity} × ${baseHours} = ${updated.hours}h`);
+      // Keep unit hours for display (don't multiply by quantity here)
+      console.log(`    📊 Quantity: ${updated.quantity}, Unit Hours: ${subservice.baseHours || subservice.hours || 0}h`);
       
     } else {
       // Check if subservice has multiple scaling factors we can combine
@@ -154,10 +154,8 @@ export class CalculationEngineV2 {
         updated.quantity = combinedQuantity;
         console.log(`    ➕ Calculated combined quantity from scaling factors: ${combinedQuantity}`);
         
-        // Calculate final hours for combined quantity case
-        const baseHours = subservice.baseHours || subservice.hours || 0;
-        updated.hours = Math.round(combinedQuantity * baseHours * 100) / 100;
-        console.log(`    💰 Final hours: ${combinedQuantity} × ${baseHours} = ${updated.hours}h`);
+        // Keep unit hours for display
+        console.log(`    📊 Quantity: ${combinedQuantity}, Unit Hours: ${subservice.baseHours || subservice.hours || 0}h`);
         
       } else {
         // Ensure quantity is always set, even if no rules
@@ -165,11 +163,7 @@ export class CalculationEngineV2 {
           updated.quantity = 1;
         }
         console.log(`    ⚠️ No calculation rules or quantity driver found, setting default quantity: ${updated.quantity}`);
-        
-        // For default case, hours = baseHours (no scaling)
-        const baseHours = subservice.baseHours || subservice.hours || 0;
-        updated.hours = baseHours;
-        console.log(`    💰 Default hours (no scaling): ${updated.hours}h`);
+        console.log(`    📊 Quantity: ${updated.quantity}, Unit Hours: ${subservice.baseHours || subservice.hours || 0}h`);
       }
     }
     

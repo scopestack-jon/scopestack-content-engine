@@ -1837,7 +1837,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                                         <th className="text-left p-3 text-sm font-medium text-gray-700">Component</th>
                                         <th className="text-left p-3 text-sm font-medium text-gray-700">Description</th>
                                         <th className="text-center p-3 text-sm font-medium text-gray-700">Qty</th>
-                                        <th className="text-center p-3 text-sm font-medium text-gray-700">Hours</th>
+                                        <th className="text-center p-3 text-sm font-medium text-gray-700">Unit Hours</th>
                                         <th className="text-center p-3 text-sm font-medium text-gray-700">Mapping</th>
                                       </tr>
                                     </thead>
@@ -1865,24 +1865,21 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON o
                                             <div className="flex items-center justify-center gap-2">
                                               <Badge variant="outline" size="sm">
                                                 {(() => {
-                                                  // Calculate actual hours: quantity × baseHours
-                                                  const quantity = sub.quantity || 1;
+                                                  // Show unit hours (AI estimate per unit)
                                                   const baseHours = sub.baseHours || sub.hours || 0;
-                                                  const totalHours = Math.round((quantity * baseHours) * 100) / 100;
                                                   
-                                                  // Debug logging for quantity display
+                                                  // Debug logging for unit hours display
                                                   if (sub.name && (sub.quantity > 1 || !sub.quantity)) {
                                                     console.log(`📊 ${sub.name}:`, {
                                                       quantity: sub.quantity,
-                                                      baseHours: sub.baseHours,
-                                                      hours: sub.hours,
-                                                      totalHours,
+                                                      unitHours: baseHours,
+                                                      totalEstimate: (sub.quantity || 1) * baseHours,
                                                       hasCalculationRules: !!sub.calculationRules,
                                                       hasQuantityDriver: !!sub.quantityDriver
                                                     });
                                                   }
                                                   
-                                                  return totalHours > 0 ? `${totalHours}h` : 'TBD';
+                                                  return baseHours > 0 ? `${baseHours}h` : 'TBD';
                                                 })()}
                                               </Badge>
                                               {sub.baseHours && sub.quantity && sub.quantity !== 1 && (
