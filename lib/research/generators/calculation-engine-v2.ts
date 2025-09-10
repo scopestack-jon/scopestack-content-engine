@@ -142,11 +142,18 @@ export class CalculationEngineV2 {
       updated.quantity = responseMap[subservice.quantityDriver] || 1;
       console.log(`    ➡️ Using quantityDriver ${subservice.quantityDriver}: ${updated.quantity}`);
     } else {
-      // Ensure quantity is always set, even if no rules
-      if (!updated.quantity) {
-        updated.quantity = 1;
+      // Check if subservice has multiple scaling factors we can combine
+      const combinedQuantity = this.calculateCombinedQuantity(subservice, responseMap);
+      if (combinedQuantity > 1) {
+        updated.quantity = combinedQuantity;
+        console.log(`    ➕ Calculated combined quantity from scaling factors: ${combinedQuantity}`);
+      } else {
+        // Ensure quantity is always set, even if no rules
+        if (!updated.quantity) {
+          updated.quantity = 1;
+        }
+        console.log(`    ⚠️ No calculation rules or quantity driver found, setting default quantity: ${updated.quantity}`);
       }
-      console.log(`    ⚠️ No calculation rules or quantity driver found, setting default quantity: ${updated.quantity}`);
     }
     
     // Update mapped questions
@@ -235,6 +242,46 @@ export class CalculationEngineV2 {
       }
       return 1;
     }
+  }
+
+  /**
+   * Calculate combined quantity from multiple scaling factors
+   */
+  private calculateCombinedQuantity(
+    subservice: any,
+    responseMap: Record<string, any>
+  ): number {
+    const scalingFactors = subservice.scalingFactors || [];
+    
+    if (scalingFactors.length === 0) {
+      return 1;
+    }
+    
+    console.log(`    🔢 Combining ${scalingFactors.length} scaling factors for ${subservice.name}:`, scalingFactors);
+    
+    let combinedQuantity = 0;
+    let factorsUsed = 0;
+    
+    scalingFactors.forEach((factor: string) => {
+      const value = responseMap[factor];
+      if (value !== undefined && value !== null) {
+        // Convert to number if it's a string number
+        const numValue = typeof value === 'number' ? value : 
+                        (typeof value === 'string' && !isNaN(Number(value))) ? Number(value) : 0;
+        
+        if (numValue > 0) {
+          // Add scaling factors together for combined impact
+          // Example: "100 users + 4 sites" = 104 total scaling units
+          combinedQuantity += numValue;
+          factorsUsed++;
+          console.log(`      ➕ ${factor}: ${numValue} (total so far: ${combinedQuantity})`);
+        }
+      }
+    });
+    
+    console.log(`    🎯 Added ${factorsUsed} factors together: ${combinedQuantity}`);
+    
+    return Math.max(combinedQuantity, 1);
   }
 
   /**
