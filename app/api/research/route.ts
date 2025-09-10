@@ -55,9 +55,11 @@ export async function POST(request: NextRequest) {
     
     // Use v2 orchestrator if enabled
     const useV2 = useV2Orchestration();
+    console.log(`🔧 DEBUG: useV2Orchestration() returned: ${useV2}`);
     console.log(`📌 Using ${useV2 ? 'V2 (service-first)' : 'V1 (legacy)'} orchestrator`);
     
     const orchestrator = useV2 ? getResearchOrchestratorV2() : getResearchOrchestrator();
+    console.log(`🔧 DEBUG: Orchestrator instance type: ${orchestrator.constructor.name}`);
     
     // Validate request
     const validation = orchestrator.validateRequest(userRequest);
