@@ -29,12 +29,18 @@ Research Context: ${researchContext.summary}
 Key Insights: ${researchContext.insights.slice(0, 3).join(', ')}
 
 Requirements:
-1. Generate EXACTLY 5 services, one for each PMBOK phase:
-   - Initiation Phase: Requirements gathering, stakeholder analysis
-   - Planning Phase: Architecture design, project planning
-   - Execution Phase: Implementation, deployment, configuration
-   - Monitoring Phase: Testing, quality assurance, performance monitoring
-   - Closing Phase: Knowledge transfer, documentation, handover
+1. Generate EXACTLY 5 services, one for each PMBOK phase with rich scope language:
+   - Initiation Phase: Requirements gathering, stakeholder analysis, current state assessment
+   - Planning Phase: Architecture design, project planning, detailed technical specifications
+   - Execution Phase: Implementation, deployment, configuration, data migration
+   - Monitoring Phase: Testing, quality assurance, performance monitoring, validation
+   - Closing Phase: Knowledge transfer, documentation, handover, project sign-off
+
+Each subservice should include professional scope language based on the research insights:
+- Use specific ${technology} terminology from the research
+- Include deliverables, activities, assumptions, and exclusions
+- Reference industry best practices found in the research
+- Mention compliance, security, or performance considerations when relevant
 
 2. Each service MUST include:
    - id: Unique identifier (e.g., "svc_init_001")
@@ -50,7 +56,8 @@ Requirements:
 3. Each subservice MUST include:
    - id: Unique identifier (e.g., "sub_init_001")
    - name: Subservice name
-   - description: Brief description
+   - description: Brief description with scope language explaining what's included
+   - scope: Detailed scope statement explaining deliverables, activities, and boundaries
    - hours: Estimated hours
    - baseHours: Base hours per unit
    - scalingFactors: Array of factors that scale this subservice

@@ -247,7 +247,9 @@ export class QuestionGeneratorV2 {
           id: `q_${questionId++}`,
           question: cq.text || cq.question, // Ensure question field is set
           impacts: impacted,
-          slug: cq.slug || this.generateSlug(cq.text || cq.question || '')
+          slug: cq.slug || this.generateSlug(cq.text || cq.question || ''),
+          scopeImpact: cq.scopeImpact || '', // Add scope impact description
+          required: true
         });
       });
       
@@ -260,7 +262,7 @@ export class QuestionGeneratorV2 {
   }
 
   /**
-   * Generate additional context-specific questions based on research
+   * Generate additional context-specific questions based on research using V1-style AI approach
    */
   private async generateContextSpecificQuestions(
     userRequest: string,
@@ -269,6 +271,7 @@ export class QuestionGeneratorV2 {
     existingQuestions: Question[]
   ): Promise<Question[]> {
     const existingFactors = existingQuestions.map(q => q.mappingKey);
+    const technology = extractTechnologyName(userRequest);
     
     // Define systematic scaling factor types we want to ensure coverage for
     const scalingTypes = [
@@ -284,30 +287,55 @@ export class QuestionGeneratorV2 {
     const uncoveredTypes = scalingTypes.filter(type => 
       !type.factors.some(factor => existingFactors.includes(factor))
     );
-    
-    const prompt = `Based on research about "${userRequest}", generate exactly 3-4 scoping questions that cover these UNCOVERED scaling dimensions:
 
-${uncoveredTypes.map(type => `${type.category}: ${type.factors.join(', ')}`).join('\n')}
+    // Enhanced V1-style prompt with research context and scope language
+    const prompt = `Based on this research about "${userRequest}", generate 4-6 specific, actionable questions that would help scope a professional services project, focusing on these scaling dimensions: ${uncoveredTypes.map(t => t.category).join(', ')}.
 
-Research insights: ${researchData.keyInsights.slice(0, 3).join(', ')}
+Research Context:
+- User Request: ${userRequest}
+- Technology: ${technology}
+- Research Summary: ${researchData.researchSummary || ''}
+- Key Insights: ${researchData.keyInsights.slice(0, 4).join(', ')}
+- Source Topics: ${researchData.sources.map(s => s.title).slice(0, 3).join(', ')}
 
-Requirements:
-1. Generate questions specific to "${userRequest}" using the research context
-2. Each question should target one of the uncovered scaling dimensions above
-3. Questions should be practical and affect project scope/effort
-4. Use appropriate question types (number for quantities, multiple_choice for complexity/approach)
+Scaling Factor Requirements:
+${uncoveredTypes.map(type => `${type.category}: Use factors like ${type.factors.join(', ')}`).join('\n')}
 
-Return ONLY valid JSON array:
+Generate questions that are:
+1. Specific to ${technology} and based on the actual research findings above
+2. Practical for professional services scoping with rich scope language
+3. Include business context and technical considerations from research
+4. Target the uncovered scaling dimensions above
+5. Mix of multiple choice (for decisions/complexity) AND numerical (for quantities)
+
+QUESTION TYPES & EXAMPLES:
+- Number: "How many ${technology} users need to be migrated?", "What is the total data volume in GB?", "How many sites require deployment?"  
+- Multiple choice: "What is the ${technology} implementation complexity level?", "What migration approach do you prefer?", "What security level is required?"
+
+Each question should include scope language explaining WHY it matters for the project.
+
+Return ONLY a JSON array of questions in this exact format:
 [
   {
-    "text": "specific question about ${userRequest}",
-    "type": "multiple_choice" or "number", 
-    "options": ["option1", "option2", "option3"] (if multiple_choice),
-    "mappingKey": "factor_from_uncovered_list_above",
-    "calculationType": "quantity" or "multiplier" or "include_exclude",
-    "defaultValue": "appropriate default"
+    "text": "How many users will be migrated to the ${technology} system?",
+    "type": "number",
+    "mappingKey": "user_count", 
+    "calculationType": "quantity",
+    "defaultValue": 100,
+    "scopeImpact": "User count directly affects migration duration, training requirements, and license provisioning"
+  },
+  {
+    "text": "What is the ${technology} implementation complexity level?",
+    "type": "multiple_choice",
+    "options": ["Basic - Standard configuration", "Intermediate - Some customization", "Advanced - Extensive customization"], 
+    "mappingKey": "complexity",
+    "calculationType": "multiplier", 
+    "defaultValue": "Intermediate - Some customization",
+    "scopeImpact": "Complexity affects configuration time, testing requirements, and integration effort"
   }
-]`;
+]
+
+NO markdown, NO explanations, ONLY the JSON array.`;
 
     try {
       console.log('🔍 Question Generator V2 - Calling AI for context questions...');

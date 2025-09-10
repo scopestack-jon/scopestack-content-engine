@@ -75,6 +75,7 @@ export interface Question {
   calculationType?: 'quantity' | 'multiplier' | 'include_exclude';
   mappingKey?: string;          // Standardized key e.g., "user_count", "complexity"
   defaultValue?: any;           // Default value if not answered
+  scopeImpact?: string;         // Description of how this affects project scope
 }
 
 export interface Calculation {
