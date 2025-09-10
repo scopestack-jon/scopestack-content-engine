@@ -101,6 +101,12 @@ export class CalculationEngineV2 {
   private calculateSubservice(subservice: any, responseMap: Record<string, any>): any {
     const updated = { ...subservice };
     
+    console.log(`    📋 Processing subservice: ${subservice.name}`);
+    console.log(`    📋 Has calculationRules: ${!!subservice.calculationRules}`);
+    console.log(`    📋 CalculationRules:`, subservice.calculationRules);
+    console.log(`    📋 Has quantityDriver: ${!!subservice.quantityDriver}`);
+    console.log(`    📋 QuantityDriver:`, subservice.quantityDriver);
+    
     if (subservice.calculationRules) {
       const { quantity, multiplier, included } = this.evaluateRules(
         subservice.calculationRules,
@@ -110,20 +116,26 @@ export class CalculationEngineV2 {
       
       // Apply quantity
       updated.quantity = quantity;
+      console.log(`    ➡️ Set quantity to: ${quantity}`);
       
       // Apply multiplier to base hours
       if (multiplier !== 1 && subservice.baseHours) {
         updated.hours = Math.round(subservice.baseHours * multiplier * 100) / 100;
+        console.log(`    ➡️ Applied multiplier ${multiplier} to baseHours ${subservice.baseHours} = ${updated.hours}`);
       }
       
       // Handle inclusion/exclusion
       if (!included) {
         updated.quantity = 0;
         updated.hours = 0;
+        console.log(`    ❌ Service excluded, set quantity and hours to 0`);
       }
     } else if (subservice.quantityDriver) {
       // Simple quantity driver without rules
       updated.quantity = responseMap[subservice.quantityDriver] || 1;
+      console.log(`    ➡️ Using quantityDriver ${subservice.quantityDriver}: ${updated.quantity}`);
+    } else {
+      console.log(`    ⚠️ No calculation rules or quantity driver found, keeping default quantity: ${updated.quantity || 1}`);
     }
     
     // Update mapped questions

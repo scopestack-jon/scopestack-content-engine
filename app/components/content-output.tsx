@@ -146,7 +146,11 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
     
     if (useV2) {
       // Use V2 calculation engine with explicit mapping
+      console.log('🔧🔧🔧 USING V2 CALCULATION ENGINE IN UI 🔧🔧🔧')
       console.log('🔧 Using V2 calculation engine for question responses')
+      console.log('📊 Question responses:', Object.fromEntries(questionResponses))
+      console.log('📊 Content services count:', content.services?.length)
+      console.log('📊 Content questions count:', content.questions?.length)
       try {
         const calculationEngine = getCalculationEngineV2()
         
@@ -156,6 +160,7 @@ export function ContentOutput({ content, setContent }: ContentOutputProps) {
           responsesObject[key] = value
         })
         
+        console.log('📊 Calling V2 calculation engine with responses:', responsesObject)
         const updatedServices = calculationEngine.applyResponsesToServices(
           content.services,
           content.questions,
