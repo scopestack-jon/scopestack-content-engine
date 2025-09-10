@@ -206,27 +206,27 @@ export class QuestionGeneratorV2 {
     const questions: Question[] = [];
     let questionId = 1;
     
-    // Generate questions for each scaling factor with technology context
-    scalingFactors.forEach(factor => {
-      const template = this.getQuestionTemplateForFactor(factor, technology, researchData, services);
-      const impactedServices = this.findImpactedServices(factor, services);
-      
-      const question: Question = {
+    // Generate AI-driven questions for scaling factors instead of using templates
+    const scalingFactorQuestions = await this.generateAIQuestionsForFactors(
+      Array.from(scalingFactors),
+      technology,
+      researchData,
+      services,
+      userRequest
+    );
+    
+    // Add scaling factor questions with proper mapping
+    scalingFactorQuestions.forEach(q => {
+      const impactedServices = this.findImpactedServices(q.mappingKey || '', services);
+      questions.push({
+        ...q,
         id: `q_${questionId++}`,
-        text: template.text,
-        question: template.text, // Set both for UI compatibility
-        type: template.type,
-        options: template.options,
-        required: true,
+        question: q.text || q.question,
         impacts: impactedServices,
-        calculationType: template.calculationType,
-        mappingKey: factor,
-        defaultValue: template.defaultValue,
-        slug: factor // Use factor as slug for easy mapping
-      };
-      
-      questions.push(question);
-      console.log(`✅ Generated specific question for ${factor} impacting ${impactedServices.length} services`);
+        slug: q.mappingKey || this.generateSlug(q.text || ''),
+        required: true
+      });
+      console.log(`✅ Generated AI question for ${q.mappingKey} impacting ${impactedServices.length} services`);
     });
     
     // Add context-specific questions based on research with systematic scaling factor coverage
@@ -259,6 +259,83 @@ export class QuestionGeneratorV2 {
     
     console.log(`📝 Generated ${questions.length} questions with explicit service mappings`);
     return questions;
+  }
+
+  /**
+   * Generate AI-driven questions for specific scaling factors
+   */
+  private async generateAIQuestionsForFactors(
+    scalingFactors: string[],
+    technology: string,
+    researchData: ResearchData,
+    services: Service[],
+    userRequest: string
+  ): Promise<Question[]> {
+    if (scalingFactors.length === 0) {
+      return [];
+    }
+
+    const prompt = `Based on this research about "${userRequest}", generate specific, research-driven questions for these scaling factors: ${scalingFactors.join(', ')}.
+
+Research Context:
+- User Request: ${userRequest}
+- Technology: ${technology}
+- Research Summary: ${researchData.researchSummary || ''}
+- Key Insights: ${researchData.keyInsights.slice(0, 4).join(', ')}
+- Source Topics: ${researchData.sources.map(s => s.title).slice(0, 3).join(', ')}
+
+Generate ONE question for EACH of these scaling factors: ${scalingFactors.join(', ')}
+
+Requirements:
+1. Each question must be specific to ${technology} and based on the research insights above
+2. Use professional scope language explaining why it affects project effort
+3. Include business context and technical considerations from research
+4. Make questions practical for professional services scoping
+
+Question Types:
+- For volume factors (like user_count, mailbox_count): Use "number" type
+- For complexity factors (like complexity, security_level): Use "multiple_choice" type
+- For count factors (like site_count, integration_count): Use "number" type
+
+Return ONLY a JSON array with exactly ${scalingFactors.length} questions in this format:
+[
+  {
+    "text": "How many users will be migrated to the ${technology} system?",
+    "type": "number",
+    "mappingKey": "user_count", 
+    "calculationType": "quantity",
+    "defaultValue": 100,
+    "scopeImpact": "User count directly affects migration duration, training requirements, and license provisioning effort"
+  }
+]
+
+NO markdown, NO explanations, ONLY the JSON array with exactly ${scalingFactors.length} questions.`;
+
+    try {
+      console.log('🔍 Generating AI questions for scaling factors:', scalingFactors);
+      
+      const response = await this.client.generateWithTimeout(
+        prompt,
+        30000,
+        'anthropic/claude-3.5-sonnet'
+      );
+      
+      console.log('📝 AI scaling factor response length:', response.length);
+      
+      const cleaned = response.replace(/```json|```/g, '').trim();
+      
+      if (!cleaned) {
+        console.error('❌ Empty response from AI for scaling factors');
+        return [];
+      }
+      
+      const questions = JSON.parse(cleaned);
+      console.log('✅ Successfully parsed', questions.length, 'scaling factor questions');
+      return questions;
+    } catch (error) {
+      console.error('❌ Failed to generate AI scaling factor questions:', error);
+      return [];
+    }
   }
 
   /**
