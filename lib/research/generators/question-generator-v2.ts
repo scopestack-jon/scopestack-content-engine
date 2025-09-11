@@ -28,6 +28,46 @@ export class QuestionGeneratorV2 {
   }
 
   /**
+   * Prioritize scaling factors based on how many services they impact
+   */
+  private prioritizeScalingFactors(scalingFactors: string[], services: Service[]): string[] {
+    const factorImpactCount = new Map<string, number>();
+    
+    // Count how many services/subservices each factor impacts
+    scalingFactors.forEach(factor => {
+      let count = 0;
+      services.forEach(service => {
+        if (service.scalingFactors?.includes(factor) || service.quantityDriver === factor) {
+          count++;
+        }
+        service.subservices?.forEach(sub => {
+          if (sub.scalingFactors?.includes(factor) || sub.quantityDriver === factor) {
+            count++;
+          }
+        });
+      });
+      factorImpactCount.set(factor, count);
+    });
+    
+    // Sort by impact count (descending) and prioritize core factors
+    const coreFactors = ['user_count', 'complexity', 'site_count', 'integration_count'];
+    
+    return scalingFactors.sort((a, b) => {
+      // Prioritize core factors first
+      const aIsCore = coreFactors.includes(a);
+      const bIsCore = coreFactors.includes(b);
+      
+      if (aIsCore && !bIsCore) return -1;
+      if (!aIsCore && bIsCore) return 1;
+      
+      // Then sort by impact count
+      const aCount = factorImpactCount.get(a) || 0;
+      const bCount = factorImpactCount.get(b) || 0;
+      return bCount - aCount;
+    });
+  }
+
+  /**
    * Map scaling factors to question types and formats with context
    */
   private getQuestionTemplateForFactor(
@@ -206,55 +246,73 @@ export class QuestionGeneratorV2 {
     const questions: Question[] = [];
     let questionId = 1;
     
-    // Generate AI-driven questions for scaling factors instead of using templates
+    // Prioritize scaling factors to focus on most important ones
+    const prioritizedFactors = this.prioritizeScalingFactors(Array.from(scalingFactors), services);
+    const primaryFactors = prioritizedFactors.slice(0, 6); // Limit to 6 primary factors max
+    
+    console.log(`📊 Prioritized ${primaryFactors.length} primary scaling factors:`, primaryFactors);
+    
+    // Generate AI-driven questions for primary scaling factors only
     const scalingFactorQuestions = await this.generateAIQuestionsForFactors(
-      Array.from(scalingFactors),
+      primaryFactors,
       technology,
       researchData,
       services,
       userRequest
     );
     
-    // Add scaling factor questions with proper mapping
-    scalingFactorQuestions.forEach(q => {
-      const impactedServices = this.findImpactedServices(q.mappingKey || '', services);
-      questions.push({
-        ...q,
-        id: `q_${questionId++}`,
-        question: q.text || q.question,
-        impacts: impactedServices,
-        slug: q.mappingKey || this.generateSlug(q.text || ''),
-        required: true
-      });
-      console.log(`✅ Generated AI question for ${q.mappingKey} impacting ${impactedServices.length} services`);
-    });
+    // Track used mapping keys to prevent duplicates
+    const usedMappingKeys = new Set<string>();
     
-    // Add context-specific questions based on research with systematic scaling factor coverage
-    try {
-      const contextQuestions = await this.generateContextSpecificQuestions(
-        userRequest,
-        researchData,
-        services,
-        questions
-      );
-      
-      // Add context questions with proper mapping
-      contextQuestions.forEach(cq => {
-        // Find which services might be impacted based on question content
-        const impacted = this.inferImpactedServices(cq.text, services);
+    // Add scaling factor questions with proper mapping and deduplication
+    scalingFactorQuestions.forEach(q => {
+      if (q.mappingKey && !usedMappingKeys.has(q.mappingKey)) {
+        usedMappingKeys.add(q.mappingKey);
+        const impactedServices = this.findImpactedServices(q.mappingKey, services);
         questions.push({
-          ...cq,
+          ...q,
           id: `q_${questionId++}`,
-          question: cq.text || cq.question, // Ensure question field is set
-          impacts: impacted,
-          slug: cq.slug || this.generateSlug(cq.text || cq.question || ''),
-          scopeImpact: cq.scopeImpact || '', // Add scope impact description
+          question: q.text || q.question,
+          impacts: impactedServices,
+          slug: q.mappingKey || this.generateSlug(q.text || ''),
           required: true
         });
-      });
-      
-    } catch (error) {
-      console.warn('Could not generate context-specific questions:', error);
+        console.log(`✅ Generated AI question for ${q.mappingKey} impacting ${impactedServices.length} services`);
+      }
+    });
+    
+    // Add context-specific questions only if we have fewer than 8 questions
+    if (questions.length < 8) {
+      try {
+        const maxContextQuestions = Math.min(3, 10 - questions.length); // Max 3 context questions, total cap at 10
+        const contextQuestions = await this.generateContextSpecificQuestions(
+          userRequest,
+          researchData,
+          services,
+          questions,
+          maxContextQuestions
+        );
+        
+        // Add context questions with deduplication
+        contextQuestions.forEach(cq => {
+          if (cq.mappingKey && !usedMappingKeys.has(cq.mappingKey) && questions.length < 10) {
+            usedMappingKeys.add(cq.mappingKey);
+            const impacted = this.inferImpactedServices(cq.text, services);
+            questions.push({
+              ...cq,
+              id: `q_${questionId++}`,
+              question: cq.text || cq.question,
+              impacts: impacted,
+              slug: cq.slug || this.generateSlug(cq.text || cq.question || ''),
+              scopeImpact: cq.scopeImpact || '',
+              required: true
+            });
+          }
+        });
+        
+      } catch (error) {
+        console.warn('Could not generate context-specific questions:', error);
+      }
     }
     
     console.log(`📝 Generated ${questions.length} questions with explicit service mappings`);
@@ -345,7 +403,8 @@ NO markdown, NO explanations, ONLY the JSON array with exactly ${scalingFactors.
     userRequest: string,
     researchData: ResearchData,
     services: Service[],
-    existingQuestions: Question[]
+    existingQuestions: Question[],
+    maxQuestions: number = 3
   ): Promise<Question[]> {
     const existingFactors = existingQuestions.map(q => q.mappingKey);
     const technology = extractTechnologyName(userRequest);
@@ -366,7 +425,7 @@ NO markdown, NO explanations, ONLY the JSON array with exactly ${scalingFactors.
     );
 
     // Enhanced V1-style prompt with research context and scope language
-    const prompt = `Based on this research about "${userRequest}", generate 4-6 specific, actionable questions that would help scope a professional services project, focusing on these scaling dimensions: ${uncoveredTypes.map(t => t.category).join(', ')}.
+    const prompt = `Based on this research about "${userRequest}", generate exactly ${maxQuestions} specific, actionable questions that would help scope a professional services project, focusing on these scaling dimensions: ${uncoveredTypes.map(t => t.category).join(', ')}.
 
 Research Context:
 - User Request: ${userRequest}
